@@ -1,0 +1,22 @@
+{
+  "name": "mindspace-hr-portal",
+  "private": true,
+  "description": "Mindspace Artificial Intelligence Inc. HR and payroll portal",
+  "workspaces": [
+    "apps/api",
+    "apps/web"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev -w apps/api",
+    "dev:web": "npm run dev -w apps/web",
+    "db:migrate": "npm run prisma:migrate -w apps/api",
+    "db:seed": "npm run prisma:seed -w apps/api",
+    "db:test:setup": "DATABASE_URL=${TEST_DATABASE_URL:-postgresql://hr:hr@localhost:5432/hrportal_test} npm run prisma:migrate -w apps/api",
+    "test": "npm test -w apps/api",
+    "typecheck": "npm run typecheck -w apps/api",
+    "build": "npm run build -w apps/api && npm run build -w apps/web"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}
