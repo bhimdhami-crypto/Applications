@@ -121,7 +121,13 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
     body: init.body === undefined ? undefined : JSON.stringify(init.body),
   });
   const text = await res.text();
-  const data = text ? JSON.parse(text) : null;
+  let data;
+  try {
+    data = text ? JSON.parse(text) : null;
+  } catch {
+    // Not JSON: the website could not reach the API server (stopped, restarting or unreachable).
+    throw new ApiError(res.status, 'The portal server is not responding. Check that "npm run dev:api" is running, then try again.');
+  }
   if (!res.ok) {
     const msg = Array.isArray(data?.message) ? data.message.join(', ') : (data?.message ?? res.statusText);
     if (res.status === 401 && token) setToken(null);
