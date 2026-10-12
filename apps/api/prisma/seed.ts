@@ -9,10 +9,10 @@ const COMPANIES = [
   { code: 'MSA-UG', name: 'Mindspace Artificial Intelligence Uganda Ltd', country: 'Uganda', countryCode: 'UG', currency: 'UGX' },
   { code: 'MSA-TZ', name: 'Mindspace Artificial Intelligence Tanzania Ltd', country: 'Tanzania', countryCode: 'TZ', currency: 'TZS' },
   { code: 'MSA-ZA', name: 'Mindspace Artificial Intelligence South Africa (Pty) Ltd', country: 'South Africa', countryCode: 'ZA', currency: 'ZAR' },
-  { code: 'MSA-EG', name: 'Mindspace Artificial Intelligence Egypt LLC', country: 'Egypt', countryCode: 'EG', currency: 'EGP' },
+  { code: 'MSA-EG', name: 'Mindspace Artificial Intelligence Egypt S.A.E.', country: 'Egypt', countryCode: 'EG', currency: 'EGP' },
   { code: 'MSA-NG', name: 'Mindspace Artificial Intelligence Nigeria Ltd', country: 'Nigeria', countryCode: 'NG', currency: 'NGN' },
-  { code: 'MSA-MX', name: 'Mindspace Artificial Intelligence México S. de R.L. de C.V.', country: 'Mexico', countryCode: 'MX', currency: 'MXN' },
-  { code: 'MSA-NZ', name: 'Mindspace Artificial Intelligence New Zealand Ltd', country: 'New Zealand', countryCode: 'NZ', currency: 'NZD' },
+  { code: 'MSA-MX', name: 'Mindspace Inteligencia Artificial Mexico S. de R.L. de C.V.', country: 'Mexico', countryCode: 'MX', currency: 'MXN' },
+  { code: 'MSA-NZ', name: 'Mindspace Artificial Intelligence NZ Limited', country: 'New Zealand', countryCode: 'NZ', currency: 'NZD' },
 ];
 
 type SeedPerson = {
@@ -29,6 +29,10 @@ type SeedPerson = {
     monthlyBasic: number;
     monthlyAllowances: number;
     reportsTo?: string;
+    gender: string;
+    dateOfBirth: string;
+    mobilePhone: string;
+    nextOfKin: { name: string; relationship: string; phone: string };
   };
 };
 
@@ -38,27 +42,27 @@ const PEOPLE: SeedPerson[] = [
   {
     email: 'hr@mindspace-ai.test',
     role: Role.HR,
-    employee: { employeeNo: 'MSA-KE-000001', firstName: 'Wanjiru', lastName: 'Kamau', jobTitle: 'HR Business Partner', department: 'People', workLocation: WorkLocation.ON_SITE, hireDate: '2019-03-04', monthlyBasic: 180000, monthlyAllowances: 20000 },
+    employee: { employeeNo: 'MSA-KE-T00001', firstName: 'Wanjiru', lastName: 'Kamau', jobTitle: 'HR Business Partner', department: 'People', workLocation: WorkLocation.ON_SITE, hireDate: '2019-03-04', monthlyBasic: 180000, monthlyAllowances: 20000, gender: 'Female', dateOfBirth: '1987-06-14', mobilePhone: '+254 722 100 001', nextOfKin: { name: 'Peter Kamau', relationship: 'Spouse', phone: '+254 733 200 001' } },
   },
   {
     email: 'payroll@mindspace-ai.test',
     role: Role.PAYROLL,
-    employee: { employeeNo: 'MSA-KE-000002', firstName: 'Brian', lastName: 'Otieno', jobTitle: 'Payroll Specialist', department: 'Finance', workLocation: WorkLocation.HYBRID, hireDate: '2020-07-01', monthlyBasic: 150000, monthlyAllowances: 15000 },
+    employee: { employeeNo: 'MSA-KE-T00002', firstName: 'Brian', lastName: 'Otieno', jobTitle: 'Payroll Specialist', department: 'Finance', workLocation: WorkLocation.HYBRID, hireDate: '2020-07-01', monthlyBasic: 150000, monthlyAllowances: 15000, gender: 'Male', dateOfBirth: '1991-02-03', mobilePhone: '+254 722 100 002', nextOfKin: { name: 'Grace Otieno', relationship: 'Mother', phone: '+254 733 200 002' } },
   },
   {
     email: 'manager@mindspace-ai.test',
     role: Role.MANAGER,
-    employee: { employeeNo: 'MSA-KE-000003', firstName: 'Amina', lastName: 'Hassan', jobTitle: 'Engineering Manager', department: 'Engineering', workLocation: WorkLocation.HYBRID, hireDate: '2018-01-15', monthlyBasic: 420000, monthlyAllowances: 50000 },
+    employee: { employeeNo: 'MSA-KE-T00003', firstName: 'Amina', lastName: 'Hassan', jobTitle: 'Engineering Manager', department: 'Engineering', workLocation: WorkLocation.HYBRID, hireDate: '2018-01-15', monthlyBasic: 420000, monthlyAllowances: 50000, gender: 'Female', dateOfBirth: '1984-11-22', mobilePhone: '+254 722 100 003', nextOfKin: { name: 'Yusuf Hassan', relationship: 'Brother', phone: '+254 733 200 003' } },
   },
   {
     email: 'developer@mindspace-ai.test',
     role: Role.EMPLOYEE,
-    employee: { employeeNo: 'MSA-KE-000004', firstName: 'Kevin', lastName: 'Mwangi', jobTitle: 'Software Engineer', department: 'Engineering', workLocation: WorkLocation.FULLY_REMOTE, hireDate: '2022-09-05', monthlyBasic: 230000, monthlyAllowances: 10000, reportsTo: 'manager@mindspace-ai.test' },
+    employee: { employeeNo: 'MSA-KE-T00004', firstName: 'Kevin', lastName: 'Mwangi', jobTitle: 'Software Engineer', department: 'Engineering', workLocation: WorkLocation.FULLY_REMOTE, hireDate: '2022-09-05', monthlyBasic: 230000, monthlyAllowances: 10000, gender: 'Male', dateOfBirth: '1996-04-09', mobilePhone: '+254 722 100 004', nextOfKin: { name: 'Mary Mwangi', relationship: 'Sister', phone: '+254 733 200 004' }, reportsTo: 'manager@mindspace-ai.test' },
   },
   {
     email: 'tester@mindspace-ai.test',
     role: Role.EMPLOYEE,
-    employee: { employeeNo: 'MSA-KE-000005', firstName: 'Faith', lastName: 'Njeri', jobTitle: 'QA Engineer', department: 'Engineering', workLocation: WorkLocation.ON_SITE, hireDate: '2023-02-13', monthlyBasic: 120000, monthlyAllowances: 8000, reportsTo: 'manager@mindspace-ai.test' },
+    employee: { employeeNo: 'MSA-KE-T00005', firstName: 'Faith', lastName: 'Njeri', jobTitle: 'QA Engineer', department: 'Engineering', workLocation: WorkLocation.ON_SITE, hireDate: '2023-02-13', monthlyBasic: 120000, monthlyAllowances: 8000, gender: 'Female', dateOfBirth: '1998-08-30', mobilePhone: '+254 722 100 005', nextOfKin: { name: 'John Njeri', relationship: 'Father', phone: '+254 733 200 005' }, reportsTo: 'manager@mindspace-ai.test' },
   },
 ];
 
@@ -85,15 +89,22 @@ export async function seed(prisma: PrismaClient) {
       create: { email: p.email, role: p.role, passwordHash },
     });
     if (!p.employee) continue;
-    const { reportsTo, hireDate, ...e } = p.employee;
+    const { reportsTo, hireDate, dateOfBirth, nextOfKin, ...e } = p.employee;
     const data = {
       ...e,
       hireDate: new Date(`${hireDate}T00:00:00Z`),
+      dateOfBirth: new Date(`${dateOfBirth}T00:00:00Z`),
+      workEmail: p.email,
+      nationalIdNumber: `SPECIMEN-KE-${e.employeeNo.slice(-5)}`,
       companyId: kenya.id,
       userId: user.id,
       managerId: reportsTo ? employeeIdByEmail.get(reportsTo) ?? null : null,
     };
-    const emp = await prisma.employee.upsert({ where: { employeeNo: e.employeeNo }, update: data, create: data });
+    // Keyed by login so re-seeding a database seeded with the old MSA-KE-00000x numbers renumbers them
+    const emp = await prisma.employee.upsert({ where: { userId: user.id }, update: data, create: data });
+    if ((await prisma.nextOfKin.count({ where: { employeeId: emp.id } })) === 0) {
+      await prisma.nextOfKin.create({ data: { ...nextOfKin, employeeId: emp.id, isEmergencyContact: true, isBeneficiary: true } });
+    }
     employeeIdByEmail.set(p.email, emp.id);
   }
 

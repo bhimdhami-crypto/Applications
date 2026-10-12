@@ -11,7 +11,8 @@
     "prisma:seed": "ts-node prisma/seed.ts",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "jest --runInBand",
-    "postinstall": "prisma generate"
+    "postinstall": "prisma generate",
+    "prisma:import-sample": "ts-node prisma/import-sample.ts"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
@@ -36,6 +37,7 @@
     "@nestjs/testing": "11.1.29",
     "@types/express": "5.0.3",
     "@types/jest": "29.5.14",
+    "@types/multer": "1.4.12",
     "@types/node": "22.15.0",
     "@types/nodemailer": "6.4.24",
     "@types/supertest": "6.0.3",

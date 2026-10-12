@@ -2,7 +2,10 @@
 
 HR and payroll portal for **Mindspace Artificial Intelligence Inc.** and its subsidiaries in Kenya, Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand.
 
-This is milestone 1: secure sign-in, employee records, and the month-end payroll run with payslips. Kenya is the first country with payroll rules; the other countries come next.
+Done so far:
+
+- **Milestone 1:** secure sign-in, employee records, and the month-end payroll run with payslips. Kenya is the first country with payroll rules; the other countries come next.
+- **Milestone 2:** staff profiles with photos, contact details, IDs, education, next of kin and HR documents, plus an import of 12,408 sample staff.
 
 | Part | Stack |
 |---|---|
@@ -22,6 +25,7 @@ cp apps/web/.env.example apps/web/.env.local
 npm install
 npm run db:migrate
 npm run db:seed                      # companies and the six test accounts
+npm run db:import-sample             # optional: 12,408 sample staff with documents and photos
 npm run dev:api                      # http://localhost:4000/api
 npm run dev:web                      # http://localhost:3000
 ```
@@ -44,6 +48,25 @@ All emails use the reserved `.test` domain, so nothing can ever reach a real per
 | tester@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips |
 
 Change the passwords with `SEED_ADMIN_PASSWORD` and `SEED_USER_PASSWORD` before seeding anything other than a laptop. The seed refuses to run with `NODE_ENV=production` unless both are set.
+
+## Staff profiles
+
+Every employee has a profile page (**My profile** in the menu for your own). It holds job details, contact details, IDs, education, up to five next of kin, a profile photo and HR documents.
+
+| Who | Sees | Can change |
+|---|---|---|
+| HR and admin | Everything, including HR-only documents | Everything; their uploads are verified straight away; verify, reject or delete documents |
+| Payroll | Everything, including pay and IDs | Nothing |
+| The employee | Their own profile and documents, except HR-only ones | Phone, personal email, marital status, dependants, next of kin and photo; uploads wait for HR to verify |
+| Their manager | Job details and photo of their direct reports | Nothing (no pay, IDs, next of kin or documents) |
+
+Uploads must be PDF, PNG, JPEG or WebP (checked from the file contents, not the name), up to 10 MB; photos up to 5 MB. Files are stored on disk under `apps/api/storage/` (set `STORAGE_DIR` to move it). That folder is not in git.
+
+### Sample staff
+
+`npm run db:import-sample` loads the 12,408 sample employees in `sample-data/` across the eight countries, with one next of kin each, 156,381 document register entries and an avatar for everyone. Eight people have scanned specimen files (ID, education certificate, profile summary). It takes under a minute, skips anyone already imported, and does not create logins, so the sample staff cannot sign in. Run `npm run db:seed` first.
+
+All sample data is fictional, and IDs start with `SPECIMEN`.
 
 ## How sign-in works
 
@@ -74,7 +97,7 @@ npm run db:test:setup   # migrates the hrportal_test database (created by docker
 npm test                # Kenya rule unit tests + full API flow
 ```
 
-The API test signs in through the email code, checks every role boundary, adds and deletes an employee, and runs payroll from draft to finalized. It wipes its database, so it only runs against a database whose name ends in `_test`.
+The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads and the sample import. It wipes its database, so it only runs against a database whose name ends in `_test`.
 
 ## Screenshots
 
@@ -82,3 +105,6 @@ The API test signs in through the email code, checks every role boundary, adds a
 |---|---|
 | ![Sign in](docs/screenshots/01-sign-in.png) | ![Payroll draft](docs/screenshots/02-payroll-draft.png) |
 | ![Admin home](docs/screenshots/03-admin-home.png) | ![Payslip](docs/screenshots/05-payslip.png) |
+| ![Staff list](docs/screenshots/06-staff-list.png) | ![Manager view of a profile](docs/screenshots/08-manager-view.png) |
+
+![Staff profile](docs/screenshots/07-staff-profile.png)

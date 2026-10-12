@@ -27,6 +27,20 @@ enum WorkLocation {
   FULLY_REMOTE
 }
 
+enum EmploymentType {
+  PERMANENT
+  FIXED_TERM
+  INTERN
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  CLEARED
+  EXPIRED
+  REJECTED
+}
+
 enum PayrollStatus {
   DRAFT
   APPROVED
@@ -75,32 +89,55 @@ model LoginChallenge {
 }
 
 model Employee {
-  id                String           @id @default(cuid())
-  employeeNo        String           @unique
-  firstName         String
-  lastName          String
-  jobTitle          String
-  department        String
-  workLocation      WorkLocation     @default(ON_SITE)
-  hireDate          DateTime         @db.Date
-  exitDate          DateTime?        @db.Date
-  status            EmploymentStatus @default(ACTIVE)
+  id                   String             @id @default(cuid())
+  employeeNo           String             @unique
+  firstName            String
+  lastName             String
+  jobTitle             String
+  department           String
+  grade                String?
+  employmentType       EmploymentType     @default(PERMANENT)
+  workLocation         WorkLocation       @default(ON_SITE)
+  city                 String?
+  /// Work email, also for staff who have no portal login yet
+  workEmail            String?            @unique
+  mobilePhone          String?
+  personalEmail        String?
+  gender               String?
+  dateOfBirth          DateTime?          @db.Date
+  maritalStatus        String?
+  dependants           Int                @default(0)
+  /// Sensitive identifiers: shown only to the employee, HR, payroll and admins
+  nationalIdNumber     String?
+  taxId                String?
+  socialSecurityNo     String?
+  highestQualification String?
+  institution          String?
+  qualificationYear    Int?
+  /// Storage key of the profile photo
+  photoKey             String?
+  exitReason           String?
+  hireDate             DateTime           @db.Date
+  exitDate             DateTime?          @db.Date
+  status               EmploymentStatus   @default(ACTIVE)
   /// Monthly base pay in the company's currency
-  monthlyBasic      Decimal          @db.Decimal(14, 2)
+  monthlyBasic         Decimal            @db.Decimal(14, 2)
   /// Monthly taxable cash allowances (housing, transport, remote work)
-  monthlyAllowances Decimal          @default(0) @db.Decimal(14, 2)
-  companyId         String
-  company           Company          @relation(fields: [companyId], references: [id])
-  userId            String?          @unique
-  user              User?            @relation(fields: [userId], references: [id])
-  managerId         String?
-  manager           Employee?        @relation("Reports", fields: [managerId], references: [id])
-  reports           Employee[]       @relation("Reports")
-  payslips          Payslip[]
+  monthlyAllowances    Decimal            @default(0) @db.Decimal(14, 2)
+  companyId            String
+  company              Company            @relation(fields: [companyId], references: [id])
+  userId               String?            @unique
+  user                 User?              @relation(fields: [userId], references: [id])
+  managerId            String?
+  manager              Employee?          @relation("Reports", fields: [managerId], references: [id])
+  reports              Employee[]         @relation("Reports")
+  payslips             Payslip[]
+  nextOfKin            NextOfKin[]
+  documents            EmployeeDocument[]
   /// Set when an admin deletes the employee. Records are kept for legal retention.
-  deletedAt         DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  deletedAt            DateTime?
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
 
   @@index([companyId, status])
 }
@@ -158,4 +195,42 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
+}
+
+model NextOfKin {
+  id                 String   @id @default(cuid())
+  employeeId         String
+  employee           Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name               String
+  relationship       String
+  phone              String
+  email              String?
+  isEmergencyContact Boolean  @default(true)
+  isBeneficiary      Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  @@index([employeeId])
+}
+
+/// An HR document on file for an employee. storageKey is null when only the paper copy is held.
+model EmployeeDocument {
+  id           String         @id @default(cuid())
+  employeeId   String
+  employee     Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type         String
+  fileName     String
+  storageKey   String?
+  mimeType     String?
+  sizeBytes    Int?
+  issuedDate   DateTime?      @db.Date
+  expiryDate   DateTime?      @db.Date
+  status       DocumentStatus @default(PENDING)
+  /// Hidden from the employee themself (e.g. background checks)
+  hrOnly       Boolean        @default(false)
+  uploadedById String?
+  verifiedById String?
+  verifiedAt   DateTime?
+  createdAt    DateTime       @default(now())
+
+  @@index([employeeId])
 }

@@ -7,6 +7,8 @@ import { EmployeesModule } from './employees/employees.module';
 import { MailModule } from './mail/mail.module';
 import { PayrollModule } from './payroll/payroll.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ProfilesModule } from './profiles/profiles.module';
+import { StorageModule } from './storage/storage.module';
 
 @Module({
   imports: [
@@ -15,9 +17,11 @@ import { PrismaModule } from './prisma/prisma.module';
     PrismaModule,
     AuditModule,
     MailModule,
+    StorageModule,
     AuthModule,
     EmployeesModule,
     PayrollModule,
+    ProfilesModule,
   ],
 })
 export class AppModule {}

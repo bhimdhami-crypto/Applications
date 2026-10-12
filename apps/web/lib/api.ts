@@ -39,6 +39,9 @@ export interface Employee {
   lastName: string;
   jobTitle: string;
   department: string;
+  grade?: string | null;
+  city?: string | null;
+  workEmail?: string | null;
   workLocation: 'ON_SITE' | 'HYBRID' | 'FULLY_REMOTE';
   hireDate: string;
   exitDate: string | null;
@@ -112,13 +115,15 @@ export function setToken(token: string | null) {
 
 export async function api<T>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> {
   const token = getToken();
+  const isForm = init.body instanceof FormData;
   const res = await fetch(`${API_URL}${path}`, {
     method: init.method ?? 'GET',
     headers: {
-      'Content-Type': 'application/json',
+      // For uploads the browser sets the multipart boundary itself
+      ...(isForm ? {} : { 'Content-Type': 'application/json' }),
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
     },
-    body: init.body === undefined ? undefined : JSON.stringify(init.body),
+    body: init.body === undefined ? undefined : isForm ? (init.body as FormData) : JSON.stringify(init.body),
   });
   const text = await res.text();
   let data;
@@ -135,6 +140,108 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
   }
   return data as T;
 }
+
+/** Fetches a file (photo, document) with the sign-in token, which a plain <img> or link cannot send. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const token = getToken();
+  const res = await fetch(`${API_URL}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!res.ok) {
+    const data = await res.json().catch(() => null);
+    throw new ApiError(res.status, data?.message ?? 'Could not load the file');
+  }
+  return res.blob();
+}
+
+export async function downloadFile(path: string, fileName: string) {
+  const url = URL.createObjectURL(await apiBlob(path));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = fileName;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
+
+export interface Page<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+
+export interface NextOfKin {
+  id?: string;
+  name: string;
+  relationship: string;
+  phone: string;
+  email?: string | null;
+  isEmergencyContact: boolean;
+  isBeneficiary: boolean;
+}
+
+export interface Profile {
+  id: string;
+  employeeNo: string;
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+  department: string;
+  grade: string | null;
+  employmentType: 'PERMANENT' | 'FIXED_TERM' | 'INTERN';
+  workLocation: Employee['workLocation'];
+  city: string | null;
+  workEmail: string | null;
+  hireDate: string;
+  exitDate: string | null;
+  status: Employee['status'];
+  hasPhoto: boolean;
+  company: { name: string; countryCode: string; currency: string };
+  manager: { id: string; firstName: string; lastName: string; jobTitle: string } | null;
+  user: { email: string; role: Role; isActive: boolean } | null;
+  access: 'FULL' | 'SELF' | 'MANAGER';
+  can: { editPersonal: boolean; editJob: boolean; viewDocuments: boolean; uploadDocuments: boolean; verifyDocuments: boolean };
+  // Not sent to managers
+  mobilePhone?: string | null;
+  personalEmail?: string | null;
+  gender?: string | null;
+  dateOfBirth?: string | null;
+  maritalStatus?: string | null;
+  dependants?: number;
+  nationalIdNumber?: string | null;
+  taxId?: string | null;
+  socialSecurityNo?: string | null;
+  highestQualification?: string | null;
+  institution?: string | null;
+  qualificationYear?: number | null;
+  exitReason?: string | null;
+  monthlyBasic?: string;
+  monthlyAllowances?: string;
+  nextOfKin?: NextOfKin[];
+}
+
+export type DocumentStatus = 'PENDING' | 'VERIFIED' | 'CLEARED' | 'EXPIRED' | 'REJECTED';
+
+export interface HrDocument {
+  id: string;
+  type: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  issuedDate: string | null;
+  expiryDate: string | null;
+  status: DocumentStatus;
+  hrOnly: boolean;
+  hasFile: boolean;
+  createdAt: string;
+}
+
+export const EMPLOYMENT_TYPE_LABEL: Record<Profile['employmentType'], string> = {
+  PERMANENT: 'Permanent',
+  FIXED_TERM: 'Fixed-term contract',
+  INTERN: 'Intern',
+};
+
+export const formatDate = (d: string | null | undefined) =>
+  d ? new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' }) : '';
 
 const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 export const periodName = (year: number, month: number) => `${MONTHS[month - 1]} ${year}`;

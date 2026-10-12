@@ -4,6 +4,7 @@ process.env.MAIL_TRANSPORT = 'memory';
 process.env.CAPTCHA_PROVIDER = 'disabled';
 process.env.JWT_SECRET ??= 'e2e-secret';
 process.env.PAYROLL_AUTODRAFT = 'false';
+process.env.STORAGE_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'hr-storage-'));
 process.env.DATABASE_URL = process.env.TEST_DATABASE_URL ?? 'postgresql://hr:hr@localhost:5432/hrportal_test';
 // The suite wipes every table, so refuse anything that is not clearly a test database.
 if (!/_test(\?|$)/.test(process.env.DATABASE_URL)) throw new Error('TEST_DATABASE_URL must name a database ending in _test');
@@ -11,6 +12,12 @@ if (!/_test(\?|$)/.test(process.env.DATABASE_URL)) throw new Error('TEST_DATABAS
 import { INestApplication } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
 import request from 'supertest';
+import { promises as fs } from 'fs';
+import * as os from 'os';
+import * as path from 'path';
+import { gunzipSync, gzipSync } from 'zlib';
+import { importSample } from '../prisma/import-sample';
+import { parseCsv } from '../prisma/csv';
 import { seed } from '../prisma/seed';
 import { AppModule } from '../src/app.module';
 import { MailService } from '../src/mail/mail.service';
@@ -38,7 +45,7 @@ describe('Mindspace HR API', () => {
     return verify.body.accessToken as string;
   }
 
-  const api = (method: 'get' | 'post' | 'patch' | 'delete', path: string, who: string) =>
+  const api = (method: 'get' | 'post' | 'put' | 'patch' | 'delete', path: string, who: string) =>
     request(app.getHttpServer())[method](`/api${path}`).set('Authorization', `Bearer ${tokens[who]}`);
 
   beforeAll(async () => {
@@ -50,14 +57,14 @@ describe('Mindspace HR API', () => {
     mail = app.get(MailService);
 
     await prisma.$executeRawUnsafe(
-      'TRUNCATE "Payslip", "PayrollRun", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
+      'TRUNCATE "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
     );
     process.env.SEED_ADMIN_PASSWORD = ADMIN_PASSWORD;
     process.env.SEED_USER_PASSWORD = USER_PASSWORD;
     await seed(prisma);
 
     tokens.admin = await signIn('admin@mindspace-ai.test', ADMIN_PASSWORD);
-    for (const who of ['hr', 'payroll', 'manager', 'developer']) tokens[who] = await signIn(`${who}@mindspace-ai.test`);
+    for (const who of ['hr', 'payroll', 'manager', 'developer', 'tester']) tokens[who] = await signIn(`${who}@mindspace-ai.test`);
   });
 
   afterAll(async () => {
@@ -111,7 +118,7 @@ describe('Mindspace HR API', () => {
         })
         .expect(201);
       newId = res.body.id;
-      expect(res.body.employeeNo).toBe('MSA-KE-000006');
+      expect(res.body.employeeNo).toBe('MSA-KE-000001');
       expect(mail.outbox.some((m) => m.to === 'grace.achieng@mindspace-ai.test' && m.subject.includes('Welcome'))).toBe(true);
     });
 
@@ -125,17 +132,17 @@ describe('Mindspace HR API', () => {
 
     it('shows a manager only their own reports, without pay', async () => {
       const res = await api('get', '/employees', 'manager').expect(200);
-      expect(res.body.map((e: { user: { email: string } }) => e.user.email).sort()).toEqual([
+      expect(res.body.items.map((e: { user: { email: string } }) => e.user.email).sort()).toEqual([
         'developer@mindspace-ai.test',
         'tester@mindspace-ai.test',
       ]);
-      expect(res.body[0].monthlyBasic).toBeUndefined();
+      expect(res.body.items[0].monthlyBasic).toBeUndefined();
     });
 
     it('lets the admin delete an employee, keeping the record and blocking sign-in', async () => {
       await api('delete', `/employees/${newId}`, 'admin').send({ reason: 'Test clean-up' }).expect(200);
       const list = await api('get', '/employees', 'admin').expect(200);
-      expect(list.body.find((e: { id: string }) => e.id === newId)).toBeUndefined();
+      expect(list.body.items.find((e: { id: string }) => e.id === newId)).toBeUndefined();
       const kept = await prisma.employee.findUniqueOrThrow({ where: { id: newId }, include: { user: true } });
       expect(kept.status).toBe('TERMINATED');
       expect(kept.user!.isActive).toBe(false);
@@ -158,7 +165,7 @@ describe('Mindspace HR API', () => {
 
     it('calculates the tester payslip from the Kenya rules', async () => {
       const run = await api('get', `/payroll/runs/${runId}`, 'payroll').expect(200);
-      const slip = run.body.payslips.find((p: { employee: { employeeNo: string } }) => p.employee.employeeNo === 'MSA-KE-000005');
+      const slip = run.body.payslips.find((p: { employee: { employeeNo: string } }) => p.employee.employeeNo === 'MSA-KE-T00005');
       // 128,000 gross: NSSF 4,320, SHIF 3,520, AHL 1,920, PAYE on 118,240
       expect(Number(slip.gross)).toBe(128000);
       const line = (code: string) => Number(slip.lines.find((l: { code: string }) => l.code === code).amount);
@@ -198,6 +205,137 @@ describe('Mindspace HR API', () => {
       expect(created).toHaveLength(1);
       const again = await app.get(PayrollService).createMonthEndDrafts(new Date(Date.UTC(2026, 9, 20)));
       expect(again).toHaveLength(0);
+    });
+  });
+  describe('staff profiles', () => {
+    const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+    const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex');
+    let dev: { id: string };
+    let hr: { id: string };
+
+    beforeAll(async () => {
+      dev = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'developer@mindspace-ai.test' } } });
+      hr = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'hr@mindspace-ai.test' } } });
+    });
+
+    it('shows an employee their full profile with next of kin', async () => {
+      const res = await api('get', `/employees/${dev.id}/profile`, 'developer').expect(200);
+      expect(res.body.access).toBe('SELF');
+      expect(res.body.nationalIdNumber).toMatch(/^SPECIMEN-KE-/);
+      expect(res.body.nextOfKin).toHaveLength(1);
+      expect(res.body.can).toMatchObject({ editPersonal: true, editJob: false, verifyDocuments: false });
+    });
+
+    it('shows a manager only the work details of their own reports', async () => {
+      const res = await api('get', `/employees/${dev.id}/profile`, 'manager').expect(200);
+      expect(res.body.access).toBe('MANAGER');
+      expect(res.body.nationalIdNumber).toBeUndefined();
+      expect(res.body.nextOfKin).toBeUndefined();
+      expect(res.body.monthlyBasic).toBeUndefined();
+      await api('get', `/employees/${dev.id}/documents`, 'manager').expect(403);
+      await api('get', `/employees/${hr.id}/profile`, 'manager').expect(403);
+    });
+
+    it('keeps colleagues out of each other’s profiles', async () => {
+      await api('get', `/employees/${hr.id}/profile`, 'developer').expect(403);
+      await api('get', `/employees/${dev.id}/profile`, 'tester').expect(403);
+      await api('get', `/employees/${dev.id}/photo`, 'tester').expect(403);
+    });
+
+    it('lets an employee update their contact details and next of kin, but not their job', async () => {
+      await api('patch', `/employees/${dev.id}/personal`, 'developer').send({ mobilePhone: '+254 700 000 111', dependants: 2 }).expect(200);
+      await api('patch', `/employees/${dev.id}/personal`, 'developer').send({ jobTitle: 'CEO' }).expect(400);
+      await api('patch', `/employees/${dev.id}`, 'developer').send({ jobTitle: 'CEO' }).expect(403);
+      const kin = await api('put', `/employees/${dev.id}/next-of-kin`, 'developer')
+        .send({ contacts: [{ name: 'Mary Mwangi', relationship: 'Sister', phone: '+254 733 200 004' }, { name: 'Paul Mwangi', relationship: 'Father', phone: '+254 711 000 222', isBeneficiary: true }] })
+        .expect(200);
+      expect(kin.body).toHaveLength(2);
+      await api('put', `/employees/${hr.id}/next-of-kin`, 'developer').send({ contacts: [] }).expect(403);
+    });
+
+    it('lets HR change job and ID details', async () => {
+      const res = await api('patch', `/employees/${dev.id}`, 'hr').send({ grade: 'G4', dateOfBirth: '1996-04-09', taxId: 'SPECIMEN-TAX-1' }).expect(200);
+      expect(res.body.grade).toBe('G4');
+    });
+
+    it('takes document uploads, pending for employees and verified for HR', async () => {
+      const own = await api('post', `/employees/${dev.id}/documents`, 'developer')
+        .field('type', 'Highest education certificate').attach('file', PDF, 'degree.pdf').expect(201);
+      expect(own.body.status).toBe('PENDING');
+      expect(own.body.hrOnly).toBe(false);
+
+      await api('post', `/employees/${dev.id}/documents`, 'developer')
+        .field('type', 'Other').attach('file', Buffer.from('<script>alert(1)</script>'), 'evil.pdf').expect(400);
+
+      const hidden = await api('post', `/employees/${dev.id}/documents`, 'hr')
+        .field('type', 'Background check report').field('hrOnly', 'true').attach('file', PDF, 'check.pdf').expect(201);
+      expect(hidden.body).toMatchObject({ status: 'VERIFIED', hrOnly: true });
+
+      const mine = await api('get', `/employees/${dev.id}/documents`, 'developer').expect(200);
+      expect(mine.body.map((d: { id: string }) => d.id)).toEqual([own.body.id]);
+      await api('get', `/documents/${hidden.body.id}/file`, 'developer').expect(404);
+
+      const file = await api('get', `/documents/${own.body.id}/file`, 'developer').buffer(true).expect(200);
+      expect(file.headers['content-disposition']).toContain('attachment');
+      expect(Buffer.compare(file.body as Buffer, PDF)).toBe(0);
+
+      await api('patch', `/documents/${own.body.id}`, 'developer').send({ status: 'VERIFIED' }).expect(403);
+      const verified = await api('patch', `/documents/${own.body.id}`, 'hr').send({ status: 'VERIFIED' }).expect(200);
+      expect(verified.body.status).toBe('VERIFIED');
+      await api('delete', `/documents/${hidden.body.id}`, 'hr').expect(200);
+    });
+
+    it('stores a profile photo that the employee and their manager can see', async () => {
+      await api('put', `/employees/${dev.id}/photo`, 'developer').attach('file', PDF, 'me.pdf').expect(400);
+      await api('put', `/employees/${dev.id}/photo`, 'developer').attach('file', PNG, 'me.png').expect(200);
+      const own = await api('get', `/employees/${dev.id}/photo`, 'developer').expect(200);
+      expect(own.headers['content-type']).toBe('image/png');
+      await api('get', `/employees/${dev.id}/photo`, 'manager').expect(200);
+    });
+
+    it('searches and pages the staff list', async () => {
+      const res = await api('get', '/employees?q=mwangi&pageSize=1', 'hr').expect(200);
+      expect(res.body.total).toBe(1);
+      expect(res.body.items[0].lastName).toBe('Mwangi');
+      // Kevin uploaded a photo above; the list says so without exposing where it is stored
+      expect(res.body.items[0].hasPhoto).toBe(true);
+      expect(res.body.items[0].photoKey).toBeUndefined();
+    });
+
+    it('imports sample staff with next of kin, documents and photos, and skips them on a second run', async () => {
+      // A three-person slice of the real sample data
+      const src = path.join(__dirname, '../../../sample-data');
+      const dir = await fs.mkdtemp(path.join(os.tmpdir(), 'hr-sample-'));
+      const ids = ['MSA-KE-000012', 'MSA-KE-000001', 'MSA-UG-001973'];
+      const slice = async (name: string) => {
+        const lines = gunzipSync(await fs.readFile(path.join(src, name))).toString('utf8').split('\n');
+        const keep = [lines[0], ...lines.filter((l) => ids.some((id) => l.includes(`,${id},`) || l.startsWith(`${id},`)))];
+        await fs.writeFile(path.join(dir, name), gzipSync(keep.join('\n') + '\n'));
+      };
+      await slice('employees.csv.gz');
+      await slice('employee_documents_register.csv.gz');
+      const photos = JSON.parse(gunzipSync(await fs.readFile(path.join(src, 'profile_photos.json.gz'))).toString('utf8'));
+      await fs.writeFile(path.join(dir, 'profile_photos.json.gz'), gzipSync(JSON.stringify(Object.fromEntries(ids.map((id) => [id, photos[id]])))));
+      await fs.cp(path.join(src, 'personal_files', 'MSA-KE-000012_Njeri_Njoroge'), path.join(dir, 'personal_files', 'MSA-KE-000012_Njeri_Njoroge'), { recursive: true });
+      expect(parseCsv(gunzipSync(await fs.readFile(path.join(dir, 'employees.csv.gz'))).toString('utf8'))).toHaveLength(3);
+
+      // MSA-KE-000001 was given to the employee added earlier in this test run, so that row is skipped
+      const first = await importSample(prisma, () => undefined, dir);
+      expect(first.imported).toBe(2);
+      const grace = await prisma.employee.findUniqueOrThrow({ where: { employeeNo: 'MSA-KE-000001' } });
+      expect(grace.firstName).toBe('Grace');
+      const njeri = await prisma.employee.findUniqueOrThrow({ where: { employeeNo: 'MSA-KE-000012' }, include: { nextOfKin: true, documents: true } });
+      expect(njeri.nextOfKin).toHaveLength(1);
+      expect(njeri.photoKey).toBe('photos/MSA-KE-000012.png');
+      expect(njeri.documents.filter((d) => d.storageKey).map((d) => d.type).sort()).toEqual(['Employee profile summary', 'Highest education certificate', 'National ID or passport']);
+
+      const res = await api('get', `/employees/${njeri.id}/documents`, 'hr').expect(200);
+      const id = res.body.find((d: { type: string }) => d.type === 'National ID or passport');
+      await api('get', `/documents/${id.id}/file`, 'hr').expect(200);
+      await api('get', `/employees/${njeri.id}/photo`, 'hr').expect(200);
+
+      const again = await importSample(prisma, () => undefined, dir);
+      expect(again.imported).toBe(0);
     });
   });
 });

@@ -1,7 +1,7 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { Role } from '@prisma/client';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators';
-import { CreateEmployeeDto, DeleteEmployeeDto, UpdateEmployeeDto } from './employees.dto';
+import { CreateEmployeeDto, DeleteEmployeeDto, ListEmployeesQuery, UpdateEmployeeDto } from './employees.dto';
 import { EmployeesService } from './employees.service';
 
 @Controller('employees')
@@ -9,8 +9,8 @@ export class EmployeesController {
   constructor(private readonly employees: EmployeesService) {}
 
   @Get()
-  list(@CurrentUser() user: AuthUser, @Query('includeLeavers') includeLeavers?: string) {
-    return this.employees.list(user, includeLeavers === 'true');
+  list(@CurrentUser() user: AuthUser, @Query() query: ListEmployeesQuery) {
+    return this.employees.list(user, query);
   }
 
   @Get('me')
