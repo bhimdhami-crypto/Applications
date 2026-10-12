@@ -1,6 +1,6 @@
 // Small fetch wrapper for the HR API. The sign-in token lives in sessionStorage,
 // so closing the browser tab signs the user out.
-export const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000/api';
+export const API_URL = '/api';
 const TOKEN_KEY = 'mindspace.token';
 
 export type Role = 'ADMIN' | 'HR' | 'PAYROLL' | 'MANAGER' | 'EMPLOYEE';

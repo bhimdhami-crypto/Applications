@@ -26,7 +26,9 @@ npm run dev:api                      # http://localhost:4000/api
 npm run dev:web                      # http://localhost:3000
 ```
 
-Open **http://localhost:8025** to see the test inboxes. Every email the portal sends (sign-in codes, welcome emails, payslip notices) lands there, so the test accounts need no real mailbox.
+Open **http://localhost:3000** for the portal and **http://localhost:8025** for the test inboxes. In GitHub Codespaces, run `dev:api` and `dev:web` in two terminals, then open ports 3000 and 8025 from the **Ports** tab.
+
+Open the test inbox to see the emails. Every email the portal sends (sign-in codes, welcome emails, payslip notices) lands there, so the test accounts need no real mailbox.
 
 ## Test accounts
 
