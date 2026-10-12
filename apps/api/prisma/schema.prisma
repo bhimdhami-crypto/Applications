@@ -1,0 +1,161 @@
+// Mindspace Artificial Intelligence Inc. HR and payroll data model (milestone 1).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  HR
+  PAYROLL
+  MANAGER
+  EMPLOYEE
+}
+
+enum EmploymentStatus {
+  ACTIVE
+  TERMINATED
+}
+
+enum WorkLocation {
+  ON_SITE
+  HYBRID
+  FULLY_REMOTE
+}
+
+enum PayrollStatus {
+  DRAFT
+  APPROVED
+  FINALIZED
+}
+
+/// One legal entity: the parent Inc. or a country subsidiary.
+model Company {
+  id          String       @id @default(cuid())
+  code        String       @unique
+  name        String
+  country     String
+  countryCode String       @db.Char(2)
+  currency    String       @db.Char(3)
+  employees   Employee[]
+  payrollRuns PayrollRun[]
+  createdAt   DateTime     @default(now())
+}
+
+/// A login account. Admin accounts need not have an employee record.
+model User {
+  id           String           @id @default(cuid())
+  email        String           @unique
+  passwordHash String
+  role         Role             @default(EMPLOYEE)
+  isActive     Boolean          @default(true)
+  employee     Employee?
+  challenges   LoginChallenge[]
+  lastLoginAt  DateTime?
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+}
+
+/// A pending second step of sign-in: the code emailed to the user.
+model LoginChallenge {
+  id         String    @id @default(cuid())
+  userId     String
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  @@index([userId, createdAt])
+}
+
+model Employee {
+  id                String           @id @default(cuid())
+  employeeNo        String           @unique
+  firstName         String
+  lastName          String
+  jobTitle          String
+  department        String
+  workLocation      WorkLocation     @default(ON_SITE)
+  hireDate          DateTime         @db.Date
+  exitDate          DateTime?        @db.Date
+  status            EmploymentStatus @default(ACTIVE)
+  /// Monthly base pay in the company's currency
+  monthlyBasic      Decimal          @db.Decimal(14, 2)
+  /// Monthly taxable cash allowances (housing, transport, remote work)
+  monthlyAllowances Decimal          @default(0) @db.Decimal(14, 2)
+  companyId         String
+  company           Company          @relation(fields: [companyId], references: [id])
+  userId            String?          @unique
+  user              User?            @relation(fields: [userId], references: [id])
+  managerId         String?
+  manager           Employee?        @relation("Reports", fields: [managerId], references: [id])
+  reports           Employee[]       @relation("Reports")
+  payslips          Payslip[]
+  /// Set when an admin deletes the employee. Records are kept for legal retention.
+  deletedAt         DateTime?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([companyId, status])
+}
+
+model PayrollRun {
+  id                String        @id @default(cuid())
+  companyId         String
+  company           Company       @relation(fields: [companyId], references: [id])
+  periodYear        Int
+  periodMonth       Int
+  status            PayrollStatus @default(DRAFT)
+  rulesPack         String
+  rulesVersion      String
+  totalGross        Decimal       @default(0) @db.Decimal(16, 2)
+  totalDeductions   Decimal       @default(0) @db.Decimal(16, 2)
+  totalNet          Decimal       @default(0) @db.Decimal(16, 2)
+  totalEmployerCost Decimal       @default(0) @db.Decimal(16, 2)
+  createdById       String?
+  approvedById      String?
+  approvedAt        DateTime?
+  finalizedById     String?
+  finalizedAt       DateTime?
+  payslips          Payslip[]
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([companyId, periodYear, periodMonth])
+}
+
+model Payslip {
+  id           String     @id @default(cuid())
+  runId        String
+  run          PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee   @relation(fields: [employeeId], references: [id])
+  currency     String     @db.Char(3)
+  gross        Decimal    @db.Decimal(14, 2)
+  deductions   Decimal    @db.Decimal(14, 2)
+  net          Decimal    @db.Decimal(14, 2)
+  employerCost Decimal    @db.Decimal(14, 2)
+  /// Line items: [{ code, label, kind: EARNING | DEDUCTION | EMPLOYER, amount }]
+  lines        Json
+  createdAt    DateTime   @default(now())
+
+  @@unique([runId, employeeId])
+}
+
+model AuditLog {
+  id        String   @id @default(cuid())
+  actorId   String?
+  action    String
+  entity    String
+  entityId  String?
+  details   Json?
+  createdAt DateTime @default(now())
+
+  @@index([entity, entityId])
+}

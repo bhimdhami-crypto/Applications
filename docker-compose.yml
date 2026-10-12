@@ -1,0 +1,23 @@
+# Local services for development: PostgreSQL and Mailpit.
+# Mailpit catches every email the portal sends (sign-in codes, welcome emails,
+# payslip notices) so the test accounts need no real mailbox.
+#   Inbox UI: http://localhost:8025   SMTP: localhost:1025
+services:
+  db:
+    image: postgres:16.10-alpine
+    environment:
+      POSTGRES_USER: hr
+      POSTGRES_PASSWORD: hr
+      POSTGRES_DB: hrportal
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/create-test-db.sql:/docker-entrypoint-initdb.d/create-test-db.sql:ro
+  mail:
+    image: axllent/mailpit:v1.31.2
+    ports:
+      - "8025:8025"
+      - "1025:1025"
+volumes:
+  pgdata:
