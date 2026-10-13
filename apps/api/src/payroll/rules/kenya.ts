@@ -52,8 +52,9 @@ export const kenyaRules: RulesPack = {
   countryCode: 'KE',
   version: 'KE-2026.1-draft',
   verified: false,
-  calculate({ basic, allowances }: PayInput) {
-    const gross = basic + allowances;
+  calculate({ basic, allowances, leaveDeduction }: PayInput) {
+    const unpaid = Math.min(leaveDeduction?.amount ?? 0, basic);
+    const gross = basic + allowances - unpaid;
     const nssf = kenyaNssf(gross);
     const shif = Math.max(cents(gross * SHIF_RATE), SHIF_MINIMUM);
     const ahl = cents(gross * AHL_RATE);
@@ -64,6 +65,8 @@ export const kenyaRules: RulesPack = {
       { code: 'BASIC', label: 'Basic salary', kind: 'EARNING', amount: basic },
     ];
     if (allowances > 0) lines.push({ code: 'ALLOW', label: 'Allowances', kind: 'EARNING', amount: allowances });
+    // Unpaid days reduce taxable pay, so they come off the earnings rather than after tax
+    if (unpaid > 0) lines.push({ code: 'LEAVE_UNPAID', label: leaveDeduction!.label, kind: 'EARNING', amount: -unpaid });
     lines.push(
       { code: 'PAYE', label: 'PAYE (income tax)', kind: 'DEDUCTION', amount: paye },
       { code: 'NSSF', label: 'NSSF pension', kind: 'DEDUCTION', amount: nssf },

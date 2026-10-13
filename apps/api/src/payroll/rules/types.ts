@@ -13,6 +13,8 @@ export interface PayInput {
   basic: number;
   /** Monthly taxable cash allowances in minor units */
   allowances: number;
+  /** Pay withheld for unpaid days (unpaid leave, sick leave past its allowance), in minor units */
+  leaveDeduction?: { amount: number; label: string };
 }
 
 export interface PayResult {

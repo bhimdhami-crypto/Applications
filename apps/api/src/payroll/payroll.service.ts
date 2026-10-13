@@ -2,6 +2,8 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { PayrollStatus, Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/decorators';
+import { toIso, workingDays } from '../leave/calendar';
+import { LeaveService } from '../leave/leave.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { rulesFor } from './rules';
@@ -24,6 +26,7 @@ export class PayrollService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly leave: LeaveService,
   ) {}
 
   listRuns() {
@@ -174,9 +177,23 @@ export class PayrollService {
       },
     });
 
+    // Unpaid and reduced-pay leave days, and the annual leave balance printed on each payslip
+    const country = run.company.countryCode;
+    const [start, end] = [toIso(periodStart), toIso(periodEnd)];
+    const holidays = await this.leave.holidaySet(country, start, end);
+    const monthWorkingDays = workingDays(start, end, country, new Set(holidays.keys())).length;
+    const cuts = await this.leave.payCuts(employees.map((e) => e.id), country, start, end);
+    const annualLeft = await this.leave.annualLeftMany(employees.map((e) => ({ ...e, company: { countryCode: country } })), run.periodYear);
+
     let gross = 0, deductions = 0, net = 0, employerCost = 0;
     const slips = employees.map((e) => {
-      const r = pack.calculate({ basic: toMinor(e.monthlyBasic), allowances: toMinor(e.monthlyAllowances) });
+      const basic = toMinor(e.monthlyBasic);
+      const cut = cuts.get(e.id);
+      const lostDays = cut ? cut.unpaidDays + cut.halfPayDays / 2 : 0;
+      const leaveDeduction = cut && monthWorkingDays > 0
+        ? { amount: Math.round((basic * lostDays) / monthWorkingDays), label: leaveLabel(cut, monthWorkingDays) }
+        : undefined;
+      const r = pack.calculate({ basic, allowances: toMinor(e.monthlyAllowances), leaveDeduction });
       gross += r.gross; deductions += r.deductions; net += r.net; employerCost += r.employerCost;
       return {
         runId,
@@ -187,6 +204,7 @@ export class PayrollService {
         net: toMajor(r.net),
         employerCost: toMajor(r.employerCost),
         lines: r.lines.map((l) => ({ ...l, amount: Number(toMajor(l.amount)) })),
+        annualLeaveLeft: annualLeft.get(e.id) ?? null,
       };
     });
 
@@ -199,4 +217,11 @@ export class PayrollService {
       }),
     ]);
   }
+}
+
+function leaveLabel(cut: { unpaidDays: number; halfPayDays: number }, monthDays: number) {
+  const parts = [];
+  if (cut.unpaidDays) parts.push(`${cut.unpaidDays} unpaid day${cut.unpaidDays === 1 ? '' : 's'}`);
+  if (cut.halfPayDays) parts.push(`${cut.halfPayDays} half-pay sick day${cut.halfPayDays === 1 ? '' : 's'}`);
+  return `Leave: ${parts.join(', ')} of ${monthDays}`;
 }

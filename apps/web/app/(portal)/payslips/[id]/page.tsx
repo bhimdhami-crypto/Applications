@@ -57,6 +57,11 @@ export default function PayslipPage() {
           <Section title="Paid by the employer on your behalf" lines={of('EMPLOYER')} currency={cur} />
         </tbody>
       </table>
+      {slip.annualLeaveLeft !== null && slip.annualLeaveLeft !== undefined && (
+        <p>
+          Annual leave left for {slip.run.periodYear}: <strong>{slip.annualLeaveLeft} day{slip.annualLeaveLeft === 1 ? '' : 's'}</strong>
+        </p>
+      )}
       <p className="muted" style={{ fontSize: '0.8rem' }}>Calculated with rules {slip.run.rulesVersion}.</p>
       <button className="secondary" onClick={() => window.print()}>Print or save as PDF</button>
     </div>

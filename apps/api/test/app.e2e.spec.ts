@@ -57,7 +57,7 @@ describe('Mindspace HR API', () => {
     mail = app.get(MailService);
 
     await prisma.$executeRawUnsafe(
-      'TRUNCATE "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
+      'TRUNCATE "LeaveRequest", "LeaveAdjustment", "PublicHoliday", "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
     );
     process.env.SEED_ADMIN_PASSWORD = ADMIN_PASSWORD;
     process.env.SEED_USER_PASSWORD = USER_PASSWORD;
@@ -336,6 +336,130 @@ describe('Mindspace HR API', () => {
 
       const again = await importSample(prisma, () => undefined, dir);
       expect(again.imported).toBe(0);
+    });
+  });
+  describe('leave', () => {
+    const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+    // Next year, so every date is in the future; the year's Kenya holidays are replaced by one known holiday
+    const Y = new Date().getUTCFullYear() + 1;
+    const iso = (d: Date) => d.toISOString().slice(0, 10);
+    const firstMonday = new Date(Date.UTC(Y, 1, 1 + ((8 - new Date(Date.UTC(Y, 1, 1)).getUTCDay()) % 7)));
+    const day = (week: number, weekday: number) => iso(new Date(firstMonday.getTime() + ((week - 1) * 7 + weekday) * 86_400_000));
+    let dev: { id: string };
+    let tester: { id: string };
+    let devLeaveId: string;
+
+    const annual = async (who: string) => {
+      const res = await api('get', `/leave/balances?year=${Y}`, who).expect(200);
+      return res.body.find((b: { type: string }) => b.type === 'ANNUAL');
+    };
+
+    beforeAll(async () => {
+      dev = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'developer@mindspace-ai.test' } } });
+      tester = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'tester@mindspace-ai.test' } } });
+      await api('get', `/leave/holidays?countryCode=KE&year=${Y}`, 'developer').expect(200);
+      await prisma.publicHoliday.deleteMany({ where: { countryCode: 'KE', date: { gte: new Date(`${Y}-01-01`), lte: new Date(`${Y}-12-31`) } } });
+    });
+
+    it('publishes each country’s public holidays and lets only HR change them', async () => {
+      const res = await api('get', '/leave/holidays?countryCode=KE&year=2026', 'developer').expect(200);
+      expect(res.body.map((h: { name: string }) => h.name)).toContain('Jamhuri Day');
+      const holiday = { countryCode: 'KE', date: day(2, 2), name: 'Test holiday' };
+      await api('post', '/leave/holidays', 'developer').send(holiday).expect(403);
+      await api('post', '/leave/holidays', 'hr').send(holiday).expect(201);
+      await api('post', '/leave/holidays', 'hr').send(holiday).expect(409);
+    });
+
+    it('counts working days, skipping the weekend and public holidays', async () => {
+      const res = await api('get', `/leave/preview?startDate=${day(2, 0)}&endDate=${day(2, 6)}`, 'developer').expect(200);
+      expect(res.body.days).toBe(4);
+      expect(res.body.holidays).toEqual([{ date: day(2, 2), name: 'Test holiday' }]);
+    });
+
+    it('sends a request to the manager, who approves it', async () => {
+      const before = await annual('developer');
+      const res = await api('post', '/leave/requests', 'developer')
+        .field('type', 'ANNUAL').field('startDate', day(2, 0)).field('endDate', day(2, 4)).field('handoverTo', 'Faith Njeri')
+        .expect(201);
+      devLeaveId = res.body.id;
+      expect(res.body).toMatchObject({ status: 'PENDING_MANAGER', days: 4, canCancel: true });
+      expect(mail.outbox.some((m) => m.to === 'manager@mindspace-ai.test' && m.subject === 'Leave request from Kevin Mwangi')).toBe(true);
+      expect((await annual('developer')).pending).toBe(before.pending + 4);
+
+      // No overlapping requests
+      await api('post', '/leave/requests', 'developer').field('type', 'SICK').field('startDate', day(2, 4)).field('endDate', day(2, 4)).expect(409);
+
+      const queue = await api('get', '/leave/approvals', 'manager').expect(200);
+      expect(queue.body.map((r: { id: string }) => r.id)).toContain(devLeaveId);
+      await api('post', `/leave/requests/${devLeaveId}/approve`, 'developer').expect(403);
+      await api('post', `/leave/requests/${devLeaveId}/approve`, 'tester').expect(403);
+      const ok = await api('post', `/leave/requests/${devLeaveId}/approve`, 'manager').send({ note: 'Enjoy' }).expect(201);
+      expect(ok.body.status).toBe('APPROVED');
+      await api('post', `/leave/requests/${devLeaveId}/decline`, 'manager').expect(409);
+      expect(mail.outbox.some((m) => m.to === 'developer@mindspace-ai.test' && m.subject === 'Your leave was approved')).toBe(true);
+      const after = await annual('developer');
+      expect(after.approved).toBe(before.approved + 4);
+      expect(after.left).toBe(before.left - 4);
+    });
+
+    it('keeps other people’s leave private', async () => {
+      await api('get', `/leave/requests?employeeId=${dev.id}&year=${Y}`, 'tester').expect(403);
+      await api('get', `/leave/requests?employeeId=${dev.id}&year=${Y}`, 'manager').expect(200);
+      const hrEmp = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'hr@mindspace-ai.test' } } });
+      await api('get', `/leave/requests?employeeId=${hrEmp.id}&year=${Y}`, 'manager').expect(403);
+      // A teammate sees that Kevin is away, but not why
+      const month = day(2, 0).slice(0, 7);
+      const team = await api('get', `/leave/calendar?month=${month}`, 'tester').expect(200);
+      expect(team.body.entries.find((e: { employeeId: string }) => e.employeeId === dev.id)).toMatchObject({ type: null, status: 'APPROVED' });
+      const mgr = await api('get', `/leave/calendar?month=${month}`, 'manager').expect(200);
+      expect(mgr.body.entries.find((e: { employeeId: string }) => e.employeeId === dev.id).type).toBe('ANNUAL');
+    });
+
+    it('enforces allowances and the medical certificate rule', async () => {
+      const floating = await api('post', '/leave/requests', 'tester').field('type', 'FLOATING').field('startDate', day(3, 0)).field('endDate', day(3, 2)).expect(400);
+      expect(floating.body.message).toContain('Only 2 days');
+      await api('post', '/leave/requests', 'tester').field('type', 'SICK').field('startDate', day(4, 0)).field('endDate', day(4, 2)).expect(400);
+      const sick = await api('post', '/leave/requests', 'tester')
+        .field('type', 'SICK').field('startDate', day(4, 0)).field('endDate', day(4, 2)).attach('file', PDF, 'certificate.pdf')
+        .expect(201);
+      const doc = await prisma.employeeDocument.findUniqueOrThrow({ where: { id: sick.body.documentId } });
+      expect(doc).toMatchObject({ type: 'Medical certificate (sick leave)', status: 'PENDING' });
+      // The employee can withdraw it while it waits
+      const cancelled = await api('post', `/leave/requests/${sick.body.id}/cancel`, 'tester').expect(201);
+      expect(cancelled.body.status).toBe('CANCELLED');
+      await api('post', `/leave/requests/${devLeaveId}/cancel`, 'tester').expect(403);
+    });
+
+    it('needs HR as well as the manager for unpaid leave, and takes it off pay', async () => {
+      const req = await api('post', '/leave/requests', 'tester').field('type', 'UNPAID').field('startDate', day(3, 0)).field('endDate', day(3, 2)).expect(201);
+      const step1 = await api('post', `/leave/requests/${req.body.id}/approve`, 'manager').expect(201);
+      expect(step1.body.status).toBe('PENDING_HR');
+      expect(mail.outbox.some((m) => m.to === 'hr@mindspace-ai.test' && m.subject.startsWith('Leave waiting for HR'))).toBe(true);
+      await api('post', `/leave/requests/${req.body.id}/approve`, 'manager').expect(403);
+      const step2 = await api('post', `/leave/requests/${req.body.id}/approve`, 'hr').expect(201);
+      expect(step2.body.status).toBe('APPROVED');
+
+      const kenya = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-KE' } });
+      const run = await api('post', '/payroll/runs', 'payroll').send({ companyId: kenya.id, year: Y, month: 2 }).expect(201);
+      const slip = run.body.payslips.find((p: { employeeId: string }) => p.employeeId === tester.id);
+      const month = await api('get', `/leave/preview?startDate=${Y}-02-01&endDate=${iso(new Date(Date.UTC(Y, 2, 0)))}`, 'tester').expect(200);
+      const unpaid = slip.lines.find((l: { code: string }) => l.code === 'LEAVE_UNPAID');
+      expect(unpaid.label).toBe(`Leave: 3 unpaid days of ${month.body.days}`);
+      expect(unpaid.amount).toBeCloseTo(-(120000 * 3) / month.body.days, 2);
+      expect(Number(slip.gross)).toBeCloseTo(128000 + unpaid.amount, 2);
+      const devSlip = run.body.payslips.find((p: { employeeId: string }) => p.employeeId === dev.id);
+      expect(devSlip.annualLeaveLeft).toBe((await annual('developer')).left + (await annual('developer')).pending);
+    });
+
+    it('lets HR record leave for staff without a login, approved at once', async () => {
+      const njeri = await prisma.employee.findUniqueOrThrow({ where: { employeeNo: 'MSA-KE-000012' } });
+      await api('post', '/leave/requests', 'developer').field('type', 'ANNUAL').field('startDate', day(5, 0)).field('endDate', day(5, 0)).field('employeeId', njeri.id).expect(403);
+      const res = await api('post', '/leave/requests', 'hr').field('type', 'ANNUAL').field('startDate', day(5, 0)).field('endDate', day(5, 1)).field('employeeId', njeri.id).expect(201);
+      expect(res.body).toMatchObject({ status: 'APPROVED', days: 2 });
+      const adj = await api('post', '/leave/adjustments', 'hr').send({ employeeId: njeri.id, type: 'ANNUAL', year: Y, days: 3, reason: 'Opening balance' }).expect(201);
+      expect(adj.body.days).toBe(3);
+      const bal = await api('get', `/leave/balances?employeeId=${njeri.id}&year=${Y}`, 'hr').expect(200);
+      expect(bal.body.find((b: { type: string }) => b.type === 'ANNUAL')).toMatchObject({ adjustment: 3, approved: 2 });
     });
   });
 });

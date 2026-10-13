@@ -52,6 +52,8 @@ export const DOCUMENT_TYPES = [
   "Dependants' birth certificates",
   'Remote work agreement',
   'Medical fitness certificate',
+  'Medical certificate (sick leave)',
+  'Leave supporting document',
   'Driving licence',
   'Work permit',
   'Exit clearance and certificate of service',

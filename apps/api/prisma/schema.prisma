@@ -41,6 +41,26 @@ enum DocumentStatus {
   REJECTED
 }
 
+enum LeaveType {
+  ANNUAL
+  SICK
+  FLOATING
+  FAMILY_CARE
+  COMPASSIONATE
+  STUDY
+  MATERNITY
+  PATERNITY
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING_MANAGER
+  PENDING_HR
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
 enum PayrollStatus {
   DRAFT
   APPROVED
@@ -134,6 +154,8 @@ model Employee {
   payslips             Payslip[]
   nextOfKin            NextOfKin[]
   documents            EmployeeDocument[]
+  leaveRequests        LeaveRequest[]
+  leaveAdjustments     LeaveAdjustment[]
   /// Set when an admin deletes the employee. Records are kept for legal retention.
   deletedAt            DateTime?
   createdAt            DateTime           @default(now())
@@ -168,19 +190,21 @@ model PayrollRun {
 }
 
 model Payslip {
-  id           String     @id @default(cuid())
-  runId        String
-  run          PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  employeeId   String
-  employee     Employee   @relation(fields: [employeeId], references: [id])
-  currency     String     @db.Char(3)
-  gross        Decimal    @db.Decimal(14, 2)
-  deductions   Decimal    @db.Decimal(14, 2)
-  net          Decimal    @db.Decimal(14, 2)
-  employerCost Decimal    @db.Decimal(14, 2)
+  id              String     @id @default(cuid())
+  runId           String
+  run             PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee   @relation(fields: [employeeId], references: [id])
+  currency        String     @db.Char(3)
+  gross           Decimal    @db.Decimal(14, 2)
+  deductions      Decimal    @db.Decimal(14, 2)
+  net             Decimal    @db.Decimal(14, 2)
+  employerCost    Decimal    @db.Decimal(14, 2)
   /// Line items: [{ code, label, kind: EARNING | DEDUCTION | EMPLOYER, amount }]
-  lines        Json
-  createdAt    DateTime   @default(now())
+  lines           Json
+  /// Annual leave days left for the year at the end of the pay period, shown on the payslip
+  annualLeaveLeft Int?
+  createdAt       DateTime   @default(now())
 
   @@unique([runId, employeeId])
 }
@@ -233,4 +257,65 @@ model EmployeeDocument {
   createdAt    DateTime       @default(now())
 
   @@index([employeeId])
+}
+
+/// A leave request. Days are working days, after the country's weekend and public holidays.
+model LeaveRequest {
+  id               String      @id @default(cuid())
+  employeeId       String
+  employee         Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type             LeaveType
+  startDate        DateTime    @db.Date
+  endDate          DateTime    @db.Date
+  days             Int
+  reason           String?
+  handoverTo       String?
+  contactWhileAway String?
+  /// Medical certificate or other supporting document
+  documentId       String?
+  status           LeaveStatus
+  /// Employee who must approve first (their manager when the request was made)
+  approverId       String?
+  managerById      String?
+  managerAt        DateTime?
+  managerNote      String?
+  hrById           String?
+  hrAt             DateTime?
+  hrNote           String?
+  createdById      String?
+  cancelledById    String?
+  cancelledAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([employeeId, startDate])
+  @@index([approverId, status])
+  @@index([status, startDate])
+}
+
+/// HR correction to a leave balance, e.g. an opening balance or carry-over agreed outside the rules
+model LeaveAdjustment {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type        LeaveType
+  year        Int
+  /// Days added (or removed when negative)
+  days        Int
+  reason      String
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId, year])
+}
+
+/// Public holidays per country. Generated each year as a draft; HR checks them against the gazette.
+model PublicHoliday {
+  id          String   @id @default(cuid())
+  countryCode String   @db.Char(2)
+  date        DateTime @db.Date
+  name        String
+  createdAt   DateTime @default(now())
+
+  @@unique([countryCode, date])
 }

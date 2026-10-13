@@ -6,6 +6,7 @@ Done so far:
 
 - **Milestone 1:** secure sign-in, employee records, and the month-end payroll run with payslips. Kenya is the first country with payroll rules; the other countries come next.
 - **Milestone 2:** staff profiles with photos, contact details, IDs, education, next of kin and HR documents, plus an import of 12,408 sample staff.
+- **Milestone 3:** leave requests and approvals, balances, a team leave calendar and public holidays for all eight countries. Unpaid leave comes off pay.
 
 | Part | Stack |
 |---|---|
@@ -68,6 +69,29 @@ Uploads must be PDF, PNG, JPEG or WebP (checked from the file contents, not the 
 
 All sample data is fictional, and IDs start with `SPECIMEN`.
 
+## Leave
+
+Staff request leave under **My leave**. The portal counts working days, skipping the weekend (Friday and Saturday in Egypt) and the country's public holidays.
+
+| Leave | Allowance | Approved by |
+|---|---|---|
+| Annual | 21 working days, +1 for every 2 years of service, up to 25 (more where the law says so: Mexico, and Egypt after 10 years or from age 50). Pro-rated in the year someone joins. Up to 5 unused days carry over. | Manager |
+| Sick | 30 days on full pay, then 30 on half pay. A medical certificate is needed after 2 days. | Manager |
+| Floating holiday, family care | 2 and 5 days a year | Manager |
+| Compassionate | 5 days per bereavement | Manager |
+| Study | 10 days a year | Manager, then HR |
+| Maternity or primary caregiver | 16 weeks (4 months in South Africa and Egypt, 26 weeks in New Zealand) | Manager, then HR |
+| Paternity or partner | 4 weeks | Manager, then HR |
+| Unpaid | Up to 3 months | Manager, then HR |
+
+- Requests go to the employee's manager, who is emailed and has 3 working days to respond. Staff without a manager in the portal go straight to HR.
+- HR can record leave for anyone, approved at once (useful for the imported staff, who have no login), and adjust balances for opening balances.
+- **Leave calendar:** HR, payroll and admins see a whole company; managers see their team; everyone else sees when teammates are away, but not why.
+- **Payroll:** unpaid leave, and sick leave past the full-pay days, reduce basic pay for those working days before tax. Every payslip shows the annual leave left.
+- **Public holidays** for 2026 onwards are generated for each country the first time they are needed. Islamic holidays are estimates: HR checks them against the official gazette and corrects them under **Leave calendar > Public holidays**.
+
+**These rules are drafts (`LEAVE-2026.1-draft`).** HR in each country should confirm them against local law before go-live.
+
 ## How sign-in works
 
 1. Email, password and a Turnstile CAPTCHA.
@@ -97,7 +121,7 @@ npm run db:test:setup   # migrates the hrportal_test database (created by docker
 npm test                # Kenya rule unit tests + full API flow
 ```
 
-The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads and the sample import. It wipes its database, so it only runs against a database whose name ends in `_test`.
+The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, and leave from request to payslip. It wipes its database, so it only runs against a database whose name ends in `_test`.
 
 ## Screenshots
 
@@ -108,3 +132,9 @@ The API test signs in through the email code, checks every role boundary, adds a
 | ![Staff list](docs/screenshots/06-staff-list.png) | ![Manager view of a profile](docs/screenshots/08-manager-view.png) |
 
 ![Staff profile](docs/screenshots/07-staff-profile.png)
+
+| | |
+|---|---|
+| ![My leave](docs/screenshots/09-my-leave.png) | ![Leave approvals](docs/screenshots/11-leave-approvals.png) |
+
+![Leave calendar](docs/screenshots/10-leave-calendar.png)

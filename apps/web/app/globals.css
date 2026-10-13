@@ -106,3 +106,33 @@ button.link { background: none; border: 0; padding: 0; color: var(--brand); font
 .muted.small, div.small { font-size: 0.8rem; }
 td.actions { white-space: nowrap; text-align: right; }
 td button.link { overflow-wrap: anywhere; text-align: left; }
+.badge.PENDING_MANAGER, .badge.PENDING_HR { background: #fff4de; color: var(--warn); }
+.badge.CANCELLED { background: #eef1f6; color: var(--muted); }
+textarea { display: block; width: 100%; margin-top: 0.3rem; padding: 0.55rem 0.65rem; border: 1px solid var(--border); border-radius: 6px; font: inherit; color: var(--text); background: #fff; }
+
+/* Leave calendar */
+.leave-cal { table-layout: fixed; min-width: 900px; }
+.leave-cal th, .leave-cal td { padding: 0; text-align: center; font-size: 0.72rem; height: 28px; border-left: 1px solid var(--border); }
+.leave-cal th { padding: 0.2rem 0; font-weight: 600; }
+.leave-cal th div { color: var(--muted); font-weight: 400; }
+.leave-cal .who { width: 180px; text-align: left; padding: 0 0.5rem; font-size: 0.85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 0; }
+.leave-cal .off { background: #eef1f6; }
+.lt { background: #0b6e99; }
+.lt-ANNUAL { background: #0b6e99; }
+.lt-SICK { background: #c0392b; }
+.lt-FLOATING, .lt-FAMILY_CARE, .lt-COMPASSIONATE { background: #8e44ad; }
+.lt-STUDY { background: #b7791f; }
+.lt-MATERNITY, .lt-PATERNITY { background: #19a974; }
+.lt-UNPAID { background: #5c6782; }
+.lt-AWAY { background: #7f9bb8; }
+.lt.pending { opacity: 0.45; background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255,255,255,0.6) 4px 7px); }
+.legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: 0.75rem; font-size: 0.8rem; color: var(--muted); }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; border: 1px solid var(--border); }
+a.button { display: inline-block; font: inherit; padding: 0.55rem 1rem; border-radius: 6px; border: 1px solid var(--brand); text-decoration: none; }
+a.button.secondary { background: transparent; color: var(--brand); }
+a.button.secondary:hover { background: #eaf3f8; }
+.legend i.off { background: #eef1f6; }
+td.decide { min-width: 190px; }
+td.decide input { margin: 0 0 0.4rem; }
+td.decide div { white-space: nowrap; }
+.badge.DECLINED { background: #fbe6e3; color: var(--danger); }

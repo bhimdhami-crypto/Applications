@@ -1,7 +1,9 @@
 // Seeds the companies and the six sample accounts used for testing.
 // Every email uses the reserved .test domain, so mail only ever lands in the local Mailpit inbox.
-import { PrismaClient, Role, WorkLocation } from '@prisma/client';
+import { LeaveStatus, LeaveType, PrismaClient, Role, WorkLocation } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
+import { workingDays } from '../src/leave/calendar';
+import { publicHolidays } from '../src/leave/public-holidays';
 
 const COMPANIES = [
   { code: 'MSA-INC', name: 'Mindspace Artificial Intelligence Inc.', country: 'United States', countryCode: 'US', currency: 'USD' },
@@ -108,7 +110,42 @@ export async function seed(prisma: PrismaClient) {
     employeeIdByEmail.set(p.email, emp.id);
   }
 
+  await seedLeave(prisma, employeeIdByEmail);
   return PEOPLE.map((p) => ({ email: p.email, role: p.role }));
+}
+
+/** A little leave history so the leave screens have something to show. Added once per person. */
+const SAMPLE_LEAVE: Array<{ email: string; type: LeaveType; start: string; end: string; status: LeaveStatus; reason?: string }> = [
+  { email: 'developer@mindspace-ai.test', type: LeaveType.ANNUAL, start: '2026-12-21', end: '2026-12-24', status: LeaveStatus.APPROVED, reason: 'Family holiday' },
+  { email: 'developer@mindspace-ai.test', type: LeaveType.SICK, start: '2026-06-15', end: '2026-06-16', status: LeaveStatus.APPROVED },
+  { email: 'tester@mindspace-ai.test', type: LeaveType.ANNUAL, start: '2026-11-02', end: '2026-11-06', status: LeaveStatus.PENDING_MANAGER, reason: 'Visiting family in Kisumu' },
+  { email: 'manager@mindspace-ai.test', type: LeaveType.ANNUAL, start: '2026-08-10', end: '2026-08-14', status: LeaveStatus.APPROVED },
+  { email: 'payroll@mindspace-ai.test', type: LeaveType.STUDY, start: '2026-11-16', end: '2026-11-17', status: LeaveStatus.PENDING_HR, reason: 'CPA exam' },
+];
+
+async function seedLeave(prisma: PrismaClient, employeeIdByEmail: Map<string, string>) {
+  const holidays = new Set(publicHolidays('KE', 2026).map((h) => h.date));
+  const manager = employeeIdByEmail.get('manager@mindspace-ai.test')!;
+  for (const email of new Set(SAMPLE_LEAVE.map((l) => l.email))) {
+    const employeeId = employeeIdByEmail.get(email)!;
+    if ((await prisma.leaveRequest.count({ where: { employeeId } })) > 0) continue;
+    for (const l of SAMPLE_LEAVE.filter((x) => x.email === email)) {
+      const reportsToManager = email === 'developer@mindspace-ai.test' || email === 'tester@mindspace-ai.test';
+      await prisma.leaveRequest.create({
+        data: {
+          employeeId,
+          type: l.type,
+          startDate: new Date(`${l.start}T00:00:00Z`),
+          endDate: new Date(`${l.end}T00:00:00Z`),
+          days: workingDays(l.start, l.end, 'KE', holidays).length,
+          reason: l.reason,
+          status: l.status,
+          approverId: reportsToManager ? manager : null,
+          ...(l.status === LeaveStatus.APPROVED ? { managerAt: new Date(`${l.start}T09:00:00Z`) } : {}),
+        },
+      });
+    }
+  }
 }
 
 if (require.main === module) {

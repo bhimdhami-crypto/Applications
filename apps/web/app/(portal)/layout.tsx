@@ -9,16 +9,21 @@ function Shell({ children }: { children: React.ReactNode }) {
   const { me, can, signOut } = useSession();
   const path = usePathname();
   const ownProfile = me.employee ? `/employees/${me.employee.id}` : '';
-  const links: { href: string; label: string; show: boolean; match?: string }[] = [
+  const links: { href: string; label: string; show: boolean }[] = [
     { href: '/dashboard', label: 'Home', show: true },
-    { href: '/profile', label: 'My profile', show: !!me.employee, match: ownProfile },
+    { href: '/profile', label: 'My profile', show: !!me.employee },
+    { href: '/leave', label: 'My leave', show: !!me.employee },
+    { href: '/leave/approvals', label: 'Leave approvals', show: can('HR', 'MANAGER') },
+    { href: '/leave/calendar', label: 'Leave calendar', show: true },
     { href: '/employees', label: me.role === 'MANAGER' ? 'My team' : 'Employees', show: can('HR', 'PAYROLL', 'MANAGER') },
     { href: '/payroll', label: 'Payroll', show: can('PAYROLL') },
     { href: '/payslips', label: 'My payslips', show: !!me.employee },
   ];
-  // Your own record lives under /employees, so it highlights "My profile" rather than the staff list
-  const isActive = (l: (typeof links)[number]) =>
-    l.match ? path === l.match || path.startsWith(l.href) : path.startsWith(l.href) && !(ownProfile && path === ownProfile);
+  // The most specific link wins (/leave/approvals over /leave); your own record under /employees highlights "My profile"
+  const activeHref = ownProfile && path === ownProfile
+    ? '/profile'
+    : links.filter((l) => l.show && (path === l.href || path.startsWith(`${l.href}/`))).sort((a, b) => b.href.length - a.href.length)[0]?.href;
+  const isActive = (l: (typeof links)[number]) => l.href === activeHref;
   return (
     <div className="shell">
       <nav className="sidebar">

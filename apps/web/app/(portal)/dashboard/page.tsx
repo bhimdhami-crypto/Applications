@@ -2,17 +2,21 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api, LOCATION_LABEL, money, Payslip, PayrollRun, periodName } from '@/lib/api';
+import { api, LeaveBalance, LeaveRequest, LOCATION_LABEL, money, Payslip, PayrollRun, periodName } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
 export default function DashboardPage() {
   const { me, can } = useSession();
   const [runs, setRuns] = useState<PayrollRun[]>([]);
   const [latest, setLatest] = useState<Payslip | null>(null);
+  const [annual, setAnnual] = useState<LeaveBalance | null>(null);
+  const [toApprove, setToApprove] = useState<LeaveRequest[]>([]);
 
   useEffect(() => {
     if (can('PAYROLL')) api<PayrollRun[]>('/payroll/runs').then(setRuns).catch(() => setRuns([]));
     if (me.employee) api<Payslip[]>('/payslips/me').then((p) => setLatest(p[0] ?? null)).catch(() => setLatest(null));
+    if (me.employee) api<LeaveBalance[]>('/leave/balances').then((b) => setAnnual(b.find((x) => x.type === 'ANNUAL') ?? null)).catch(() => setAnnual(null));
+    if (can('HR', 'MANAGER')) api<LeaveRequest[]>('/leave/approvals').then(setToApprove).catch(() => setToApprove([]));
   }, [me, can]);
 
   const waiting = runs.filter((r) => r.status !== 'FINALIZED');
@@ -39,6 +43,21 @@ export default function DashboardPage() {
             <Link href={`/payslips/${latest.id}`}>
               {latest.run ? periodName(latest.run.periodYear, latest.run.periodMonth) : 'Open'} payslip
             </Link>
+          </div>
+        )}
+        {annual && (
+          <div className="card stat">
+            <div className="label">Annual leave left this year</div>
+            <div className="value">{annual.left} days</div>
+            <Link href="/leave">Request leave</Link>
+          </div>
+        )}
+        {can('HR', 'MANAGER') && (
+          <div className="card stat">
+            <div className="label">Leave waiting for you</div>
+            <div className="value">{toApprove.length}</div>
+            {toApprove.some((r) => r.overdue) && <div className="muted small">{toApprove.filter((r) => r.overdue).length} overdue</div>}
+            <Link href="/leave/approvals">Open approvals</Link>
           </div>
         )}
         {can('PAYROLL') && (

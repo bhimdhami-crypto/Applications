@@ -233,6 +233,7 @@ export default function ProfilePage() {
             {p.employeeNo} · {p.company.name} · <span className={`badge ${p.status}`}>{p.status}</span>
           </div>
         </div>
+        <Link className="button secondary" href={isSelf ? '/leave' : `/leave?employeeId=${p.id}`}>Leave</Link>
         {p.can.editPersonal && (
           <>
             <input ref={photoInput} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={uploadPhoto} />

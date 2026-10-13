@@ -28,7 +28,7 @@ export interface Me {
     department: string;
     workLocation: string;
     hireDate: string;
-    company: { name: string; currency: string };
+    company: { name: string; currency: string; countryCode: string };
   };
 }
 
@@ -70,6 +70,7 @@ export interface Payslip {
   net: string;
   employerCost: string;
   lines: PayLine[];
+  annualLeaveLeft?: number | null;
   employee?: { employeeNo: string; firstName: string; lastName: string; jobTitle: string };
   run?: { periodYear: number; periodMonth: number; company?: { name: string } };
 }
@@ -269,4 +270,77 @@ export const LOCATION_LABEL: Record<Employee['workLocation'], string> = {
 export function amount(value: string | number | undefined) {
   if (value === undefined) return '';
   return new Intl.NumberFormat('en-GB', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(value));
+}
+
+export type LeaveType = 'ANNUAL' | 'SICK' | 'FLOATING' | 'FAMILY_CARE' | 'COMPASSIONATE' | 'STUDY' | 'MATERNITY' | 'PATERNITY' | 'UNPAID';
+export type LeaveStatus = 'PENDING_MANAGER' | 'PENDING_HR' | 'APPROVED' | 'DECLINED' | 'CANCELLED';
+
+export interface LeaveTypeInfo {
+  type: LeaveType;
+  label: string;
+  hrApproval: boolean;
+  backdated: boolean;
+  yearly: boolean;
+  note: string;
+}
+
+export interface LeaveBalance {
+  type: LeaveType;
+  label: string;
+  entitlement: number | null;
+  carriedOver: number;
+  adjustment: number;
+  approved: number;
+  pending: number;
+  left: number | null;
+}
+
+export interface LeaveRequest {
+  id: string;
+  employeeId: string;
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string | null;
+  handoverTo: string | null;
+  contactWhileAway: string | null;
+  documentId: string | null;
+  status: LeaveStatus;
+  managerNote: string | null;
+  hrNote: string | null;
+  createdAt: string;
+  canCancel?: boolean;
+  employee?: { id: string; firstName: string; lastName: string; employeeNo: string; company: { countryCode: string; name: string } };
+  waitingDays?: number;
+  overdue?: boolean;
+}
+
+export interface Holiday {
+  id?: string;
+  date: string;
+  name: string;
+}
+
+export const LEAVE_STATUS_LABEL: Record<LeaveStatus, string> = {
+  PENDING_MANAGER: 'Waiting for manager',
+  PENDING_HR: 'Waiting for HR',
+  APPROVED: 'Approved',
+  DECLINED: 'Declined',
+  CANCELLED: 'Cancelled',
+};
+
+export const COUNTRY_NAME: Record<string, string> = {
+  KE: 'Kenya', UG: 'Uganda', TZ: 'Tanzania', ZA: 'South Africa', EG: 'Egypt', NG: 'Nigeria', MX: 'Mexico', NZ: 'New Zealand',
+};
+
+/** Short date range, e.g. "2 to 6 Nov 2026" */
+export function dateRange(start: string, end: string) {
+  if (start === end) return formatDate(start);
+  const s = new Date(start);
+  const e = new Date(end);
+  const sameYear = s.getUTCFullYear() === e.getUTCFullYear();
+  const sameMonth = sameYear && s.getUTCMonth() === e.getUTCMonth();
+  const opts: Intl.DateTimeFormatOptions = { day: 'numeric', timeZone: 'UTC', ...(sameMonth ? {} : { month: 'short' }), ...(sameYear ? {} : { year: 'numeric' }) };
+  return `${s.toLocaleDateString('en-GB', opts)} to ${formatDate(end)}`;
 }
