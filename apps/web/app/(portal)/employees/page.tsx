@@ -105,7 +105,7 @@ export default function EmployeesPage() {
     }
   }
 
-  const roles: Role[] = isAdmin ? ['EMPLOYEE', 'MANAGER', 'HR', 'PAYROLL', 'ADMIN'] : ['EMPLOYEE', 'MANAGER'];
+  const roles: Role[] = isAdmin ? ['EMPLOYEE', 'MANAGER', 'HR', 'PAYROLL', 'FINANCE', 'ADMIN'] : ['EMPLOYEE', 'MANAGER'];
   const employees = data?.items ?? [];
   const showPay = employees[0]?.monthlyBasic !== undefined;
   const pages = data ? Math.max(1, Math.ceil(data.total / data.pageSize)) : 1;

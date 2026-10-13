@@ -136,3 +136,19 @@ td.decide { min-width: 190px; }
 td.decide input { margin: 0 0 0.4rem; }
 td.decide div { white-space: nowrap; }
 .badge.DECLINED { background: #fbe6e3; color: var(--danger); }
+
+/* Advances, loans and benefits */
+.badge.CLOSED { background: #e2f6ee; color: var(--accent); }
+.tabs { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1rem; }
+.tabs button { background: #eef1f6; color: var(--text); }
+.tabs button.active { background: var(--brand); color: #fff; }
+.quote { border-left: 3px solid var(--brand); padding: 0.5rem 0.75rem; background: #f5f8fc; margin: 0.75rem 0; }
+.quote.bad { border-left-color: var(--danger); background: #fdf3f1; }
+.trail { margin: 0.25rem 0 0; padding-left: 1rem; }
+.trail li { font-size: 0.8rem; color: var(--muted); }
+details.more summary { cursor: pointer; color: var(--brand); font-size: 0.85rem; }
+.plans { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 0.75rem; }
+.plan { border: 1px solid var(--border); border-radius: 8px; padding: 0.75rem; }
+.plan.off { opacity: 0.55; }
+.plan h3 { margin: 0 0 0.25rem; font-size: 1rem; }
+td.wrap { white-space: normal; min-width: 11rem; }

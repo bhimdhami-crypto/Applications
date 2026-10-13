@@ -7,6 +7,7 @@ Done so far:
 - **Milestone 1:** secure sign-in, employee records, and the month-end payroll run with payslips. Kenya is the first country with payroll rules; the other countries come next.
 - **Milestone 2:** staff profiles with photos, contact details, IDs, education, next of kin and HR documents, plus an import of 12,408 sample staff.
 - **Milestone 3:** leave requests and approvals, balances, a team leave calendar and public holidays for all eight countries. Unpaid leave comes off pay.
+- **Milestone 4:** salary advances, staff loans and IOUs with their approvals and payroll recovery; meal vouchers, gym memberships and gift vouchers, taxed as benefits on the payslip.
 
 | Part | Stack |
 |---|---|
@@ -25,7 +26,7 @@ cp .env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 npm install
 npm run db:migrate
-npm run db:seed                      # companies and the six test accounts
+npm run db:seed                      # companies, the seven test accounts and benefit options
 npm run db:import-sample             # optional: 12,408 sample staff with documents and photos
 npm run dev:api                      # http://localhost:4000/api
 npm run dev:web                      # http://localhost:3000
@@ -47,6 +48,7 @@ All emails use the reserved `.test` domain, so nothing can ever reach a real per
 | manager@mindspace-ai.test | `Test#Mindspace2026` | Manager | See their own team (no pay figures) |
 | developer@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips (fully remote) |
 | tester@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips |
+| finance@mindspace-ai.test | `Test#Mindspace2026` | Finance | Approve advances, loans and IOUs; confirm IOU settlements; the loan book |
 
 Change the passwords with `SEED_ADMIN_PASSWORD` and `SEED_USER_PASSWORD` before seeding anything other than a laptop. The seed refuses to run with `NODE_ENV=production` unless both are set.
 
@@ -92,6 +94,36 @@ Staff request leave under **My leave**. The portal counts working days, skipping
 
 **These rules are drafts (`LEAVE-2026.1-draft`).** HR in each country should confirm them against local law before go-live.
 
+## Advances, loans and IOUs
+
+Staff ask under **Advances and loans** (forms HR-F02, HR-F03 and HR-F04 of the Staff Advances, Loans and IOUs policy, POL-22). The form shows the monthly deduction and take-home pay before anything is sent.
+
+| | Limit | Repaid | Approved by |
+|---|---|---|---|
+| Salary advance | Half of net pay, once in any 3 months | In full from the next salary | Manager, Payroll, Finance |
+| Staff loan | 3 times monthly gross pay over up to 36 months; permanent staff after 6 months | Monthly instalments on a reducing balance: personal and vehicle 5%, housing 4%, education and emergency interest-free | Manager, HR, Finance; Country Head (the admin) for a housing loan above 3 times gross pay |
+| IOU | Cash for a business purchase | Settled with receipts within 14 days; Finance recovers whatever was not spent or returned | Manager, Finance |
+
+- Each step is approved by a different person, and nobody approves their own request. Everything waiting for someone is under **Loan and benefit approvals**, with an email at each step.
+- Take-home pay must stay above a third of gross pay. The request is refused if it would not, and payroll takes less (the loan runs longer) if pay drops.
+- **Payroll** deducts advances, IOU balances and loan instalments after tax. Repayments are recorded when the run is finalized. Someone leaving repays everything from final dues; the **Loan book** flags anything still owed.
+- **Finance** confirms IOU settlements against the receipts, recovers an overdue IOU through payroll after emailing the employee, and records cash repayments.
+- **Privacy:** loan details are visible to the employee, Payroll, Finance and their approvers only.
+- **Kenya:** the employer pays fringe benefit tax (30%) on the interest saved on cheap loans, against the market rate in `KE_MARKET_RATE` (update it every quarter).
+
+**These rules are drafts (`LOANS-2026.1-draft`).** Finance should confirm the limits and rates.
+
+## Benefits
+
+Under **Benefits**, staff join a meal option (HR-F06) or a gym plan (HR-F07); managers and HR nominate people for gift vouchers (HR-F05).
+
+- **Meal vouchers:** a canteen wallet or partner meal card for on-site and hybrid staff, or a cash meal allowance for fully remote staff. One at a time.
+- **Gym:** Standard, Premium and Family add-on plans at partner gyms. The company pays a subsidy; the employee's share comes off net pay.
+- Enrolments run whole calendar months and are approved by HR and then Payroll. Ending one stops it at the end of the current payroll month.
+- **Gift vouchers** for birthdays, long service, festive seasons, recognition, weddings and new babies. A manager's nomination counts as the manager step and then HR approves. HR's nominations go to the person's manager, or are issued at once if they have none.
+- **Payslip:** the company's share and vouchers appear as benefits in kind. In Kenya they are tax-free up to KES 5,000 a month in total, and fully taxed above that. The remote meal allowance is paid as taxable cash.
+- HR sets the options and prices for each company under **Benefits > Manage benefit options**, which also shows members, monthly cost and vouchers issued. The Kenya prices in the seed are examples.
+
 ## How sign-in works
 
 1. Email, password and a Turnstile CAPTCHA.
@@ -108,9 +140,9 @@ The CAPTCHA keys in `.env.example` are Cloudflare's published test keys, which a
 
 Deleting an employee is a soft delete: their login stops at once, and their record and payslips are kept for the legal retention period.
 
-### Kenya rules (`KE-2026.1-draft`)
+### Kenya rules (`KE-2026.2-draft`)
 
-PAYE bands with KES 2,400 personal relief; NSSF 6% up to KES 72,000 pensionable pay (employer matches); SHIF 2.75% (minimum KES 300); Affordable Housing Levy 1.5% each side; NITA KES 50 employer levy. NSSF, SHIF and the housing levy are deducted before PAYE.
+PAYE bands with KES 2,400 personal relief; NSSF 6% up to KES 72,000 pensionable pay (employer matches); SHIF 2.75% (minimum KES 300); Affordable Housing Levy 1.5% each side; NITA KES 50 employer levy. NSSF, SHIF and the housing levy are deducted before PAYE. Benefits in kind over KES 5,000 a month are taxed; voluntary deductions never take pay below a third of gross (Employment Act s.19).
 
 **These rules are marked unverified.** A Kenyan payroll adviser must sign them off before real pay. Until then the portal shows a warning on every run.
 
@@ -121,7 +153,7 @@ npm run db:test:setup   # migrates the hrportal_test database (created by docker
 npm test                # Kenya rule unit tests + full API flow
 ```
 
-The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, and leave from request to payslip. It wipes its database, so it only runs against a database whose name ends in `_test`.
+The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, leave from request to payslip, and advances, loans, IOUs and benefits from request to repayment. It wipes its database, so it only runs against a database whose name ends in `_test`.
 
 ## Screenshots
 
@@ -138,3 +170,10 @@ The API test signs in through the email code, checks every role boundary, adds a
 | ![My leave](docs/screenshots/09-my-leave.png) | ![Leave approvals](docs/screenshots/11-leave-approvals.png) |
 
 ![Leave calendar](docs/screenshots/10-leave-calendar.png)
+
+| | |
+|---|---|
+| ![Advances and loans](docs/screenshots/12-advances-and-loans.png) | ![Loan and benefit approvals](docs/screenshots/13-loan-approvals.png) |
+| ![Benefits](docs/screenshots/14-benefits.png) | ![Payslip with deductions and benefits](docs/screenshots/15-payslip-benefits.png) |
+
+![Loan book](docs/screenshots/16-loan-book.png)

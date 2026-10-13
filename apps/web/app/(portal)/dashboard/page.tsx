@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api, LeaveBalance, LeaveRequest, LOCATION_LABEL, money, Payslip, PayrollRun, periodName } from '@/lib/api';
+import { api, ApprovalItem, LeaveBalance, LeaveRequest, LOCATION_LABEL, money, Payslip, PayrollRun, periodName } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
 export default function DashboardPage() {
@@ -11,12 +11,20 @@ export default function DashboardPage() {
   const [latest, setLatest] = useState<Payslip | null>(null);
   const [annual, setAnnual] = useState<LeaveBalance | null>(null);
   const [toApprove, setToApprove] = useState<LeaveRequest[]>([]);
+  const [moneyQueue, setMoneyQueue] = useState<ApprovalItem[]>([]);
+  const [owed, setOwed] = useState<{ amount: string; currency: string } | null>(null);
 
   useEffect(() => {
     if (can('PAYROLL')) api<PayrollRun[]>('/payroll/runs').then(setRuns).catch(() => setRuns([]));
     if (me.employee) api<Payslip[]>('/payslips/me').then((p) => setLatest(p[0] ?? null)).catch(() => setLatest(null));
     if (me.employee) api<LeaveBalance[]>('/leave/balances').then((b) => setAnnual(b.find((x) => x.type === 'ANNUAL') ?? null)).catch(() => setAnnual(null));
     if (can('HR', 'MANAGER')) api<LeaveRequest[]>('/leave/approvals').then(setToApprove).catch(() => setToApprove([]));
+    if (can('HR', 'MANAGER', 'PAYROLL', 'FINANCE')) api<ApprovalItem[]>('/approvals').then(setMoneyQueue).catch(() => setMoneyQueue([]));
+    if (me.employee) {
+      api<{ outstanding: string; employee: { currency: string } }>('/loans')
+        .then((l) => setOwed(Number(l.outstanding) > 0 ? { amount: l.outstanding, currency: l.employee.currency } : null))
+        .catch(() => setOwed(null));
+    }
   }, [me, can]);
 
   const waiting = runs.filter((r) => r.status !== 'FINALIZED');
@@ -58,6 +66,20 @@ export default function DashboardPage() {
             <div className="value">{toApprove.length}</div>
             {toApprove.some((r) => r.overdue) && <div className="muted small">{toApprove.filter((r) => r.overdue).length} overdue</div>}
             <Link href="/leave/approvals">Open approvals</Link>
+          </div>
+        )}
+        {owed && (
+          <div className="card stat">
+            <div className="label">Advances and loans you owe</div>
+            <div className="value">{money(owed.amount, owed.currency)}</div>
+            <Link href="/money">See repayments</Link>
+          </div>
+        )}
+        {can('HR', 'MANAGER', 'PAYROLL', 'FINANCE') && (
+          <div className="card stat">
+            <div className="label">Loans and benefits waiting for you</div>
+            <div className="value">{moneyQueue.length}</div>
+            <Link href="/approvals">Open approvals</Link>
           </div>
         )}
         {can('PAYROLL') && (

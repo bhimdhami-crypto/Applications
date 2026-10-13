@@ -201,6 +201,16 @@ export class ProfilesService {
     return { data, mime: doc.mimeType ?? 'application/octet-stream', fileName: doc.fileName };
   }
 
+  /** A document's file for a caller that has already checked access (e.g. Finance reading IOU receipts) */
+  async documentFileChecked(actorId: string, docId: string) {
+    const doc = await this.prisma.employeeDocument.findUnique({ where: { id: docId } });
+    if (!doc?.storageKey) throw new NotFoundException('No file is on record');
+    const data = await this.storage.get(doc.storageKey);
+    if (!data) throw new NotFoundException('The file is missing from storage');
+    await this.audit.record(actorId, 'document.download', 'EmployeeDocument', doc.id);
+    return { data, mime: doc.mimeType ?? 'application/octet-stream', fileName: doc.fileName };
+  }
+
   async setDocumentStatus(actor: AuthUser, docId: string, status: DocumentStatus) {
     const doc = await this.findDocument(actor, docId);
     const updated = await this.prisma.employeeDocument.update({

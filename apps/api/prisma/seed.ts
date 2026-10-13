@@ -1,8 +1,9 @@
-// Seeds the companies and the six sample accounts used for testing.
+// Seeds the companies and the seven sample accounts used for testing.
 // Every email uses the reserved .test domain, so mail only ever lands in the local Mailpit inbox.
-import { LeaveStatus, LeaveType, PrismaClient, Role, WorkLocation } from '@prisma/client';
+import { ApprovalStage, BenefitKind, LeaveStatus, LeaveType, LoanKind, LoanProduct, Prisma, PrismaClient, RequestStatus, Role, VoucherOccasion, WorkLocation } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
 import { workingDays } from '../src/leave/calendar';
+import { instalmentFor } from '../src/loans/loan-rules';
 import { publicHolidays } from '../src/leave/public-holidays';
 
 const COMPANIES = [
@@ -38,7 +39,7 @@ type SeedPerson = {
   };
 };
 
-// The admin is a system account. The other five are Kenya staff paid in KES.
+// The admin is a system account. The other six are Kenya staff paid in KES.
 const PEOPLE: SeedPerson[] = [
   { email: 'admin@mindspace-ai.test', role: Role.ADMIN },
   {
@@ -65,6 +66,11 @@ const PEOPLE: SeedPerson[] = [
     email: 'tester@mindspace-ai.test',
     role: Role.EMPLOYEE,
     employee: { employeeNo: 'MSA-KE-T00005', firstName: 'Faith', lastName: 'Njeri', jobTitle: 'QA Engineer', department: 'Engineering', workLocation: WorkLocation.ON_SITE, hireDate: '2023-02-13', monthlyBasic: 120000, monthlyAllowances: 8000, gender: 'Female', dateOfBirth: '1998-08-30', mobilePhone: '+254 722 100 005', nextOfKin: { name: 'John Njeri', relationship: 'Father', phone: '+254 733 200 005' }, reportsTo: 'manager@mindspace-ai.test' },
+  },
+  {
+    email: 'finance@mindspace-ai.test',
+    role: Role.FINANCE,
+    employee: { employeeNo: 'MSA-KE-T00006', firstName: 'Lucy', lastName: 'Achieng', jobTitle: 'Finance Manager', department: 'Finance', workLocation: WorkLocation.ON_SITE, hireDate: '2017-05-02', monthlyBasic: 260000, monthlyAllowances: 20000, gender: 'Female', dateOfBirth: '1985-01-19', mobilePhone: '+254 722 100 006', nextOfKin: { name: 'Otieno Achieng', relationship: 'Spouse', phone: '+254 733 200 006' } },
   },
 ];
 
@@ -111,6 +117,8 @@ export async function seed(prisma: PrismaClient) {
   }
 
   await seedLeave(prisma, employeeIdByEmail);
+  await seedBenefitPlans(prisma, kenya.id);
+  await seedMoney(prisma, employeeIdByEmail);
   return PEOPLE.map((p) => ({ email: p.email, role: p.role }));
 }
 
@@ -146,6 +154,82 @@ async function seedLeave(prisma: PrismaClient, employeeIdByEmail: Map<string, st
       });
     }
   }
+}
+
+/** Kenya's meal and gym options (draft prices for HR to confirm), in KES a month */
+const KE_PLANS: Array<{ kind: BenefitKind; name: string; provider: string; description: string; companyShare: number; employeeShare: number; paidAsCash?: boolean; workLocations: WorkLocation[] }> = [
+  { kind: BenefitKind.MEAL, name: 'Canteen wallet', provider: 'Office canteen', description: 'Monthly credit for meals in the office canteen', companyShare: 4000, employeeShare: 0, workLocations: [WorkLocation.ON_SITE, WorkLocation.HYBRID] },
+  { kind: BenefitKind.MEAL, name: 'Partner meal card', provider: 'Partner restaurants', description: 'Card accepted at partner restaurants near the office', companyShare: 4000, employeeShare: 0, workLocations: [WorkLocation.ON_SITE, WorkLocation.HYBRID] },
+  { kind: BenefitKind.MEAL, name: 'Remote meal allowance', provider: 'Paid with salary', description: 'Cash allowance for fully remote staff, taxed with pay', companyShare: 3000, employeeShare: 0, paidAsCash: true, workLocations: [WorkLocation.FULLY_REMOTE] },
+  { kind: BenefitKind.GYM, name: 'Standard', provider: 'Partner gyms', description: 'Gym floor and classes at any partner branch', companyShare: 3000, employeeShare: 2000, workLocations: [] },
+  { kind: BenefitKind.GYM, name: 'Premium', provider: 'Partner gyms', description: 'Adds pool, sauna and personal training sessions', companyShare: 4000, employeeShare: 5000, workLocations: [] },
+  { kind: BenefitKind.GYM, name: 'Family add-on', provider: 'Partner gyms', description: 'Adds one family member; the employee pays it in full', companyShare: 0, employeeShare: 4000, workLocations: [] },
+];
+
+async function seedBenefitPlans(prisma: PrismaClient, companyId: string) {
+  for (const p of KE_PLANS) {
+    const data = { ...p, companyShare: p.companyShare.toFixed(2), employeeShare: p.employeeShare.toFixed(2), paidAsCash: !!p.paidAsCash };
+    await prisma.benefitPlan.upsert({ where: { companyId_kind_name: { companyId, kind: p.kind, name: p.name } }, update: {}, create: { ...data, companyId } });
+  }
+}
+
+/** A loan, an advance, an IOU, two memberships and a voucher nomination, so the screens have something to show. Added once. */
+async function seedMoney(prisma: PrismaClient, ids: Map<string, string>) {
+  const kevin = ids.get('developer@mindspace-ai.test')!;
+  const faith = ids.get('tester@mindspace-ai.test')!;
+  const brian = ids.get('payroll@mindspace-ai.test')!;
+  const amina = ids.get('manager@mindspace-ai.test')!;
+  if ((await prisma.loan.count({ where: { employeeId: { in: [kevin, faith, brian] } } })) > 0) return;
+  const users = new Map((await prisma.user.findMany({ select: { id: true, email: true } })).map((u) => [u.email, u.id]));
+  const decision = (stage: ApprovalStage, email: string, name: string, at: string, note: string | null = null) => ({ stage, byId: users.get(email)!, byName: name, at: `${at}T09:00:00.000Z`, approved: true, note });
+  const json = (v: unknown) => v as Prisma.InputJsonValue;
+
+  await prisma.loan.create({
+    data: {
+      employeeId: kevin, kind: LoanKind.LOAN, product: LoanProduct.PERSONAL, amount: '150000.00', currency: 'KES', months: 12, interestRate: 5,
+      instalment: (instalmentFor(15_000_000, 12, 5) / 100).toFixed(2), recoverable: '150000.00', firstMonth: 202610,
+      purpose: 'Laptop and home office setup', guarantor: 'Faith Njeri, MSA-KE-T00005', status: RequestStatus.APPROVED,
+      stages: [ApprovalStage.MANAGER, ApprovalStage.HR, ApprovalStage.FINANCE], stage: null, approverId: amina,
+      decisions: json([decision(ApprovalStage.MANAGER, 'manager@mindspace-ai.test', 'Amina Hassan', '2026-09-22'), decision(ApprovalStage.HR, 'hr@mindspace-ai.test', 'Wanjiru Kamau', '2026-09-23'), decision(ApprovalStage.FINANCE, 'finance@mindspace-ai.test', 'Lucy Achieng', '2026-09-24')]),
+      createdById: users.get('developer@mindspace-ai.test'),
+    },
+  });
+  await prisma.loan.create({
+    data: {
+      employeeId: faith, kind: LoanKind.ADVANCE, amount: '20000.00', currency: 'KES', months: 1, instalment: '20000.00',
+      purpose: 'School fees for my sister', status: RequestStatus.PENDING,
+      stages: [ApprovalStage.MANAGER, ApprovalStage.PAYROLL, ApprovalStage.FINANCE], stage: ApprovalStage.MANAGER, approverId: amina,
+      createdById: users.get('tester@mindspace-ai.test'),
+    },
+  });
+  await prisma.loan.create({
+    data: {
+      employeeId: brian, kind: LoanKind.IOU, amount: '15000.00', currency: 'KES', months: 1, instalment: '15000.00',
+      purpose: 'Venue deposit for the payroll training day', costCentre: 'FIN-OPS', neededOn: new Date('2026-10-05T00:00:00Z'), settleBy: new Date('2026-10-19T00:00:00Z'),
+      status: RequestStatus.APPROVED, stages: [ApprovalStage.FINANCE], stage: null,
+      decisions: json([decision(ApprovalStage.FINANCE, 'finance@mindspace-ai.test', 'Lucy Achieng', '2026-10-02')]),
+      createdById: users.get('payroll@mindspace-ai.test'),
+    },
+  });
+
+  const plans = new Map((await prisma.benefitPlan.findMany({ where: { company: { code: 'MSA-KE' } } })).map((p) => [p.name, p.id]));
+  const enrolled = [ApprovalStage.HR, ApprovalStage.PAYROLL];
+  const enrolDecisions = json([decision(ApprovalStage.HR, 'hr@mindspace-ai.test', 'Wanjiru Kamau', '2026-09-25'), decision(ApprovalStage.PAYROLL, 'payroll@mindspace-ai.test', 'Brian Otieno', '2026-09-26')]);
+  await prisma.benefitEnrolment.create({
+    data: { employeeId: kevin, planId: plans.get('Standard')!, kind: BenefitKind.GYM, startDate: new Date('2026-10-01T00:00:00Z'), branch: 'Westlands', emergencyContact: 'Mary Mwangi, +254 733 200 004', status: RequestStatus.APPROVED, stages: enrolled, decisions: enrolDecisions, createdById: users.get('developer@mindspace-ai.test') },
+  });
+  await prisma.benefitEnrolment.create({
+    data: { employeeId: faith, planId: plans.get('Canteen wallet')!, kind: BenefitKind.MEAL, startDate: new Date('2026-10-01T00:00:00Z'), dietaryNeeds: 'Vegetarian', status: RequestStatus.APPROVED, stages: enrolled, decisions: enrolDecisions, createdById: users.get('tester@mindspace-ai.test') },
+  });
+  await prisma.giftVoucher.create({
+    data: {
+      employeeId: faith, occasion: VoucherOccasion.RECOGNITION, value: '5000.00', currency: 'KES', partner: 'Partner bookstore',
+      reason: 'Led the release testing for the payroll launch', status: RequestStatus.PENDING,
+      stages: [ApprovalStage.MANAGER, ApprovalStage.HR], stage: ApprovalStage.HR, approverId: amina,
+      decisions: json([{ ...decision(ApprovalStage.MANAGER, 'manager@mindspace-ai.test', 'Amina Hassan', '2026-10-12'), note: 'Nominated by them' }]),
+      createdById: users.get('manager@mindspace-ai.test'),
+    },
+  });
 }
 
 if (require.main === module) {

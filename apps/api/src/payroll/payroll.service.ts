@@ -2,8 +2,10 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { PayrollStatus, Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/decorators';
+import { BenefitsService } from '../benefits/benefits.service';
 import { toIso, workingDays } from '../leave/calendar';
 import { LeaveService } from '../leave/leave.service';
+import { LoansService } from '../loans/loans.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { rulesFor } from './rules';
@@ -27,6 +29,8 @@ export class PayrollService {
     private readonly audit: AuditService,
     private readonly mail: MailService,
     private readonly leave: LeaveService,
+    private readonly loans: LoansService,
+    private readonly benefits: BenefitsService,
   ) {}
 
   listRuns() {
@@ -86,7 +90,9 @@ export class PayrollService {
   /** Locks the run and tells each employee their payslip is ready. */
   async finalize(actorId: string, id: string) {
     await this.transition(id, PayrollStatus.APPROVED, PayrollStatus.FINALIZED, { finalizedById: actorId, finalizedAt: new Date() });
-    await this.audit.record(actorId, 'payroll.finalize', 'PayrollRun', id);
+    // Loan, advance and IOU deductions on the payslips become repayments
+    const repaid = await this.loans.recordFromRun(id, actorId);
+    await this.audit.record(actorId, 'payroll.finalize', 'PayrollRun', id, { loansRepaid: repaid });
     const run = await this.prisma.payrollRun.findUniqueOrThrow({
       where: { id },
       include: { payslips: { include: { employee: { include: { user: true } } } } },
@@ -184,6 +190,9 @@ export class PayrollService {
     const monthWorkingDays = workingDays(start, end, country, new Set(holidays.keys())).length;
     const cuts = await this.leave.payCuts(employees.map((e) => e.id), country, start, end);
     const annualLeft = await this.leave.annualLeftMany(employees.map((e) => ({ ...e, company: { countryCode: country } })), run.periodYear);
+    // Loans, advances and IOUs to recover, then meal, gym and gift voucher benefits
+    const owed = await this.loans.payrollItems(employees, run.periodYear, run.periodMonth, periodEnd);
+    const perks = await this.benefits.payrollItems(employees.map((e) => e.id), run.periodYear, run.periodMonth);
 
     let gross = 0, deductions = 0, net = 0, employerCost = 0;
     const slips = employees.map((e) => {
@@ -193,7 +202,17 @@ export class PayrollService {
       const leaveDeduction = cut && monthWorkingDays > 0
         ? { amount: Math.round((basic * lostDays) / monthWorkingDays), label: leaveLabel(cut, monthWorkingDays) }
         : undefined;
-      const r = pack.calculate({ basic, allowances: toMinor(e.monthlyAllowances), leaveDeduction });
+      const loan = owed.get(e.id);
+      const perk = perks.get(e.id);
+      const r = pack.calculate({
+        basic,
+        allowances: toMinor(e.monthlyAllowances),
+        leaveDeduction,
+        cashAllowances: perk?.cashAllowances,
+        benefitsInKind: perk?.benefitsInKind,
+        voluntary: [...(loan?.voluntary ?? []), ...(perk?.voluntary ?? [])],
+        staffLoans: loan?.staffLoans,
+      });
       gross += r.gross; deductions += r.deductions; net += r.net; employerCost += r.employerCost;
       return {
         runId,
@@ -203,7 +222,7 @@ export class PayrollService {
         deductions: toMajor(r.deductions),
         net: toMajor(r.net),
         employerCost: toMajor(r.employerCost),
-        lines: r.lines.map((l) => ({ ...l, amount: Number(toMajor(l.amount)) })),
+        lines: r.lines.map((l) => ({ ...l, amount: Number(toMajor(l.amount)), ...(l.interest !== undefined ? { interest: Number(toMajor(l.interest)) } : {}) })),
         annualLeaveLeft: annualLeft.get(e.id) ?? null,
       };
     });

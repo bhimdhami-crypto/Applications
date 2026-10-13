@@ -57,14 +57,14 @@ describe('Mindspace HR API', () => {
     mail = app.get(MailService);
 
     await prisma.$executeRawUnsafe(
-      'TRUNCATE "LeaveRequest", "LeaveAdjustment", "PublicHoliday", "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
+      'TRUNCATE "LoanRepayment", "Loan", "BenefitEnrolment", "BenefitPlan", "GiftVoucher", "LeaveRequest", "LeaveAdjustment", "PublicHoliday", "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
     );
     process.env.SEED_ADMIN_PASSWORD = ADMIN_PASSWORD;
     process.env.SEED_USER_PASSWORD = USER_PASSWORD;
     await seed(prisma);
 
     tokens.admin = await signIn('admin@mindspace-ai.test', ADMIN_PASSWORD);
-    for (const who of ['hr', 'payroll', 'manager', 'developer', 'tester']) tokens[who] = await signIn(`${who}@mindspace-ai.test`);
+    for (const who of ['hr', 'payroll', 'manager', 'developer', 'tester', 'finance']) tokens[who] = await signIn(`${who}@mindspace-ai.test`);
   });
 
   afterAll(async () => {
@@ -158,7 +158,7 @@ describe('Mindspace HR API', () => {
       runId = res.body.id;
       const run = await api('get', `/payroll/runs/${runId}`, 'payroll').expect(200);
       expect(run.body.status).toBe('DRAFT');
-      expect(run.body.payslips).toHaveLength(5);
+      expect(run.body.payslips).toHaveLength(6);
       expect(run.body.rulesVerified).toBe(false);
       await api('post', '/payroll/runs', 'payroll').send({ companyId: kenya.id, year: 2026, month: 9 }).expect(409);
     });
@@ -460,6 +460,195 @@ describe('Mindspace HR API', () => {
       expect(adj.body.days).toBe(3);
       const bal = await api('get', `/leave/balances?employeeId=${njeri.id}&year=${Y}`, 'hr').expect(200);
       expect(bal.body.find((b: { type: string }) => b.type === 'ANNUAL')).toMatchObject({ adjustment: 3, approved: 2 });
+    });
+  });
+
+  describe('advances, loans, IOUs and benefits', () => {
+    const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+    const now = new Date();
+    const thisMonth = now.getUTCFullYear() * 100 + now.getUTCMonth() + 1;
+    const nextMonth = thisMonth % 100 === 12 ? thisMonth + 89 : thisMonth + 1;
+    const monthText = (m: number) => `${Math.floor(m / 100)}-${String(m % 100).padStart(2, '0')}`;
+    const today = now.toISOString().slice(0, 10);
+    const inDays = (n: number) => new Date(now.getTime() + n * 86_400_000).toISOString().slice(0, 10);
+    let dev: { id: string };
+    let tester: { id: string };
+    let advanceId: string;
+    let housingId: string;
+    let iouId: string;
+
+    const queue = async (who: string) => (await api('get', '/approvals', who).expect(200)).body as Array<{ entity: string; id: string; title: string }>;
+
+    beforeAll(async () => {
+      dev = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'developer@mindspace-ai.test' } } });
+      tester = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'tester@mindspace-ai.test' } } });
+    });
+
+    it('limits an advance to half of net pay and once in 3 months, then takes it through manager, payroll and finance', async () => {
+      // The seeded advance is still waiting, so another one is refused until it is withdrawn
+      const seeded = await prisma.loan.findFirstOrThrow({ where: { employeeId: tester.id, kind: 'ADVANCE' } });
+      const quote = await api('get', '/loans/quote?kind=ADVANCE&amount=10000', 'tester').expect(200);
+      expect(quote.body.problems.join(' ')).toContain('One advance is allowed in any 3 months');
+      await api('post', `/loans/${seeded.id}/cancel`, 'tester').expect(201);
+
+      const options = await api('get', '/loans/options', 'tester').expect(200);
+      expect(Number(options.body.maxAdvance)).toBeCloseTo(Number(options.body.net) / 2, 0);
+      const tooMuch = await api('post', '/loans', 'tester').send({ kind: 'ADVANCE', amount: Number(options.body.maxAdvance) + 1, purpose: 'Rent' }).expect(400);
+      expect(tooMuch.body.message).toContain('at most half of your net pay');
+
+      const res = await api('post', '/loans', 'tester').send({ kind: 'ADVANCE', amount: 20000, purpose: 'School fees' }).expect(201);
+      advanceId = res.body.id;
+      expect(res.body).toMatchObject({ status: 'PENDING', stageLabel: 'Manager', stages: ['Manager', 'Payroll', 'Finance'], canCancel: true });
+      expect(mail.outbox.some((m) => m.to === 'manager@mindspace-ai.test' && m.subject === 'Salary advance request from Faith Njeri')).toBe(true);
+
+      expect((await queue('manager')).map((q) => q.id)).toContain(advanceId);
+      await api('post', `/approvals/loan/${advanceId}/approve`, 'payroll').expect(403);
+      await api('post', `/approvals/loan/${advanceId}/approve`, 'manager').expect(201);
+      await api('post', `/approvals/loan/${advanceId}/approve`, 'finance').expect(403);
+      await api('post', `/approvals/loan/${advanceId}/approve`, 'payroll').expect(201);
+      const done = await api('post', `/approvals/loan/${advanceId}/approve`, 'finance').send({ note: 'Paid today' }).expect(201);
+      expect(done.body).toMatchObject({ status: 'APPROVED', instalment: '20000.00', outstanding: '20000.00' });
+      expect(mail.outbox.some((m) => m.to === 'tester@mindspace-ai.test' && m.subject === 'Your salary advance was approved')).toBe(true);
+
+      await api('post', '/loans', 'tester').send({ kind: 'ADVANCE', amount: 5000, purpose: 'Again' }).expect(400);
+    });
+
+    it('caps loans at 3 times gross pay, lets housing go higher with the Country Head, and keeps loans private', async () => {
+      const personal = await api('post', '/loans', 'developer').send({ kind: 'LOAN', product: 'PERSONAL', amount: 1_000_000, months: 36, purpose: 'Car' }).expect(400);
+      expect(personal.body.message).toContain('3 times monthly gross pay');
+      const unaffordable = await api('get', '/loans/quote?kind=LOAN&product=HOUSING&amount=2000000&months=12', 'developer').expect(200);
+      expect(unaffordable.body.problems.join(' ')).toContain('below a third of gross pay');
+
+      const res = await api('post', '/loans', 'developer')
+        .send({ kind: 'LOAN', product: 'HOUSING', amount: 1_000_000, months: 36, purpose: 'Deposit on a flat', guarantor: 'Amina Hassan' })
+        .expect(201);
+      housingId = res.body.id;
+      expect(res.body.stages).toEqual(['Manager', 'HR', 'Finance', 'Country Head']);
+      expect(res.body.interestRate).toBe(4);
+
+      await api('get', `/loans?employeeId=${dev.id}`, 'tester').expect(403);
+      await api('get', `/loans?employeeId=${dev.id}`, 'hr').expect(403);
+      await api('get', `/loans?employeeId=${dev.id}`, 'finance').expect(200);
+      await api('get', '/loans/book', 'hr').expect(403);
+
+      await api('post', `/approvals/loan/${housingId}/approve`, 'manager').expect(201);
+      expect((await queue('hr')).map((q) => q.id)).toContain(housingId);
+      await api('post', `/approvals/loan/${housingId}/approve`, 'hr').expect(201);
+      await api('post', `/approvals/loan/${housingId}/approve`, 'finance').expect(201);
+      const done = await api('post', `/approvals/loan/${housingId}/approve`, 'admin').expect(201);
+      expect(done.body.status).toBe('APPROVED');
+      expect(done.body.upcoming).toHaveLength(36);
+    });
+
+    it('settles an IOU with receipts and recovers the unspent balance, or all of it when overdue', async () => {
+      await api('post', '/loans', 'tester').send({ kind: 'IOU', amount: 10000, purpose: 'Team offsite supplies', neededOn: today, settleBy: inDays(20) }).expect(400);
+      const res = await api('post', '/loans', 'tester').send({ kind: 'IOU', amount: 10000, purpose: 'Team offsite supplies', neededOn: today, costCentre: 'ENG-01' }).expect(201);
+      iouId = res.body.id;
+      expect(res.body.stages).toEqual(['Manager', 'Finance']);
+      await api('post', `/approvals/loan/${iouId}/approve`, 'manager').expect(201);
+      const issued = await api('post', `/approvals/loan/${iouId}/approve`, 'finance').expect(201);
+      expect(issued.body).toMatchObject({ status: 'APPROVED', outstanding: '0.00' });
+      const mine = await api('get', '/loans', 'tester').expect(200);
+      expect(mine.body.loans.find((l: { id: string }) => l.id === iouId).canSettle).toBe(true);
+
+      await api('post', `/loans/${iouId}/settle`, 'tester').field('spent', '6000').field('cashReturned', '1000').expect(400);
+      const sent = await api('post', `/loans/${iouId}/settle`, 'tester').field('spent', '6000').field('cashReturned', '1000').attach('file', PDF, 'receipts.pdf').expect(201);
+      expect(sent.body.stageLabel).toBe('Finance (settlement)');
+      const financeQueue = await queue('finance');
+      expect(financeQueue.find((q) => q.id === iouId)!.title).toBe('IOU settlement');
+      await api('get', `/loans/${iouId}/receipt`, 'finance').expect(200);
+      await api('get', `/loans/${iouId}/receipt`, 'manager').expect(403);
+      const settled = await api('post', `/approvals/loan/${iouId}/approve`, 'finance').expect(201);
+      expect(settled.body).toMatchObject({ status: 'APPROVED', outstanding: '3000.00', instalment: '3000.00' });
+
+      // The seeded IOU is made overdue, then Finance recovers it through payroll after emailing a notice
+      const brianIou = await prisma.loan.findFirstOrThrow({ where: { kind: 'IOU', employee: { user: { email: 'payroll@mindspace-ai.test' } } } });
+      await api('post', `/loans/${brianIou.id}/recover`, 'finance').expect(409);
+      await prisma.loan.update({ where: { id: brianIou.id }, data: { settleBy: new Date(Date.now() - 2 * 86_400_000) } });
+      await api('post', `/loans/${brianIou.id}/recover`, 'payroll').expect(403);
+      const recovered = await api('post', `/loans/${brianIou.id}/recover`, 'finance').expect(201);
+      expect(recovered.body.outstanding).toBe('15000.00');
+      expect(mail.outbox.some((m) => m.to === 'payroll@mindspace-ai.test' && m.subject === 'Unsettled IOU will be deducted from your pay')).toBe(true);
+    });
+
+    it('enrols staff in meal and gym options their work location allows, through HR and payroll', async () => {
+      const plans = (await api('get', '/benefits/plans', 'tester').expect(200)).body as Array<{ id: string; name: string; eligible: boolean }>;
+      const plan = (name: string) => plans.find((p) => p.name === name)!;
+      expect(plan('Remote meal allowance').eligible).toBe(false);
+      await api('post', '/benefits/enrolments', 'tester').send({ planId: plan('Remote meal allowance').id, startMonth: monthText(nextMonth) }).expect(400);
+      // Faith already has the canteen wallet
+      await api('post', '/benefits/enrolments', 'tester').send({ planId: plan('Partner meal card').id, startMonth: monthText(nextMonth) }).expect(409);
+      await api('post', '/benefits/enrolments', 'tester').send({ planId: plan('Premium').id, startMonth: monthText(nextMonth) }).expect(400);
+      const res = await api('post', '/benefits/enrolments', 'tester')
+        .send({ planId: plan('Premium').id, startMonth: monthText(nextMonth), branch: 'Kilimani', emergencyContact: 'John Njeri, +254 733 200 005' })
+        .expect(201);
+      expect(res.body).toMatchObject({ status: 'PENDING', stageLabel: 'HR' });
+      await api('post', `/approvals/enrolment/${res.body.id}/approve`, 'payroll').expect(403);
+      await api('post', `/approvals/enrolment/${res.body.id}/approve`, 'hr').expect(201);
+      const ok = await api('post', `/approvals/enrolment/${res.body.id}/approve`, 'payroll').expect(201);
+      expect(ok.body.status).toBe('APPROVED');
+      // Not started yet, so ending it simply cancels it
+      const ended = await api('post', `/benefits/enrolments/${res.body.id}/end`, 'tester').expect(201);
+      expect(ended.body.status).toBe('CANCELLED');
+    });
+
+    it('lets managers nominate their team for gift vouchers, approved by HR', async () => {
+      const nominees = await api('get', '/benefits/nominees', 'manager').expect(200);
+      expect(nominees.body.map((n: { name: string }) => n.name).sort()).toEqual(['Faith Njeri', 'Kevin Mwangi']);
+      await api('post', '/benefits/vouchers', 'tester').send({ employeeId: dev.id, occasion: 'BIRTHDAY', value: 3000 }).expect(403);
+      const hrEmp = await prisma.employee.findFirstOrThrow({ where: { user: { email: 'hr@mindspace-ai.test' } } });
+      await api('post', '/benefits/vouchers', 'manager').send({ employeeId: hrEmp.id, occasion: 'BIRTHDAY', value: 3000 }).expect(403);
+      const nominated = await api('post', '/benefits/vouchers', 'manager').send({ employeeId: dev.id, occasion: 'BIRTHDAY', value: 3000, partner: 'Bookstore' }).expect(201);
+      expect(nominated.body).toMatchObject({ status: 'PENDING', stageLabel: 'HR' });
+
+      const seeded = await prisma.giftVoucher.findFirstOrThrow({ where: { employeeId: tester.id } });
+      expect((await queue('hr')).map((q) => q.id)).toEqual(expect.arrayContaining([seeded.id, nominated.body.id]));
+      const issued = await api('post', `/approvals/voucher/${seeded.id}/approve`, 'hr').expect(201);
+      expect(issued.body.status).toBe('APPROVED');
+      expect(mail.outbox.some((m) => m.to === 'tester@mindspace-ai.test' && m.subject === 'You have a gift voucher')).toBe(true);
+      await api('post', `/approvals/voucher/${nominated.body.id}/decline`, 'hr').send({ note: 'Over budget' }).expect(201);
+    });
+
+    it('deducts advances, IOUs, loans and gym shares in payroll, taxes benefits, and records repayments when finalized', async () => {
+      const kenya = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-KE' } });
+      // The month-end job may already have drafted this month's run; if so it is recalculated
+      const existing = await prisma.payrollRun.findUnique({ where: { companyId_periodYear_periodMonth: { companyId: kenya.id, periodYear: Math.floor(thisMonth / 100), periodMonth: thisMonth % 100 } } });
+      const run = existing
+        ? await api('post', `/payroll/runs/${existing.id}/recalculate`, 'payroll').expect(201)
+        : await api('post', '/payroll/runs', 'payroll').send({ companyId: kenya.id, year: Math.floor(thisMonth / 100), month: thisMonth % 100 }).expect(201);
+      type Line = { code: string; kind: string; amount: number; ref?: string; label: string };
+      const slipOf = (id: string) => run.body.payslips.find((p: { employeeId: string }) => p.employeeId === id) as { id: string; lines: Line[]; gross: string; net: string };
+
+      const faith = slipOf(tester.id);
+      const code = (slip: { lines: Line[] }, c: string) => slip.lines.filter((l) => l.code === c);
+      expect(code(faith, 'ADVANCE')[0]).toMatchObject({ kind: 'DEDUCTION', amount: 20000, ref: advanceId });
+      expect(code(faith, 'IOU')[0]).toMatchObject({ amount: 3000, ref: iouId });
+      expect(code(faith, 'MEAL')[0]).toMatchObject({ kind: 'BENEFIT', amount: 4000, label: 'Meal: Canteen wallet (taxed)' });
+      expect(code(faith, 'VOUCHER')[0]).toMatchObject({ kind: 'BENEFIT', amount: 5000 });
+      expect(Number(faith.gross)).toBe(128000);
+      expect(Number(faith.net)).toBeGreaterThanOrEqual(128000 / 3);
+
+      const kevin = slipOf(dev.id);
+      expect(code(kevin, 'LOAN')).toHaveLength(2);
+      expect(code(kevin, 'GYM_SHARE')[0]).toMatchObject({ amount: 2000 });
+      expect(code(kevin, 'GYM')[0]).toMatchObject({ kind: 'BENEFIT', amount: 3000, label: 'Gym: Standard' });
+      expect(code(kevin, 'FBT_ER')[0].kind).toBe('EMPLOYER');
+
+      await api('post', `/payroll/runs/${run.body.id}/approve`, 'admin').expect(201);
+      await api('post', `/payroll/runs/${run.body.id}/finalize`, 'admin').expect(201);
+      const advance = await prisma.loan.findUniqueOrThrow({ where: { id: advanceId }, include: { repayments: true } });
+      expect(advance.status).toBe('CLOSED');
+      expect(advance.repayments).toHaveLength(1);
+      const mine = await api('get', '/loans', 'developer').expect(200);
+      const housing = mine.body.loans.find((l: { id: string }) => l.id === housingId);
+      expect(housing.repayments).toHaveLength(1);
+      expect(Number(housing.outstanding)).toBeLessThan(1_000_000);
+      // New requests now start from next month, because this month's payroll is final
+      const quote = await api('get', '/loans/quote?kind=LOAN&product=EMERGENCY&amount=10000&months=2', 'developer').expect(200);
+      expect(quote.body.firstMonth).toBe(nextMonth);
+
+      const book = await api('get', `/loans/book?companyId=${kenya.id}`, 'finance').expect(200);
+      expect(Number(book.body.totals.KES)).toBeGreaterThan(0);
     });
   });
 });

@@ -54,6 +54,7 @@ export const DOCUMENT_TYPES = [
   'Medical fitness certificate',
   'Medical certificate (sick leave)',
   'Leave supporting document',
+  'IOU receipts',
   'Driving licence',
   'Work permit',
   'Exit clearance and certificate of service',

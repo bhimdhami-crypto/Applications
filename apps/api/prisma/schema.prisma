@@ -14,6 +14,7 @@ enum Role {
   PAYROLL
   MANAGER
   EMPLOYEE
+  FINANCE
 }
 
 enum EmploymentStatus {
@@ -61,6 +62,54 @@ enum LeaveStatus {
   CANCELLED
 }
 
+/// One approval step of a loan, advance, IOU, voucher or benefit enrolment
+enum ApprovalStage {
+  MANAGER
+  HR
+  PAYROLL
+  FINANCE
+  COUNTRY_HEAD
+}
+
+/// PENDING: in approval. APPROVED: approved and running (a loan being repaid, an active membership,
+/// an issued voucher). CLOSED: repaid, settled or ended.
+enum RequestStatus {
+  PENDING
+  APPROVED
+  CLOSED
+  DECLINED
+  CANCELLED
+}
+
+enum LoanKind {
+  ADVANCE
+  LOAN
+  IOU
+}
+
+enum LoanProduct {
+  PERSONAL
+  EDUCATION
+  EMERGENCY
+  HOUSING
+  VEHICLE
+}
+
+enum BenefitKind {
+  MEAL
+  GYM
+}
+
+enum VoucherOccasion {
+  BIRTHDAY
+  LONG_SERVICE
+  FESTIVE
+  RECOGNITION
+  WEDDING
+  NEW_BABY
+  OTHER
+}
+
 enum PayrollStatus {
   DRAFT
   APPROVED
@@ -69,15 +118,16 @@ enum PayrollStatus {
 
 /// One legal entity: the parent Inc. or a country subsidiary.
 model Company {
-  id          String       @id @default(cuid())
-  code        String       @unique
-  name        String
-  country     String
-  countryCode String       @db.Char(2)
-  currency    String       @db.Char(3)
-  employees   Employee[]
-  payrollRuns PayrollRun[]
-  createdAt   DateTime     @default(now())
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  country      String
+  countryCode  String        @db.Char(2)
+  currency     String        @db.Char(3)
+  employees    Employee[]
+  payrollRuns  PayrollRun[]
+  benefitPlans BenefitPlan[]
+  createdAt    DateTime      @default(now())
 }
 
 /// A login account. Admin accounts need not have an employee record.
@@ -156,6 +206,9 @@ model Employee {
   documents            EmployeeDocument[]
   leaveRequests        LeaveRequest[]
   leaveAdjustments     LeaveAdjustment[]
+  loans                Loan[]
+  benefitEnrolments    BenefitEnrolment[]
+  giftVouchers         GiftVoucher[]
   /// Set when an admin deletes the employee. Records are kept for legal retention.
   deletedAt            DateTime?
   createdAt            DateTime           @default(now())
@@ -318,4 +371,156 @@ model PublicHoliday {
   createdAt   DateTime @default(now())
 
   @@unique([countryCode, date])
+}
+
+/// A salary advance, staff loan or IOU (POL-22). Amounts are in the company's currency.
+model Loan {
+  id                    String          @id @default(cuid())
+  employeeId            String
+  employee              Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind                  LoanKind
+  product               LoanProduct?
+  amount                Decimal         @db.Decimal(14, 2)
+  currency              String          @db.Char(3)
+  /// Repayment period: 1 for advances and IOUs
+  months                Int             @default(1)
+  /// Yearly interest rate in percent, fixed when the loan is requested
+  interestRate          Decimal         @default(0) @db.Decimal(5, 2)
+  /// Monthly payroll deduction, interest included
+  instalment            Decimal         @db.Decimal(14, 2)
+  /// Amount to recover through payroll: the amount lent, or an IOU's unspent balance once settled
+  recoverable           Decimal         @default(0) @db.Decimal(14, 2)
+  /// First payroll month to deduct from, as year * 100 + month
+  firstMonth            Int?
+  purpose               String
+  guarantor             String?
+  /// IOU: cost centre or project code, date needed and settlement deadline
+  costCentre            String?
+  neededOn              DateTime?       @db.Date
+  settleBy              DateTime?       @db.Date
+  /// IOU settlement sent by the employee, then confirmed by Finance
+  spent                 Decimal?        @db.Decimal(14, 2)
+  cashReturned          Decimal?        @db.Decimal(14, 2)
+  receiptDocumentId     String?
+  settlementSubmittedAt DateTime?
+  settledById           String?
+  settledAt             DateTime?
+  status                RequestStatus
+  /// Approval steps in order, the one waiting now, and the manager who must approve
+  stages                ApprovalStage[]
+  stage                 ApprovalStage?
+  approverId            String?
+  /// [{ stage, byId, byName, at, approved, note }]
+  decisions             Json            @default("[]")
+  createdById           String?
+  cancelledById         String?
+  cancelledAt           DateTime?
+  repayments            LoanRepayment[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([employeeId, status])
+  @@index([status, stage])
+}
+
+/// Money paid back: from a finalized payslip, from final dues, or in cash to Finance
+model LoanRepayment {
+  id          String   @id @default(cuid())
+  loanId      String
+  loan        Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  payslipId   String?
+  year        Int
+  month       Int
+  amount      Decimal  @db.Decimal(14, 2)
+  principal   Decimal  @db.Decimal(14, 2)
+  interest    Decimal  @default(0) @db.Decimal(14, 2)
+  /// PAYROLL, FINAL_DUES or CASH
+  source      String
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([loanId])
+}
+
+/// A meal or gym option a company offers, with what the company and the employee pay each month
+model BenefitPlan {
+  id            String             @id @default(cuid())
+  companyId     String
+  company       Company            @relation(fields: [companyId], references: [id])
+  kind          BenefitKind
+  name          String
+  provider      String?
+  description   String?
+  /// Paid by the company each month: a taxable benefit in kind, or cash in the salary when paidAsCash
+  companyShare  Decimal            @db.Decimal(14, 2)
+  /// Deducted from the employee's net pay each month
+  employeeShare Decimal            @default(0) @db.Decimal(14, 2)
+  paidAsCash    Boolean            @default(false)
+  /// Who may enrol; empty means everyone
+  workLocations WorkLocation[]
+  active        Boolean            @default(true)
+  enrolments    BenefitEnrolment[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([companyId, kind, name])
+}
+
+/// Meal voucher (HR-F06) or gym membership (HR-F07) enrolment. Runs whole calendar months.
+model BenefitEnrolment {
+  id               String          @id @default(cuid())
+  employeeId       String
+  employee         Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  planId           String
+  plan             BenefitPlan     @relation(fields: [planId], references: [id])
+  kind             BenefitKind
+  /// First day of the first month
+  startDate        DateTime        @db.Date
+  /// Last day of the last month, once ended
+  endDate          DateTime?       @db.Date
+  /// Meal: dietary needs. Gym: branch and emergency contact.
+  dietaryNeeds     String?
+  branch           String?
+  emergencyContact String?
+  status           RequestStatus
+  stages           ApprovalStage[]
+  stage            ApprovalStage?
+  approverId       String?
+  decisions        Json            @default("[]")
+  createdById      String?
+  cancelledById    String?
+  cancelledAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([employeeId, status])
+  @@index([status, stage])
+}
+
+/// Gift voucher nomination (HR-F05). Taxed as a benefit in kind in the payroll month it is issued.
+model GiftVoucher {
+  id            String          @id @default(cuid())
+  employeeId    String
+  employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  occasion      VoucherOccasion
+  value         Decimal         @db.Decimal(14, 2)
+  currency      String          @db.Char(3)
+  partner       String?
+  reason        String?
+  /// Payroll month the voucher is taxed in, as year * 100 + month
+  taxMonth      Int?
+  status        RequestStatus
+  stages        ApprovalStage[]
+  stage         ApprovalStage?
+  approverId    String?
+  decisions     Json            @default("[]")
+  createdById   String?
+  cancelledById String?
+  cancelledAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([employeeId, status])
+  @@index([status, stage])
 }

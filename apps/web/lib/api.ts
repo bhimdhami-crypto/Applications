@@ -3,7 +3,7 @@
 export const API_URL = '/api';
 const TOKEN_KEY = 'mindspace.token';
 
-export type Role = 'ADMIN' | 'HR' | 'PAYROLL' | 'MANAGER' | 'EMPLOYEE';
+export type Role = 'ADMIN' | 'HR' | 'PAYROLL' | 'MANAGER' | 'EMPLOYEE' | 'FINANCE';
 
 export interface Company {
   id: string;
@@ -57,7 +57,8 @@ export interface Employee {
 export interface PayLine {
   code: string;
   label: string;
-  kind: 'EARNING' | 'DEDUCTION' | 'EMPLOYER';
+  /** BENEFIT: received in kind (meal card, gym, voucher), taxed but not paid in cash */
+  kind: 'EARNING' | 'DEDUCTION' | 'EMPLOYER' | 'BENEFIT';
   amount: string;
 }
 
@@ -258,6 +259,7 @@ export const ROLE_LABEL: Record<Role, string> = {
   PAYROLL: 'Payroll',
   MANAGER: 'Manager',
   EMPLOYEE: 'Employee',
+  FINANCE: 'Finance',
 };
 
 export const LOCATION_LABEL: Record<Employee['workLocation'], string> = {
@@ -344,3 +346,190 @@ export function dateRange(start: string, end: string) {
   const opts: Intl.DateTimeFormatOptions = { day: 'numeric', timeZone: 'UTC', ...(sameMonth ? {} : { month: 'short' }), ...(sameYear ? {} : { year: 'numeric' }) };
   return `${s.toLocaleDateString('en-GB', opts)} to ${formatDate(end)}`;
 }
+
+// ---------- advances, loans, IOUs and benefits ----------
+
+export type RequestStatus = 'PENDING' | 'APPROVED' | 'CLOSED' | 'DECLINED' | 'CANCELLED';
+export type LoanKind = 'ADVANCE' | 'LOAN' | 'IOU';
+export type LoanProduct = 'PERSONAL' | 'EDUCATION' | 'EMERGENCY' | 'HOUSING' | 'VEHICLE';
+
+export interface Decision {
+  stage: string;
+  byName: string;
+  at: string;
+  approved: boolean;
+  note: string | null;
+}
+
+export interface Loan {
+  id: string;
+  kind: LoanKind;
+  product: LoanProduct | null;
+  title: string;
+  amount: string;
+  currency: string;
+  months: number;
+  interestRate: number;
+  instalment: string;
+  firstMonthLabel: string | null;
+  purpose: string;
+  status: RequestStatus;
+  stage: string | null;
+  stageLabel: string | null;
+  createdAt: string;
+  settleBy: string | null;
+  settledAt: string | null;
+  guarantor: string | null;
+  costCentre: string | null;
+  neededOn: string | null;
+  spent: string | null;
+  cashReturned: string | null;
+  settlementSubmittedAt: string | null;
+  stages: string[];
+  decisions: Decision[];
+  outstanding: string;
+  repaid: string;
+  repayments: Array<{ id: string; label: string; amount: string; interest: string; source: string; note: string | null }>;
+  upcoming: Array<{ label: string; payment: string; balance: string }>;
+  canCancel: boolean;
+  canSettle: boolean;
+}
+
+export interface LoanOptions {
+  rulesVersion: string;
+  currency: string;
+  hasPayroll: boolean;
+  gross: string | null;
+  net: string | null;
+  commitments: string;
+  maxAdvance: string | null;
+  maxLoan: string | null;
+  maxHousingLoan: string | null;
+  maxMonths: number;
+  iouSettleDays: number;
+  loanBlock: string | null;
+  firstMonthLabel: string;
+  products: Array<{ product: LoanProduct; label: string; yearlyRate: number; note: string }>;
+}
+
+export interface LoanQuote {
+  currency: string;
+  instalment: string;
+  months: number;
+  yearlyRate: number;
+  totalInterest: string;
+  firstMonthLabel: string;
+  lastMonthLabel: string;
+  takeHome: string | null;
+  takeHomeFloor: string | null;
+  stageLabels: string[];
+  problems: string[];
+}
+
+export interface ApprovalItem {
+  entity: 'loan' | 'enrolment' | 'voucher';
+  id: string;
+  title: string;
+  employee: { id: string; name: string; employeeNo: string; company: string };
+  amount: string | null;
+  currency: string;
+  details: string[];
+  stage: string;
+  stageLabel: string;
+  stages: string[];
+  decisions: Decision[];
+  receipt?: boolean;
+  createdAt: string;
+}
+
+export type BenefitKind = 'MEAL' | 'GYM';
+
+export interface BenefitPlan {
+  id: string;
+  companyId: string;
+  kind: BenefitKind;
+  kindLabel: string;
+  name: string;
+  provider: string | null;
+  description: string | null;
+  companyShare: string;
+  employeeShare: string;
+  paidAsCash: boolean;
+  workLocations: Employee['workLocation'][];
+  active: boolean;
+  currency: string;
+  eligible?: boolean;
+}
+
+export interface Enrolment {
+  id: string;
+  kind: BenefitKind;
+  kindLabel: string;
+  plan: { id: string; name: string; provider: string | null; companyShare: string; employeeShare: string; paidAsCash: boolean };
+  startLabel: string;
+  endLabel: string | null;
+  dietaryNeeds: string | null;
+  branch: string | null;
+  emergencyContact: string | null;
+  status: RequestStatus;
+  stageLabel: string | null;
+  stages: string[];
+  decisions: Decision[];
+  canEnd: boolean;
+  endsAtLabel: string | null;
+  employee?: { id: string; name: string; employeeNo: string };
+}
+
+export type VoucherOccasion = 'BIRTHDAY' | 'LONG_SERVICE' | 'FESTIVE' | 'RECOGNITION' | 'WEDDING' | 'NEW_BABY' | 'OTHER';
+
+export interface Voucher {
+  id: string;
+  occasion: VoucherOccasion;
+  occasionLabel: string;
+  value: string;
+  currency: string;
+  partner: string | null;
+  reason: string | null;
+  status: RequestStatus;
+  stageLabel: string | null;
+  taxMonthLabel: string | null;
+  decisions: Decision[];
+  createdAt: string;
+  nominee?: string;
+  employeeId?: string;
+  canCancel?: boolean;
+}
+
+export const OCCASION_LABEL: Record<VoucherOccasion, string> = {
+  BIRTHDAY: 'Birthday',
+  LONG_SERVICE: 'Long service',
+  FESTIVE: 'Festive season',
+  RECOGNITION: 'Recognition',
+  WEDDING: 'Wedding',
+  NEW_BABY: 'New baby',
+  OTHER: 'Other',
+};
+
+/** Status wording for loans, advances and IOUs */
+export function loanStatus(l: Pick<Loan, 'kind' | 'status' | 'stageLabel' | 'settledAt' | 'outstanding'>) {
+  if (l.status === 'PENDING') return `Waiting for ${l.stageLabel}`;
+  if (l.status === 'APPROVED' && l.stageLabel) return 'Settlement waiting for Finance';
+  if (l.status === 'APPROVED' && l.kind === 'IOU' && !l.settledAt) return 'Issued, to settle';
+  if (l.status === 'APPROVED') return 'Repaying';
+  if (l.status === 'CLOSED') return l.kind === 'IOU' ? 'Settled' : 'Repaid';
+  return l.status === 'DECLINED' ? 'Declined' : 'Cancelled';
+}
+
+/** Status wording for benefit enrolments and vouchers */
+export function benefitStatus(r: { status: RequestStatus; stageLabel: string | null; endLabel?: string | null }, issued = 'Active') {
+  if (r.status === 'PENDING') return `Waiting for ${r.stageLabel}`;
+  if (r.status === 'APPROVED') return r.endLabel ? `Ends ${r.endLabel}` : issued;
+  if (r.status === 'CLOSED') return r.endLabel ? `Ended ${r.endLabel}` : 'Ended';
+  return r.status === 'DECLINED' ? 'Declined' : 'Cancelled';
+}
+
+const STAGE_NAME: Record<string, string> = { MANAGER: 'Manager', HR: 'HR', PAYROLL: 'Payroll', FINANCE: 'Finance', COUNTRY_HEAD: 'Country Head' };
+
+/** "Manager: Amina Hassan approved 22 Sep" lines for the approval trail */
+export const trail = (decisions: Decision[]) =>
+  decisions.map((d) => `${STAGE_NAME[d.stage] ?? d.stage}: ${d.byName} ${d.approved ? 'approved' : 'declined'} ${formatDate(d.at)}${d.note ? ` (${d.note})` : ''}`);
