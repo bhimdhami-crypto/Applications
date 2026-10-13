@@ -14,8 +14,8 @@ function Section({ title, lines, currency }: { title: string; lines: PayLine[]; 
   return (
     <>
       <tr><th colSpan={2}>{title}</th></tr>
-      {lines.map((l) => (
-        <tr key={l.code}>
+      {lines.map((l, i) => (
+        <tr key={`${l.code}-${i}`}>
           <td>{l.label}</td>
           <td className="num">{money(l.amount, currency)}</td>
         </tr>
@@ -55,8 +55,14 @@ export default function PayslipPage() {
           <tr className="total"><td>Total deductions</td><td className="num">{money(slip.deductions, cur)}</td></tr>
           <tr className="total"><td>Net pay</td><td className="num">{money(slip.net, cur)}</td></tr>
           <Section title="Paid by the employer on your behalf" lines={of('EMPLOYER')} currency={cur} />
+          <Section title="Benefits in kind (not paid in cash)" lines={of('BENEFIT')} currency={cur} />
         </tbody>
       </table>
+      {slip.annualLeaveLeft !== null && slip.annualLeaveLeft !== undefined && (
+        <p>
+          Annual leave left for {slip.run.periodYear}: <strong>{slip.annualLeaveLeft} day{slip.annualLeaveLeft === 1 ? '' : 's'}</strong>
+        </p>
+      )}
       <p className="muted" style={{ fontSize: '0.8rem' }}>Calculated with rules {slip.run.rulesVersion}.</p>
       <button className="secondary" onClick={() => window.print()}>Print or save as PDF</button>
     </div>

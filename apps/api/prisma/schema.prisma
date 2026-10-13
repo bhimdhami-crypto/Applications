@@ -14,6 +14,7 @@ enum Role {
   PAYROLL
   MANAGER
   EMPLOYEE
+  FINANCE
 }
 
 enum EmploymentStatus {
@@ -27,6 +28,88 @@ enum WorkLocation {
   FULLY_REMOTE
 }
 
+enum EmploymentType {
+  PERMANENT
+  FIXED_TERM
+  INTERN
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  CLEARED
+  EXPIRED
+  REJECTED
+}
+
+enum LeaveType {
+  ANNUAL
+  SICK
+  FLOATING
+  FAMILY_CARE
+  COMPASSIONATE
+  STUDY
+  MATERNITY
+  PATERNITY
+  UNPAID
+}
+
+enum LeaveStatus {
+  PENDING_MANAGER
+  PENDING_HR
+  APPROVED
+  DECLINED
+  CANCELLED
+}
+
+/// One approval step of a loan, advance, IOU, voucher or benefit enrolment
+enum ApprovalStage {
+  MANAGER
+  HR
+  PAYROLL
+  FINANCE
+  COUNTRY_HEAD
+}
+
+/// PENDING: in approval. APPROVED: approved and running (a loan being repaid, an active membership,
+/// an issued voucher). CLOSED: repaid, settled or ended.
+enum RequestStatus {
+  PENDING
+  APPROVED
+  CLOSED
+  DECLINED
+  CANCELLED
+}
+
+enum LoanKind {
+  ADVANCE
+  LOAN
+  IOU
+}
+
+enum LoanProduct {
+  PERSONAL
+  EDUCATION
+  EMERGENCY
+  HOUSING
+  VEHICLE
+}
+
+enum BenefitKind {
+  MEAL
+  GYM
+}
+
+enum VoucherOccasion {
+  BIRTHDAY
+  LONG_SERVICE
+  FESTIVE
+  RECOGNITION
+  WEDDING
+  NEW_BABY
+  OTHER
+}
+
 enum PayrollStatus {
   DRAFT
   APPROVED
@@ -35,29 +118,36 @@ enum PayrollStatus {
 
 /// One legal entity: the parent Inc. or a country subsidiary.
 model Company {
-  id          String       @id @default(cuid())
-  code        String       @unique
-  name        String
-  country     String
-  countryCode String       @db.Char(2)
-  currency    String       @db.Char(3)
-  employees   Employee[]
-  payrollRuns PayrollRun[]
-  createdAt   DateTime     @default(now())
+  id           String        @id @default(cuid())
+  code         String        @unique
+  name         String
+  country      String
+  countryCode  String        @db.Char(2)
+  currency     String        @db.Char(3)
+  employees    Employee[]
+  payrollRuns  PayrollRun[]
+  benefitPlans BenefitPlan[]
+  createdAt    DateTime      @default(now())
 }
 
 /// A login account. Admin accounts need not have an employee record.
 model User {
-  id           String           @id @default(cuid())
-  email        String           @unique
-  passwordHash String
-  role         Role             @default(EMPLOYEE)
-  isActive     Boolean          @default(true)
-  employee     Employee?
-  challenges   LoginChallenge[]
-  lastLoginAt  DateTime?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id            String               @id @default(cuid())
+  email         String               @unique
+  passwordHash  String
+  role          Role                 @default(EMPLOYEE)
+  isActive      Boolean              @default(true)
+  employee      Employee?
+  challenges    LoginChallenge[]
+  conversations ConversationMember[]
+  messages      ChatMessage[]
+  posts         CommunityPost[]
+  postLikes     PostLike[]
+  postComments  PostComment[]
+  reports       ContentReport[]
+  lastLoginAt   DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 }
 
 /// A pending second step of sign-in: the code emailed to the user.
@@ -75,32 +165,63 @@ model LoginChallenge {
 }
 
 model Employee {
-  id                String           @id @default(cuid())
-  employeeNo        String           @unique
-  firstName         String
-  lastName          String
-  jobTitle          String
-  department        String
-  workLocation      WorkLocation     @default(ON_SITE)
-  hireDate          DateTime         @db.Date
-  exitDate          DateTime?        @db.Date
-  status            EmploymentStatus @default(ACTIVE)
+  id                   String                  @id @default(cuid())
+  employeeNo           String                  @unique
+  firstName            String
+  lastName             String
+  jobTitle             String
+  department           String
+  grade                String?
+  employmentType       EmploymentType          @default(PERMANENT)
+  workLocation         WorkLocation            @default(ON_SITE)
+  city                 String?
+  /// Work email, also for staff who have no portal login yet
+  workEmail            String?                 @unique
+  mobilePhone          String?
+  personalEmail        String?
+  gender               String?
+  dateOfBirth          DateTime?               @db.Date
+  maritalStatus        String?
+  dependants           Int                     @default(0)
+  /// Sensitive identifiers: shown only to the employee, HR, payroll and admins
+  nationalIdNumber     String?
+  taxId                String?
+  socialSecurityNo     String?
+  highestQualification String?
+  institution          String?
+  qualificationYear    Int?
+  /// Storage key of the profile photo
+  photoKey             String?
+  exitReason           String?
+  hireDate             DateTime                @db.Date
+  exitDate             DateTime?               @db.Date
+  status               EmploymentStatus        @default(ACTIVE)
   /// Monthly base pay in the company's currency
-  monthlyBasic      Decimal          @db.Decimal(14, 2)
+  monthlyBasic         Decimal                 @db.Decimal(14, 2)
   /// Monthly taxable cash allowances (housing, transport, remote work)
-  monthlyAllowances Decimal          @default(0) @db.Decimal(14, 2)
-  companyId         String
-  company           Company          @relation(fields: [companyId], references: [id])
-  userId            String?          @unique
-  user              User?            @relation(fields: [userId], references: [id])
-  managerId         String?
-  manager           Employee?        @relation("Reports", fields: [managerId], references: [id])
-  reports           Employee[]       @relation("Reports")
-  payslips          Payslip[]
+  monthlyAllowances    Decimal                 @default(0) @db.Decimal(14, 2)
+  companyId            String
+  company              Company                 @relation(fields: [companyId], references: [id])
+  userId               String?                 @unique
+  user                 User?                   @relation(fields: [userId], references: [id])
+  managerId            String?
+  manager              Employee?               @relation("Reports", fields: [managerId], references: [id])
+  reports              Employee[]              @relation("Reports")
+  payslips             Payslip[]
+  nextOfKin            NextOfKin[]
+  documents            EmployeeDocument[]
+  leaveRequests        LeaveRequest[]
+  leaveAdjustments     LeaveAdjustment[]
+  loans                Loan[]
+  benefitEnrolments    BenefitEnrolment[]
+  giftVouchers         GiftVoucher[]
+  acknowledgements     PolicyAcknowledgement[]
+  attendance           AttendanceSession[]
+  workLogs             WorkLog[]
   /// Set when an admin deletes the employee. Records are kept for legal retention.
-  deletedAt         DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+  deletedAt            DateTime?
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
 
   @@index([companyId, status])
 }
@@ -131,19 +252,21 @@ model PayrollRun {
 }
 
 model Payslip {
-  id           String     @id @default(cuid())
-  runId        String
-  run          PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  employeeId   String
-  employee     Employee   @relation(fields: [employeeId], references: [id])
-  currency     String     @db.Char(3)
-  gross        Decimal    @db.Decimal(14, 2)
-  deductions   Decimal    @db.Decimal(14, 2)
-  net          Decimal    @db.Decimal(14, 2)
-  employerCost Decimal    @db.Decimal(14, 2)
+  id              String     @id @default(cuid())
+  runId           String
+  run             PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee   @relation(fields: [employeeId], references: [id])
+  currency        String     @db.Char(3)
+  gross           Decimal    @db.Decimal(14, 2)
+  deductions      Decimal    @db.Decimal(14, 2)
+  net             Decimal    @db.Decimal(14, 2)
+  employerCost    Decimal    @db.Decimal(14, 2)
   /// Line items: [{ code, label, kind: EARNING | DEDUCTION | EMPLOYER, amount }]
-  lines        Json
-  createdAt    DateTime   @default(now())
+  lines           Json
+  /// Annual leave days left for the year at the end of the pay period, shown on the payslip
+  annualLeaveLeft Int?
+  createdAt       DateTime   @default(now())
 
   @@unique([runId, employeeId])
 }
@@ -158,4 +281,457 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
+}
+
+model NextOfKin {
+  id                 String   @id @default(cuid())
+  employeeId         String
+  employee           Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  name               String
+  relationship       String
+  phone              String
+  email              String?
+  isEmergencyContact Boolean  @default(true)
+  isBeneficiary      Boolean  @default(false)
+  createdAt          DateTime @default(now())
+
+  @@index([employeeId])
+}
+
+/// An HR document on file for an employee. storageKey is null when only the paper copy is held.
+model EmployeeDocument {
+  id           String         @id @default(cuid())
+  employeeId   String
+  employee     Employee       @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type         String
+  fileName     String
+  storageKey   String?
+  mimeType     String?
+  sizeBytes    Int?
+  issuedDate   DateTime?      @db.Date
+  expiryDate   DateTime?      @db.Date
+  status       DocumentStatus @default(PENDING)
+  /// Hidden from the employee themself (e.g. background checks)
+  hrOnly       Boolean        @default(false)
+  uploadedById String?
+  verifiedById String?
+  verifiedAt   DateTime?
+  createdAt    DateTime       @default(now())
+
+  @@index([employeeId])
+}
+
+/// A leave request. Days are working days, after the country's weekend and public holidays.
+model LeaveRequest {
+  id               String      @id @default(cuid())
+  employeeId       String
+  employee         Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type             LeaveType
+  startDate        DateTime    @db.Date
+  endDate          DateTime    @db.Date
+  days             Int
+  reason           String?
+  handoverTo       String?
+  contactWhileAway String?
+  /// Medical certificate or other supporting document
+  documentId       String?
+  status           LeaveStatus
+  /// Employee who must approve first (their manager when the request was made)
+  approverId       String?
+  managerById      String?
+  managerAt        DateTime?
+  managerNote      String?
+  hrById           String?
+  hrAt             DateTime?
+  hrNote           String?
+  createdById      String?
+  cancelledById    String?
+  cancelledAt      DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+
+  @@index([employeeId, startDate])
+  @@index([approverId, status])
+  @@index([status, startDate])
+}
+
+/// HR correction to a leave balance, e.g. an opening balance or carry-over agreed outside the rules
+model LeaveAdjustment {
+  id          String    @id @default(cuid())
+  employeeId  String
+  employee    Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  type        LeaveType
+  year        Int
+  /// Days added (or removed when negative)
+  days        Int
+  reason      String
+  createdById String?
+  createdAt   DateTime  @default(now())
+
+  @@index([employeeId, year])
+}
+
+/// Public holidays per country. Generated each year as a draft; HR checks them against the gazette.
+model PublicHoliday {
+  id          String   @id @default(cuid())
+  countryCode String   @db.Char(2)
+  date        DateTime @db.Date
+  name        String
+  createdAt   DateTime @default(now())
+
+  @@unique([countryCode, date])
+}
+
+/// A salary advance, staff loan or IOU (POL-22). Amounts are in the company's currency.
+model Loan {
+  id                    String          @id @default(cuid())
+  employeeId            String
+  employee              Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  kind                  LoanKind
+  product               LoanProduct?
+  amount                Decimal         @db.Decimal(14, 2)
+  currency              String          @db.Char(3)
+  /// Repayment period: 1 for advances and IOUs
+  months                Int             @default(1)
+  /// Yearly interest rate in percent, fixed when the loan is requested
+  interestRate          Decimal         @default(0) @db.Decimal(5, 2)
+  /// Monthly payroll deduction, interest included
+  instalment            Decimal         @db.Decimal(14, 2)
+  /// Amount to recover through payroll: the amount lent, or an IOU's unspent balance once settled
+  recoverable           Decimal         @default(0) @db.Decimal(14, 2)
+  /// First payroll month to deduct from, as year * 100 + month
+  firstMonth            Int?
+  purpose               String
+  guarantor             String?
+  /// IOU: cost centre or project code, date needed and settlement deadline
+  costCentre            String?
+  neededOn              DateTime?       @db.Date
+  settleBy              DateTime?       @db.Date
+  /// IOU settlement sent by the employee, then confirmed by Finance
+  spent                 Decimal?        @db.Decimal(14, 2)
+  cashReturned          Decimal?        @db.Decimal(14, 2)
+  receiptDocumentId     String?
+  settlementSubmittedAt DateTime?
+  settledById           String?
+  settledAt             DateTime?
+  status                RequestStatus
+  /// Approval steps in order, the one waiting now, and the manager who must approve
+  stages                ApprovalStage[]
+  stage                 ApprovalStage?
+  approverId            String?
+  /// [{ stage, byId, byName, at, approved, note }]
+  decisions             Json            @default("[]")
+  createdById           String?
+  cancelledById         String?
+  cancelledAt           DateTime?
+  repayments            LoanRepayment[]
+  createdAt             DateTime        @default(now())
+  updatedAt             DateTime        @updatedAt
+
+  @@index([employeeId, status])
+  @@index([status, stage])
+}
+
+/// Money paid back: from a finalized payslip, from final dues, or in cash to Finance
+model LoanRepayment {
+  id          String   @id @default(cuid())
+  loanId      String
+  loan        Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  payslipId   String?
+  year        Int
+  month       Int
+  amount      Decimal  @db.Decimal(14, 2)
+  principal   Decimal  @db.Decimal(14, 2)
+  interest    Decimal  @default(0) @db.Decimal(14, 2)
+  /// PAYROLL, FINAL_DUES or CASH
+  source      String
+  note        String?
+  createdById String?
+  createdAt   DateTime @default(now())
+
+  @@index([loanId])
+}
+
+/// A meal or gym option a company offers, with what the company and the employee pay each month
+model BenefitPlan {
+  id            String             @id @default(cuid())
+  companyId     String
+  company       Company            @relation(fields: [companyId], references: [id])
+  kind          BenefitKind
+  name          String
+  provider      String?
+  description   String?
+  /// Paid by the company each month: a taxable benefit in kind, or cash in the salary when paidAsCash
+  companyShare  Decimal            @db.Decimal(14, 2)
+  /// Deducted from the employee's net pay each month
+  employeeShare Decimal            @default(0) @db.Decimal(14, 2)
+  paidAsCash    Boolean            @default(false)
+  /// Who may enrol; empty means everyone
+  workLocations WorkLocation[]
+  active        Boolean            @default(true)
+  enrolments    BenefitEnrolment[]
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+
+  @@unique([companyId, kind, name])
+}
+
+/// Meal voucher (HR-F06) or gym membership (HR-F07) enrolment. Runs whole calendar months.
+model BenefitEnrolment {
+  id               String          @id @default(cuid())
+  employeeId       String
+  employee         Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  planId           String
+  plan             BenefitPlan     @relation(fields: [planId], references: [id])
+  kind             BenefitKind
+  /// First day of the first month
+  startDate        DateTime        @db.Date
+  /// Last day of the last month, once ended
+  endDate          DateTime?       @db.Date
+  /// Meal: dietary needs. Gym: branch and emergency contact.
+  dietaryNeeds     String?
+  branch           String?
+  emergencyContact String?
+  status           RequestStatus
+  stages           ApprovalStage[]
+  stage            ApprovalStage?
+  approverId       String?
+  decisions        Json            @default("[]")
+  createdById      String?
+  cancelledById    String?
+  cancelledAt      DateTime?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+
+  @@index([employeeId, status])
+  @@index([status, stage])
+}
+
+/// Gift voucher nomination (HR-F05). Taxed as a benefit in kind in the payroll month it is issued.
+model GiftVoucher {
+  id            String          @id @default(cuid())
+  employeeId    String
+  employee      Employee        @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  occasion      VoucherOccasion
+  value         Decimal         @db.Decimal(14, 2)
+  currency      String          @db.Char(3)
+  partner       String?
+  reason        String?
+  /// Payroll month the voucher is taxed in, as year * 100 + month
+  taxMonth      Int?
+  status        RequestStatus
+  stages        ApprovalStage[]
+  stage         ApprovalStage?
+  approverId    String?
+  decisions     Json            @default("[]")
+  createdById   String?
+  cancelledById String?
+  cancelledAt   DateTime?
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+
+  @@index([employeeId, status])
+  @@index([status, stage])
+}
+
+// ---------- Milestone 6: policies and forms, chat, community page, activity tracker ----------
+
+enum LibraryKind {
+  POLICY
+  FORM
+}
+
+/// A policy or HR form in the Policy Centre. Replacing the file publishes a new version.
+model LibraryItem {
+  id               String                  @id @default(cuid())
+  kind             LibraryKind
+  /// POL-01 or HR-F01
+  code             String                  @unique
+  title            String
+  category         String
+  summary          String?
+  owner            String?
+  version          String
+  fileKey          String
+  fileName         String
+  /// Policies every employee must confirm they have read
+  mustRead         Boolean                 @default(true)
+  active           Boolean                 @default(true)
+  /// When the current version was published
+  publishedAt      DateTime                @default(now())
+  updatedById      String?
+  acknowledgements PolicyAcknowledgement[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+}
+
+model PolicyAcknowledgement {
+  id         String      @id @default(cuid())
+  itemId     String
+  item       LibraryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  version    String
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@unique([itemId, version, employeeId])
+  @@index([employeeId])
+}
+
+enum ConversationKind {
+  DIRECT
+  GROUP
+}
+
+model Conversation {
+  id            String               @id @default(cuid())
+  kind          ConversationKind
+  name          String?
+  /// For direct chats: the two user ids, sorted and joined, so a pair has one chat
+  directKey     String?              @unique
+  createdById   String
+  lastMessageAt DateTime             @default(now())
+  members       ConversationMember[]
+  messages      ChatMessage[]
+  createdAt     DateTime             @default(now())
+}
+
+model ConversationMember {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime     @default(now())
+  /// Set when the member leaves a group; they keep read access to what was said before
+  leftAt         DateTime?
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+/// Chat messages are company records (POL-20 3.10): removed ones are hidden, not deleted.
+model ChatMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  body           String
+  removedAt      DateTime?
+  removedById    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model CommunityPost {
+  id          String        @id @default(cuid())
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id])
+  body        String
+  /// [{ mime, name, size }] in upload order; files are stored as community/<postId>/<index>
+  attachments Json          @default("[]")
+  removedAt   DateTime?
+  removedById String?
+  likes       PostLike[]
+  comments    PostComment[]
+  createdAt   DateTime      @default(now())
+
+  @@index([createdAt])
+}
+
+model PostLike {
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@id([postId, userId])
+}
+
+model PostComment {
+  id          String        @id @default(cuid())
+  postId      String
+  post        CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id])
+  body        String
+  removedAt   DateTime?
+  removedById String?
+  createdAt   DateTime      @default(now())
+
+  @@index([postId, createdAt])
+}
+
+enum ReportTarget {
+  MESSAGE
+  POST
+  COMMENT
+}
+
+enum ReportStatus {
+  OPEN
+  REMOVED
+  DISMISSED
+}
+
+/// The Report button on a chat message, post or comment (POL-20 3.7)
+model ContentReport {
+  id           String       @id @default(cuid())
+  target       ReportTarget
+  targetId     String
+  reporterId   String
+  reporter     User         @relation(fields: [reporterId], references: [id])
+  reason       String
+  status       ReportStatus @default(OPEN)
+  reviewedById String?
+  reviewedAt   DateTime?
+  note         String?
+  createdAt    DateTime     @default(now())
+
+  @@unique([target, targetId, reporterId])
+  @@index([status, createdAt])
+}
+
+enum WorkMode {
+  OFFICE
+  REMOTE
+  FIELD
+}
+
+/// Clock-in and clock-out (POL-21 3.1). No location is recorded.
+model AttendanceSession {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// The employee's local date at clock-in
+  date       DateTime  @db.Date
+  clockIn    DateTime
+  clockOut   DateTime?
+  mode       WorkMode
+  /// Closed by the portal because the employee forgot to clock out
+  autoClosed Boolean   @default(false)
+  editedAt   DateTime?
+  editReason String?
+  createdAt  DateTime  @default(now())
+
+  @@index([employeeId, date])
+}
+
+/// What the employee worked on, in hours, for a day
+model WorkLog {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  hours       Decimal  @db.Decimal(4, 2)
+  project     String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([employeeId, date])
 }

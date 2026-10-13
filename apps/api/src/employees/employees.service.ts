@@ -6,7 +6,7 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/decorators';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateEmployeeDto, DeleteEmployeeDto, UpdateEmployeeDto } from './employees.dto';
+import { CreateEmployeeDto, DeleteEmployeeDto, ListEmployeesQuery, UpdateEmployeeDto } from './employees.dto';
 
 const PUBLIC_FIELDS = {
   id: true,
@@ -15,6 +15,9 @@ const PUBLIC_FIELDS = {
   lastName: true,
   jobTitle: true,
   department: true,
+  grade: true,
+  city: true,
+  workEmail: true,
   workLocation: true,
   hireDate: true,
   exitDate: true,
@@ -36,19 +39,46 @@ export class EmployeesService {
     private readonly mail: MailService,
   ) {}
 
-  async list(actor: AuthUser, includeLeavers = false) {
-    const where: Prisma.EmployeeWhereInput = { deletedAt: null, ...(includeLeavers ? {} : { status: 'ACTIVE' }) };
+  /** One page of employees, newest search first. Managers only see their own team. */
+  async list(actor: AuthUser, query: ListEmployeesQuery = {}) {
+    const page = query.page ?? 1;
+    const pageSize = query.pageSize ?? 50;
+    const where: Prisma.EmployeeWhereInput = { deletedAt: null };
+    if (query.status) where.status = query.status;
+    else if (query.includeLeavers !== 'true') where.status = 'ACTIVE';
+    if (query.companyId) where.companyId = query.companyId;
+    if (query.role) where.user = { role: query.role };
+    if (query.q) {
+      const terms = query.q.trim().split(/\s+/).slice(0, 4);
+      where.AND = terms.map((t) => ({
+        OR: [
+          { firstName: { contains: t, mode: 'insensitive' } },
+          { lastName: { contains: t, mode: 'insensitive' } },
+          { employeeNo: { contains: t, mode: 'insensitive' } },
+          { workEmail: { contains: t, mode: 'insensitive' } },
+          { jobTitle: { contains: t, mode: 'insensitive' } },
+          { department: { contains: t, mode: 'insensitive' } },
+        ],
+      }));
+    }
     if (actor.role === Role.MANAGER) {
       const me = await this.prisma.employee.findUnique({ where: { userId: actor.id } });
       where.managerId = me?.id ?? '__none__';
     } else if (!SEES_PAY.includes(actor.role)) {
       throw new ForbiddenException('Your role cannot list employees');
     }
-    return this.prisma.employee.findMany({
-      where,
-      select: SEES_PAY.includes(actor.role) ? PAY_FIELDS : PUBLIC_FIELDS,
-      orderBy: [{ companyId: 'asc' }, { lastName: 'asc' }],
-    });
+    const [total, items] = await this.prisma.$transaction([
+      this.prisma.employee.count({ where }),
+      this.prisma.employee.findMany({
+        where,
+        select: { ...(SEES_PAY.includes(actor.role) ? PAY_FIELDS : PUBLIC_FIELDS), photoKey: true },
+        orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }, { employeeNo: 'asc' }],
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+      }),
+    ]);
+    // The storage key stays server side; the list only says whether a photo exists
+    return { items: items.map(({ photoKey, ...e }) => ({ ...e, hasPhoto: !!photoKey })), total, page, pageSize };
   }
 
   async me(actor: AuthUser) {
@@ -66,8 +96,7 @@ export class EmployeesService {
     if (await this.prisma.user.findUnique({ where: { email } })) throw new ConflictException('This email already has an account');
 
     const tempPassword = `Ms-${randomBytes(6).toString('base64url')}`;
-    const count = await this.prisma.employee.count({ where: { company: { countryCode: company.countryCode } } });
-    const employeeNo = `MSA-${company.countryCode}-${String(count + 1).padStart(6, '0')}`;
+    const employeeNo = await this.nextEmployeeNo(company.countryCode);
 
     const employee = await this.prisma.employee.create({
       data: {
@@ -77,6 +106,11 @@ export class EmployeesService {
         jobTitle: dto.jobTitle,
         department: dto.department,
         workLocation: dto.workLocation,
+        employmentType: dto.employmentType,
+        grade: dto.grade,
+        city: dto.city,
+        mobilePhone: dto.mobilePhone,
+        workEmail: email,
         hireDate: new Date(dto.hireDate),
         monthlyBasic: dto.monthlyBasic,
         monthlyAllowances: dto.monthlyAllowances ?? 0,
@@ -98,7 +132,9 @@ export class EmployeesService {
   async update(actor: AuthUser, id: string, dto: UpdateEmployeeDto) {
     const existing = await this.prisma.employee.findFirst({ where: { id, deletedAt: null } });
     if (!existing) throw new NotFoundException('Employee not found');
-    const employee = await this.prisma.employee.update({ where: { id }, data: dto, select: PAY_FIELDS });
+    const { dateOfBirth, ...rest } = dto;
+    const data: Prisma.EmployeeUncheckedUpdateInput = { ...rest, ...(dateOfBirth ? { dateOfBirth: new Date(dateOfBirth) } : {}) };
+    const employee = await this.prisma.employee.update({ where: { id }, data, select: PAY_FIELDS });
     await this.audit.record(actor.id, 'employee.update', 'Employee', id, { ...dto } as Prisma.InputJsonValue);
     return employee;
   }
@@ -122,5 +158,14 @@ export class EmployeesService {
     ]);
     await this.audit.record(actor.id, 'employee.delete', 'Employee', id, { reason: dto.reason ?? null });
     return { id, deleted: true };
+  }
+
+  /** Next free number in the MSA-<country>-000123 series (test accounts use MSA-KE-T00001 and are skipped). */
+  private async nextEmployeeNo(countryCode: string) {
+    const prefix = `MSA-${countryCode}-`;
+    const rows = await this.prisma.$queryRaw<{ max: number | null }[]>`
+      SELECT MAX(CAST(SUBSTRING("employeeNo" FROM 8) AS INTEGER)) AS max
+      FROM "Employee" WHERE "employeeNo" ~ ${'^' + prefix + '[0-9]{6}$'}`;
+    return `${prefix}${String((rows[0]?.max ?? 0) + 1).padStart(6, '0')}`;
   }
 }

@@ -42,3 +42,57 @@ describe('Kenya payroll rules', () => {
     expect(kenyaNssf(KES(5_000))).toBe(KES(300));
   });
 });
+
+describe('Kenya benefits and voluntary deductions', () => {
+  const base = { basic: 100_000_00, allowances: 0 };
+
+  it('leaves benefits in kind up to KES 5,000 a month untaxed', () => {
+    const plain = kenyaRules.calculate(base);
+    const withMeal = kenyaRules.calculate({ ...base, benefitsInKind: [{ code: 'MEAL', label: 'Meal: Canteen wallet', amount: 4_000_00 }] });
+    expect(withMeal.net).toBe(plain.net);
+    expect(withMeal.gross).toBe(plain.gross);
+    expect(withMeal.lines.find((l) => l.kind === 'BENEFIT')!.amount).toBe(4_000_00);
+    expect(withMeal.employerCost).toBe(plain.employerCost + 4_000_00);
+  });
+
+  it('taxes the whole value once benefits in kind pass KES 5,000', () => {
+    const plain = kenyaRules.calculate(base);
+    const r = kenyaRules.calculate({
+      ...base,
+      benefitsInKind: [
+        { code: 'MEAL', label: 'Meal', amount: 4_000_00 },
+        { code: 'GYM', label: 'Gym', amount: 3_000_00 },
+      ],
+    });
+    // 7,000 more taxable pay at the 30% band
+    expect(plain.net - r.net).toBe(2_100_00);
+  });
+
+  it('pays a cash allowance as taxable earnings', () => {
+    const r = kenyaRules.calculate({ ...base, cashAllowances: [{ code: 'MEAL_CASH', label: 'Remote meal allowance', amount: 3_000_00 }] });
+    expect(r.gross).toBe(103_000_00);
+  });
+
+  it('takes voluntary deductions after tax, but never below a third of gross pay', () => {
+    const plain = kenyaRules.calculate(base);
+    const r = kenyaRules.calculate({
+      ...base,
+      voluntary: [
+        { code: 'ADVANCE', label: 'Salary advance recovery', amount: 30_000_00, ref: 'a1' },
+        { code: 'LOAN', label: 'Personal loan repayment', amount: 40_000_00, ref: 'l1', interest: 500_00 },
+      ],
+    });
+    expect(r.lines.find((l) => l.code === 'ADVANCE')!.amount).toBe(30_000_00);
+    const loan = r.lines.find((l) => l.code === 'LOAN')!;
+    expect(loan.label).toContain('(part)');
+    expect(r.net).toBe(Math.ceil(100_000_00 / 3));
+    expect(loan.amount).toBe(plain.net - 30_000_00 - Math.ceil(100_000_00 / 3));
+    expect(loan.interest).toBe(500_00);
+  });
+
+  it('charges the employer fringe benefit tax on cheap staff loans', () => {
+    const r = kenyaRules.calculate({ ...base, staffLoans: [{ outstanding: 120_000_00, yearlyRate: 5 }] });
+    // 30% of (13% - 5%) / 12 of KES 120,000
+    expect(r.lines.find((l) => l.code === 'FBT_ER')!.amount).toBe(240_00);
+  });
+});

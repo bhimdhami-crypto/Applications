@@ -2,6 +2,10 @@ import { BadRequestException, ConflictException, ForbiddenException, Injectable,
 import { PayrollStatus, Prisma, Role } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/decorators';
+import { BenefitsService } from '../benefits/benefits.service';
+import { toIso, workingDays } from '../leave/calendar';
+import { LeaveService } from '../leave/leave.service';
+import { LoansService } from '../loans/loans.service';
 import { MailService } from '../mail/mail.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { rulesFor } from './rules';
@@ -24,6 +28,9 @@ export class PayrollService {
     private readonly prisma: PrismaService,
     private readonly audit: AuditService,
     private readonly mail: MailService,
+    private readonly leave: LeaveService,
+    private readonly loans: LoansService,
+    private readonly benefits: BenefitsService,
   ) {}
 
   listRuns() {
@@ -50,7 +57,7 @@ export class PayrollService {
     if (!company) throw new BadRequestException('Unknown company');
     const pack = rulesFor(company.countryCode);
     if (!pack) {
-      throw new UnprocessableEntityException(`Payroll rules for ${company.country} are not built yet`);
+      throw new UnprocessableEntityException(`${company.country} has no payroll rules in the portal`);
     }
     const exists = await this.prisma.payrollRun.findUnique({
       where: { companyId_periodYear_periodMonth: { companyId, periodYear: year, periodMonth: month } },
@@ -83,7 +90,9 @@ export class PayrollService {
   /** Locks the run and tells each employee their payslip is ready. */
   async finalize(actorId: string, id: string) {
     await this.transition(id, PayrollStatus.APPROVED, PayrollStatus.FINALIZED, { finalizedById: actorId, finalizedAt: new Date() });
-    await this.audit.record(actorId, 'payroll.finalize', 'PayrollRun', id);
+    // Loan, advance and IOU deductions on the payslips become repayments
+    const repaid = await this.loans.recordFromRun(id, actorId);
+    await this.audit.record(actorId, 'payroll.finalize', 'PayrollRun', id, { loansRepaid: repaid });
     const run = await this.prisma.payrollRun.findUniqueOrThrow({
       where: { id },
       include: { payslips: { include: { employee: { include: { user: true } } } } },
@@ -174,9 +183,38 @@ export class PayrollService {
       },
     });
 
+    // Unpaid and reduced-pay leave days, and the annual leave balance printed on each payslip
+    const country = run.company.countryCode;
+    const [start, end] = [toIso(periodStart), toIso(periodEnd)];
+    const holidays = await this.leave.holidaySet(country, start, end);
+    const monthWorkingDays = workingDays(start, end, country, new Set(holidays.keys())).length;
+    const cuts = await this.leave.payCuts(employees.map((e) => e.id), country, start, end);
+    const annualLeft = await this.leave.annualLeftMany(employees.map((e) => ({ ...e, company: { countryCode: country } })), run.periodYear);
+    // Loans, advances and IOUs to recover, then meal, gym and gift voucher benefits
+    const owed = await this.loans.payrollItems(employees, run.periodYear, run.periodMonth, periodEnd);
+    const perks = await this.benefits.payrollItems(employees.map((e) => e.id), run.periodYear, run.periodMonth);
+
     let gross = 0, deductions = 0, net = 0, employerCost = 0;
     const slips = employees.map((e) => {
-      const r = pack.calculate({ basic: toMinor(e.monthlyBasic), allowances: toMinor(e.monthlyAllowances) });
+      const basic = toMinor(e.monthlyBasic);
+      const cut = cuts.get(e.id);
+      const lostDays = cut ? cut.unpaidDays + cut.halfPayDays / 2 : 0;
+      const leaveDeduction = cut && monthWorkingDays > 0
+        ? { amount: Math.round((basic * lostDays) / monthWorkingDays), label: leaveLabel(cut, monthWorkingDays) }
+        : undefined;
+      const loan = owed.get(e.id);
+      const perk = perks.get(e.id);
+      const r = pack.calculate({
+        basic,
+        allowances: toMinor(e.monthlyAllowances),
+        leaveDeduction,
+        cashAllowances: perk?.cashAllowances,
+        benefitsInKind: perk?.benefitsInKind,
+        voluntary: [...(loan?.voluntary ?? []), ...(perk?.voluntary ?? [])],
+        staffLoans: loan?.staffLoans,
+        period: { year: run.periodYear, month: run.periodMonth },
+        birthDate: e.dateOfBirth ? toIso(e.dateOfBirth) : undefined,
+      });
       gross += r.gross; deductions += r.deductions; net += r.net; employerCost += r.employerCost;
       return {
         runId,
@@ -186,7 +224,8 @@ export class PayrollService {
         deductions: toMajor(r.deductions),
         net: toMajor(r.net),
         employerCost: toMajor(r.employerCost),
-        lines: r.lines.map((l) => ({ ...l, amount: Number(toMajor(l.amount)) })),
+        lines: r.lines.map((l) => ({ ...l, amount: Number(toMajor(l.amount)), ...(l.interest !== undefined ? { interest: Number(toMajor(l.interest)) } : {}) })),
+        annualLeaveLeft: annualLeft.get(e.id) ?? null,
       };
     });
 
@@ -199,4 +238,11 @@ export class PayrollService {
       }),
     ]);
   }
+}
+
+function leaveLabel(cut: { unpaidDays: number; halfPayDays: number }, monthDays: number) {
+  const parts = [];
+  if (cut.unpaidDays) parts.push(`${cut.unpaidDays} unpaid day${cut.unpaidDays === 1 ? '' : 's'}`);
+  if (cut.halfPayDays) parts.push(`${cut.halfPayDays} half-pay sick day${cut.halfPayDays === 1 ? '' : 's'}`);
+  return `Leave: ${parts.join(', ')} of ${monthDays}`;
 }
