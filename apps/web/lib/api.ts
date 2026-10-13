@@ -537,3 +537,190 @@ const STAGE_NAME: Record<string, string> = { MANAGER: 'Manager', HR: 'HR', PAYRO
 /** "Manager: Amina Hassan approved 22 Sep" lines for the approval trail */
 export const trail = (decisions: Decision[]) =>
   decisions.map((d) => `${STAGE_NAME[d.stage] ?? d.stage}: ${d.byName} ${d.approved ? 'approved' : 'declined'} ${formatDate(d.at)}${d.note ? ` (${d.note})` : ''}`);
+
+// ---------- Policies and forms, chat, community page, activity tracker ----------
+
+export interface LibraryItem {
+  id: string;
+  kind: 'POLICY' | 'FORM';
+  code: string;
+  title: string;
+  category: string;
+  summary: string | null;
+  owner: string | null;
+  version: string;
+  fileName: string;
+  mustRead: boolean;
+  active: boolean;
+  publishedAt: string;
+  readAt: string | null;
+  readEarlier: boolean;
+}
+
+export interface Person {
+  id: string;
+  name: string;
+  jobTitle: string;
+  country: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  kind: 'DIRECT' | 'GROUP';
+  name: string;
+  members: Person[];
+  left: boolean;
+  lastMessageAt: string;
+  preview: { from: string; text: string } | null;
+  unread: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: Person;
+  mine: boolean;
+  body: string | null;
+  removed: string | null;
+  createdAt: string;
+}
+
+export interface PostComment {
+  id: string;
+  author: Person;
+  mine: boolean;
+  body: string | null;
+  removed: string | null;
+  createdAt: string;
+}
+
+export interface Post extends PostComment {
+  attachments: Array<{ index: number; mime: string; name: string; size: number }>;
+  likes: number;
+  liked: boolean;
+  comments: PostComment[];
+}
+
+export interface ContentReport {
+  id: string;
+  target: 'MESSAGE' | 'POST' | 'COMMENT';
+  targetId: string;
+  status: 'OPEN' | 'REMOVED' | 'DISMISSED';
+  reason: string;
+  note: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  reporter: Person;
+  where: string;
+  author: Person | null;
+  body: string | null;
+  removed: boolean;
+}
+
+export type WorkMode = 'OFFICE' | 'REMOTE' | 'FIELD';
+export const MODE_LABEL: Record<WorkMode, string> = { OFFICE: 'In the office', REMOTE: 'Remote', FIELD: 'At a client or on site' };
+
+export interface WorkSession {
+  id: string;
+  date: string;
+  clockIn: string;
+  clockOut: string | null;
+  mode: WorkMode;
+  minutes: number;
+  autoClosed: boolean;
+  edited: boolean;
+  editReason: string | null;
+}
+
+export interface WorkLog {
+  id: string;
+  date: string;
+  hours: number;
+  project: string;
+  description: string;
+}
+
+export interface ActivityWeek {
+  today: string;
+  timeZone: string;
+  editableFrom: string;
+  week: { start: string; end: string };
+  open: WorkSession | null;
+  days: Array<{ date: string; working: boolean; holiday: string | null; onLeave: boolean; sessions: WorkSession[]; logs: WorkLog[]; workedMinutes: number; loggedHours: number }>;
+  totals: { workedMinutes: number; loggedHours: number; expectedHours: number };
+}
+
+/** 7h 05m */
+export function hoursAndMinutes(minutes: number) {
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return `${h}h ${String(m).padStart(2, '0')}m`;
+}
+
+/** A time of day in a given time zone, e.g. 08:05 */
+export function timeIn(iso: string | null, timeZone: string) {
+  if (!iso) return '';
+  return new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', timeZone }).format(new Date(iso));
+}
+
+/** "2 minutes ago", "yesterday 14:05" style labels for chat and posts */
+export function whenLabel(iso: string) {
+  const d = new Date(iso);
+  const mins = Math.round((Date.now() - d.getTime()) / 60_000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins} min ago`;
+  const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+  const days = Math.floor((new Date().setHours(0, 0, 0, 0) - new Date(d).setHours(0, 0, 0, 0)) / 86_400_000);
+  if (days === 0) return time;
+  if (days === 1) return `yesterday ${time}`;
+  return `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} ${time}`;
+}
+
+export const initials = (name: string) => name.split(/\s+/).map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+
+/** Opens a PDF or image the API serves in a new tab */
+export async function openFile(path: string) {
+  const tab = window.open('', '_blank');
+  try {
+    const url = URL.createObjectURL(await apiBlob(path));
+    if (tab) tab.location.href = url;
+    else window.location.href = url;
+    setTimeout(() => URL.revokeObjectURL(url), 60_000);
+  } catch (err) {
+    tab?.close();
+    throw err;
+  }
+}
+
+/** Turns a date and a time of day in a time zone into an ISO timestamp */
+export function zonedIso(date: string, time: string, timeZone: string) {
+  const [y, mo, d] = date.split('-').map(Number);
+  const [h, mi] = time.split(':').map(Number);
+  const guess = Date.UTC(y, mo - 1, d, h, mi);
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-GB', { timeZone, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })
+      .formatToParts(new Date(guess))
+      .map((p) => [p.type, p.value]),
+  );
+  const shown = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute);
+  return new Date(guess - (shown - guess)).toISOString();
+}
+
+export interface TeamActivity {
+  date: string;
+  companyId: string | null;
+  timeZone: string;
+  summary: { people: number; in: number; out: number; onLeave: number };
+  rows: Array<{
+    id: string; name: string; employeeNo: string; jobTitle: string; hasLogin: boolean;
+    status: 'IN' | 'OUT' | 'ON_LEAVE' | 'NOT_STARTED'; mode: WorkMode | null;
+    firstIn: string | null; lastOut: string | null; workedMinutes: number; weekMinutes: number;
+    flags: string[]; logs: WorkLog[];
+  }>;
+  truncated: boolean;
+}
+
+export interface ActivityReport {
+  month: string;
+  expectedHours: number;
+  rows: Array<{ employeeNo: string; name: string; daysPresent: number; hoursWorked: number; hoursLogged: number; overExpected: number; forgotClockOut: number; edited: number }>;
+}

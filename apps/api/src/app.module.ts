@@ -1,3 +1,7 @@
+import { ActivityModule } from './activity/activity.module';
+import { ChatModule } from './chat/chat.module';
+import { CommunityModule } from './community/community.module';
+import { LibraryModule } from './library/library.module';
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ScheduleModule } from '@nestjs/schedule';
@@ -30,6 +34,10 @@ import { StorageModule } from './storage/storage.module';
     LoansModule,
     BenefitsModule,
     InboxModule,
+    LibraryModule,
+    ChatModule,
+    CommunityModule,
+    ActivityModule,
   ],
 })
 export class AppModule {}

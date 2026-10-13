@@ -57,7 +57,7 @@ describe('Mindspace HR API', () => {
     mail = app.get(MailService);
 
     await prisma.$executeRawUnsafe(
-      'TRUNCATE "LoanRepayment", "Loan", "BenefitEnrolment", "BenefitPlan", "GiftVoucher", "LeaveRequest", "LeaveAdjustment", "PublicHoliday", "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
+      'TRUNCATE "ContentReport", "PostComment", "PostLike", "CommunityPost", "ChatMessage", "ConversationMember", "Conversation", "PolicyAcknowledgement", "LibraryItem", "AttendanceSession", "WorkLog", "LoanRepayment", "Loan", "BenefitEnrolment", "BenefitPlan", "GiftVoucher", "LeaveRequest", "LeaveAdjustment", "PublicHoliday", "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
     );
     process.env.SEED_ADMIN_PASSWORD = ADMIN_PASSWORD;
     process.env.SEED_USER_PASSWORD = USER_PASSWORD;
@@ -669,6 +669,135 @@ describe('Mindspace HR API', () => {
 
       const book = await api('get', `/loans/book?companyId=${kenya.id}`, 'finance').expect(200);
       expect(Number(book.body.totals.KES)).toBeGreaterThan(0);
+    });
+  });
+
+  describe('policies, chat, community page and activity tracker', () => {
+    const PDF = Buffer.from('%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n');
+    const PNG = Buffer.from('89504e470d0a1a0a0000000d4948445200000001000000010806000000', 'hex');
+
+    it('lists the 22 policies and 20 forms, and records who has read a policy', async () => {
+      const all = await api('get', '/library', 'tester').expect(200);
+      expect(all.body.filter((i: { kind: string }) => i.kind === 'POLICY')).toHaveLength(22);
+      expect(all.body.filter((i: { kind: string }) => i.kind === 'FORM')).toHaveLength(20);
+      const pol = all.body.find((i: { code: string }) => i.code === 'POL-20');
+      expect(pol.readAt).toBeNull();
+      const before = (await api('get', '/library/pending', 'tester').expect(200)).body.count;
+      const file = await api('get', `/library/${pol.id}/file`, 'tester').expect(200);
+      expect(file.headers['content-type']).toBe('application/pdf');
+      await api('post', `/library/${pol.id}/acknowledge`, 'tester').expect(201);
+      expect((await api('get', '/library/pending', 'tester').expect(200)).body.count).toBe(before - 1);
+      const form = all.body.find((i: { code: string }) => i.code === 'HR-F10');
+      await api('post', `/library/${form.id}/acknowledge`, 'tester').expect(400);
+    });
+
+    it('lets only HR publish, and a new version asks everyone to read it again', async () => {
+      const pol = (await api('get', '/library?kind=POLICY', 'hr').expect(200)).body.find((i: { code: string }) => i.code === 'POL-20');
+      await api('post', `/library/${pol.id}/versions`, 'developer').field('version', '0.2').attach('file', PDF, 'p.pdf').expect(403);
+      await api('post', `/library/${pol.id}/versions`, 'hr').field('version', '0.2').attach('file', PNG, 'p.png').expect(400);
+      await api('post', `/library/${pol.id}/versions`, 'hr').field('version', '0.2').attach('file', PDF, 'p.pdf').expect(201);
+      const again = (await api('get', '/library', 'tester').expect(200)).body.find((i: { code: string }) => i.code === 'POL-20');
+      expect(again).toMatchObject({ version: '0.2', readAt: null, readEarlier: true });
+      const report = await api('get', `/library/${pol.id}/report`, 'hr').expect(200);
+      expect(report.body.perCompany.find((c: { company: string }) => c.company.includes('Kenya')).read).toBe(0);
+      const sent = await api('post', `/library/${pol.id}/remind`, 'hr').expect(201);
+      expect(sent.body.sent).toBeGreaterThan(0);
+      const created = await api('post', '/library', 'hr')
+        .field('kind', 'FORM').field('code', 'HR-F21').field('title', 'Equipment Request').field('category', 'Work arrangements').field('version', '1.0')
+        .attach('file', PDF, 'f.pdf').expect(201);
+      expect(created.body.mustRead).toBe(false);
+    });
+
+    it('runs a direct chat and a group, and keeps chats private to their members', async () => {
+      const people = await api('get', '/chat/people?q=faith', 'developer').expect(200);
+      const faith = people.body[0];
+      expect(faith.name).toBe('Faith Njeri');
+      const chat = await api('post', '/chat/conversations', 'developer').send({ userIds: [faith.id] }).expect(201);
+      const same = await api('post', '/chat/conversations', 'developer').send({ userIds: [faith.id] }).expect(201);
+      expect(same.body.id).toBe(chat.body.id);
+      const sent = await api('post', `/chat/conversations/${chat.body.id}/messages`, 'developer').send({ body: 'Lunch at 1?' }).expect(201);
+      expect((await api('get', '/chat/unread', 'tester').expect(200)).body.count).toBeGreaterThan(0);
+      const read = await api('get', `/chat/conversations/${chat.body.id}/messages`, 'tester').expect(200);
+      expect(read.body.messages.map((m: { body: string }) => m.body)).toContain('Lunch at 1?');
+      const newer = await api('get', `/chat/conversations/${chat.body.id}/messages?after=${sent.body.id}`, 'tester').expect(200);
+      expect(newer.body.messages).toHaveLength(0);
+      await api('get', `/chat/conversations/${chat.body.id}/messages`, 'manager').expect(404);
+      await api('post', `/chat/conversations/${chat.body.id}/messages`, 'manager').send({ body: 'hi' }).expect(404);
+
+      const group = await api('post', '/chat/conversations', 'manager').send({ userIds: [faith.id], name: 'Release war room' }).expect(201);
+      const kevin = (await api('get', '/chat/people?q=kevin', 'manager').expect(200)).body[0];
+      await api('post', `/chat/conversations/${group.body.id}/members`, 'tester').send({ userIds: [kevin.id] }).expect(201);
+      await api('post', `/chat/conversations/${group.body.id}/messages`, 'developer').send({ body: 'Joined' }).expect(201);
+      await api('post', `/chat/conversations/${group.body.id}/leave`, 'developer').expect(201);
+      await api('post', `/chat/conversations/${group.body.id}/messages`, 'developer').send({ body: 'Still here?' }).expect(403);
+      const list = await api('get', '/chat/conversations', 'tester').expect(200);
+      expect(list.body.find((c: { id: string }) => c.id === group.body.id).name).toBe('Release war room');
+    });
+
+    it('lets a member report a chat message and HR remove it', async () => {
+      const chats = (await api('get', '/chat/conversations', 'tester').expect(200)).body;
+      const direct = chats.find((c: { kind: string; name: string }) => c.kind === 'DIRECT' && c.name === 'Kevin Mwangi');
+      const msgs = (await api('get', `/chat/conversations/${direct.id}/messages`, 'tester').expect(200)).body.messages;
+      const theirs = msgs.find((m: { mine: boolean }) => !m.mine);
+      await api('post', '/reports', 'manager').send({ target: 'MESSAGE', targetId: theirs.id, reason: 'Not my chat' }).expect(404);
+      await api('post', '/reports', 'tester').send({ target: 'MESSAGE', targetId: theirs.id, reason: 'Testing the report button' }).expect(201);
+      await api('get', '/reports', 'developer').expect(403);
+      const open = await api('get', '/reports', 'hr').expect(200);
+      const report = open.body.find((r: { targetId: string }) => r.targetId === theirs.id);
+      expect(report.body).toBe(theirs.body);
+      await api('post', `/reports/${report.id}/remove`, 'hr').send({ note: 'Removed in testing' }).expect(201);
+      const after = (await api('get', `/chat/conversations/${direct.id}/messages`, 'tester').expect(200)).body.messages;
+      expect(after.find((m: { id: string }) => m.id === theirs.id)).toMatchObject({ body: null, removed: 'Removed by a moderator' });
+      expect(mail.outbox.some((m) => m.to === 'developer@mindspace-ai.test' && m.subject.includes('removed'))).toBe(true);
+    });
+
+    it('posts to the community page with a photo, likes, comments and moderation', async () => {
+      await api('post', '/community/posts', 'tester').field('body', 'Team photo').attach('files', PNG, 'team.png').expect(400);
+      await api('post', '/community/posts', 'tester').field('body', 'Bad file').field('filesConfirmed', 'true').attach('files', Buffer.from('MZ not allowed'), 'x.exe').expect(400);
+      const post = await api('post', '/community/posts', 'tester').field('body', 'Team photo from the hackathon').field('filesConfirmed', 'true').attach('files', PNG, 'team.png').expect(201);
+      expect(post.body.attachments[0]).toMatchObject({ mime: 'image/png', name: 'team.png' });
+      const img = await api('get', `/community/posts/${post.body.id}/files/0`, 'developer').expect(200);
+      expect(img.headers['content-type']).toBe('image/png');
+      expect((await api('post', `/community/posts/${post.body.id}/like`, 'developer').expect(201)).body.likes).toBe(1);
+      await api('post', `/community/posts/${post.body.id}/comments`, 'developer').send({ body: 'Great shot' }).expect(201);
+      const feed = await api('get', '/community/posts', 'tester').expect(200);
+      const mine = feed.body.posts.find((p: { id: string }) => p.id === post.body.id);
+      expect(mine).toMatchObject({ likes: 1, mine: true });
+      expect(mine.comments[0].body).toBe('Great shot');
+      await api('delete', `/community/posts/${post.body.id}`, 'developer').expect(403);
+      await api('post', '/reports', 'developer').send({ target: 'POST', targetId: post.body.id, reason: 'Checking the copyright of this photo' }).expect(201);
+      const report = (await api('get', '/reports', 'hr').expect(200)).body.find((r: { targetId: string }) => r.targetId === post.body.id);
+      await api('post', `/reports/${report.id}/dismiss`, 'hr').send({ note: 'Own photo' }).expect(201);
+      await api('delete', `/community/posts/${post.body.id}`, 'tester').expect(200);
+      const gone = await api('get', '/community/posts', 'developer').expect(200);
+      expect(gone.body.posts.some((p: { id: string }) => p.id === post.body.id)).toBe(false);
+    });
+
+    it('clocks in and out, logs work and shows the team to the manager only', async () => {
+      const week = await api('get', '/activity/me', 'tester').expect(200);
+      expect(week.body.days).toHaveLength(7);
+      expect(week.body.timeZone).toBe('Africa/Nairobi');
+      if (week.body.open) await api('post', '/activity/clock-out', 'tester').expect(201);
+      const s = await api('post', '/activity/clock-in', 'tester').send({ mode: 'REMOTE' }).expect(201);
+      await api('post', '/activity/clock-in', 'tester').send({ mode: 'REMOTE' }).expect(409);
+      await api('post', '/activity/clock-out', 'tester').expect(201);
+      await api('post', '/activity/clock-out', 'tester').expect(409);
+      const today = week.body.today;
+      await api('post', '/activity/logs', 'tester').send({ date: today, hours: 25, project: 'X', description: 'Too long' }).expect(400);
+      const log = await api('post', '/activity/logs', 'tester').send({ date: today, hours: 2.5, project: 'HR portal', description: 'Exploratory testing' }).expect(201);
+      await api('post', '/activity/logs', 'tester').send({ date: '2020-01-06', hours: 1, project: 'Old', description: 'Too far back' }).expect(400);
+      const before = new Date(new Date(s.body.clockIn).getTime() - 60 * 60_000);
+      await api('patch', `/activity/sessions/${s.body.id}`, 'tester').send({ clockIn: before.toISOString(), clockOut: new Date(before.getTime() + 30 * 60_000).toISOString(), reason: 'Started earlier' }).expect(200);
+
+      const team = await api('get', '/activity/team', 'manager').expect(200);
+      const faith = team.body.rows.find((r: { name: string }) => r.name === 'Faith Njeri');
+      expect(faith.logs.map((l: { id: string }) => l.id)).toContain(log.body.id);
+      expect(faith.flags).toContain('Times edited');
+      await api('get', '/activity/team', 'developer').expect(403);
+      const csv = await api('get', `/activity/report?month=${today.slice(0, 7)}&format=csv`, 'payroll').expect(200);
+      expect(csv.headers['content-type']).toContain('text/csv');
+      expect(csv.text).toContain('Faith Njeri');
+      await api('get', `/activity/report?month=${today.slice(0, 7)}`, 'manager').expect(403);
     });
   });
 });

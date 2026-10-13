@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { api, ApprovalItem, LeaveBalance, LeaveRequest, LOCATION_LABEL, money, Payslip, PayrollRun, periodName } from '@/lib/api';
+import { ActivityWeek, api, ApprovalItem, hoursAndMinutes, LeaveBalance, LeaveRequest, LOCATION_LABEL, money, Payslip, PayrollRun, periodName } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
 export default function DashboardPage() {
@@ -12,6 +12,8 @@ export default function DashboardPage() {
   const [annual, setAnnual] = useState<LeaveBalance | null>(null);
   const [toApprove, setToApprove] = useState<LeaveRequest[]>([]);
   const [moneyQueue, setMoneyQueue] = useState<ApprovalItem[]>([]);
+  const [toRead, setToRead] = useState(0);
+  const [day, setDay] = useState<ActivityWeek | null>(null);
   const [owed, setOwed] = useState<{ amount: string; currency: string } | null>(null);
 
   useEffect(() => {
@@ -20,6 +22,8 @@ export default function DashboardPage() {
     if (me.employee) api<LeaveBalance[]>('/leave/balances').then((b) => setAnnual(b.find((x) => x.type === 'ANNUAL') ?? null)).catch(() => setAnnual(null));
     if (can('HR', 'MANAGER')) api<LeaveRequest[]>('/leave/approvals').then(setToApprove).catch(() => setToApprove([]));
     if (can('HR', 'MANAGER', 'PAYROLL', 'FINANCE')) api<ApprovalItem[]>('/approvals').then(setMoneyQueue).catch(() => setMoneyQueue([]));
+    if (me.employee) api<{ count: number }>('/library/pending').then((p) => setToRead(p.count)).catch(() => setToRead(0));
+    if (me.employee) api<ActivityWeek>('/activity/me').then(setDay).catch(() => setDay(null));
     if (me.employee) {
       api<{ outstanding: string; employee: { currency: string } }>('/loans')
         .then((l) => setOwed(Number(l.outstanding) > 0 ? { amount: l.outstanding, currency: l.employee.currency } : null))
@@ -42,6 +46,20 @@ export default function DashboardPage() {
               {me.employee.department} · {LOCATION_LABEL[me.employee.workLocation as keyof typeof LOCATION_LABEL]}
             </div>
             <div className="muted">{me.employee.company.name}</div>
+          </div>
+        )}
+        {day && (
+          <div className="card stat">
+            <div className="label">{day.open ? 'Clocked in' : 'My day'}</div>
+            <div className="value">{hoursAndMinutes(day.days.find((d) => d.date === day.today)?.workedMinutes ?? 0)}</div>
+            <Link href="/activity">{day.open ? 'Clock out or add a work note' : 'Clock in'}</Link>
+          </div>
+        )}
+        {toRead > 0 && (
+          <div className="card stat">
+            <div className="label">Policies to read</div>
+            <div className="value">{toRead}</div>
+            <Link href="/policies">Read and confirm</Link>
           </div>
         )}
         {latest && (

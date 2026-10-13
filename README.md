@@ -9,6 +9,7 @@ Done so far:
 - **Milestone 3:** leave requests and approvals, balances, a team leave calendar and public holidays for all eight countries. Unpaid leave comes off pay.
 - **Milestone 4:** salary advances, staff loans and IOUs with their approvals and payroll recovery; meal vouchers, gym memberships and gift vouchers, taxed as benefits on the payslip.
 - **Milestone 5:** payroll rules for Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand, so every subsidiary can run month-end payroll.
+- **Milestone 6:** the policies and forms library with read confirmations, staff chat, a community page for news, photos and videos with moderation, and a daily activity tracker.
 
 | Part | Stack |
 |---|---|
@@ -27,7 +28,7 @@ cp .env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 npm install
 npm run db:migrate
-npm run db:seed                      # companies, the seven test accounts and benefit options
+npm run db:seed                      # companies, the seven test accounts, benefit options, policies and sample chats
 npm run db:import-sample             # optional: 12,408 sample staff with documents and photos
 npm run dev:api                      # http://localhost:4000/api
 npm run dev:web                      # http://localhost:3000
@@ -125,6 +126,32 @@ Under **Benefits**, staff join a meal option (HR-F06) or a gym plan (HR-F07); ma
 - **Payslip:** the company's share and vouchers appear as benefits in kind. In Kenya they are tax-free up to KES 5,000 a month in total, and fully taxed above that. The remote meal allowance is paid as taxable cash.
 - HR sets the options and prices for each company under **Benefits > Manage benefit options**, which also shows members, monthly cost and vouchers issued. The Kenya prices in the seed are examples.
 
+## Policies and forms
+
+**Policies and forms** holds the 22 group policies (POL-01 to POL-22) and 20 HR forms (HR-F01 to HR-F20) as PDFs, grouped by topic and searchable.
+
+- Policies marked "must read" ask every employee to open them and press **I have read this policy**. The count shows in the menu and on the home page.
+- Confirmations are kept per version. When HR uploads a new version, everyone confirms again, unless HR marks it as a small correction (typos, layout).
+- HR uploads, updates and hides documents under **Manage policies and forms**, sees who has read each policy per company, and emails a reminder to those with a login. Staff without a login can hand in a signed copy.
+- Forms that have an online version in the portal (leave, advances, loans, IOUs, gift vouchers, meals, gym) say so.
+
+## Chat and community
+
+- **Chat:** one-to-one and group chats with anyone who has a portal login, across all companies. Unread counts show in the menu. People can delete their own messages and report anyone else's.
+- **Community:** posts with up to 4 photos, an MP4 video (up to 50 MB) or a PDF, likes and comments. Before attaching files the author confirms they made them or have permission, and that anyone recognisable agreed (POL-20 copyright rules).
+- **Moderation:** HR sees reported messages, posts and comments and removes or keeps each one. The author is emailed when something is removed. Removed content is hidden but kept as a company record.
+- Chat and the community page refresh every few seconds; there is no separate chat server to run.
+
+## Daily activity tracker
+
+Under **My day**, staff clock in (in the office, remote, or at a client or on site) and out, and note what they worked on. This follows POL-21.
+
+- The portal records clock-in and clock-out times, the work mode and the notes. It does **not** record location, screens, keystrokes, websites or apps; the page says so.
+- A forgotten clock-out is closed after 16 hours at 9 hours from clock-in and flagged.
+- Staff can correct their times (with a reason) and notes for the last 7 days. Corrections are marked as edited.
+- **Team activity:** managers see their direct reports for any day; HR and Payroll see a whole company, plus a monthly report of days present, hours worked and hours noted, with a CSV download.
+- Each company's times use its own time zone.
+
 ## How sign-in works
 
 1. Email, password and a Turnstile CAPTCHA.
@@ -170,7 +197,7 @@ npm run db:test:setup   # migrates the hrportal_test database (created by docker
 npm test                # payroll rule unit tests for all eight countries + full API flow
 ```
 
-The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, leave from request to payslip, and advances, loans, IOUs and benefits from request to repayment. It wipes its database, so it only runs against a database whose name ends in `_test`.
+The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, leave from request to payslip, and advances, loans, IOUs and benefits from request to repayment, and policies, chat, the community page, moderation and the activity tracker. It wipes its database, so it only runs against a database whose name ends in `_test`.
 
 ## Screenshots
 
@@ -200,3 +227,14 @@ The API test signs in through the email code, checks every role boundary, adds a
 | | |
 |---|---|
 | ![South Africa payslip](docs/screenshots/18-payslip-south-africa.png) | ![New Zealand payslip](docs/screenshots/19-payslip-new-zealand.png) |
+
+| | |
+|---|---|
+| ![Policies and forms](docs/screenshots/20-policies.png) | ![Community page](docs/screenshots/22-community.png) |
+
+![Chat](docs/screenshots/21-chat.png)
+
+| | |
+|---|---|
+| ![My day](docs/screenshots/23-my-day.png) | ![Team activity](docs/screenshots/24-team-activity.png) |
+| ![Moderation](docs/screenshots/25-moderation.png) | ![Chat on a phone](docs/screenshots/26-chat-mobile.png) |

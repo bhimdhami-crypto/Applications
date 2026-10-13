@@ -132,16 +132,22 @@ model Company {
 
 /// A login account. Admin accounts need not have an employee record.
 model User {
-  id           String           @id @default(cuid())
-  email        String           @unique
-  passwordHash String
-  role         Role             @default(EMPLOYEE)
-  isActive     Boolean          @default(true)
-  employee     Employee?
-  challenges   LoginChallenge[]
-  lastLoginAt  DateTime?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id            String               @id @default(cuid())
+  email         String               @unique
+  passwordHash  String
+  role          Role                 @default(EMPLOYEE)
+  isActive      Boolean              @default(true)
+  employee      Employee?
+  challenges    LoginChallenge[]
+  conversations ConversationMember[]
+  messages      ChatMessage[]
+  posts         CommunityPost[]
+  postLikes     PostLike[]
+  postComments  PostComment[]
+  reports       ContentReport[]
+  lastLoginAt   DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
 }
 
 /// A pending second step of sign-in: the code emailed to the user.
@@ -159,24 +165,24 @@ model LoginChallenge {
 }
 
 model Employee {
-  id                   String             @id @default(cuid())
-  employeeNo           String             @unique
+  id                   String                  @id @default(cuid())
+  employeeNo           String                  @unique
   firstName            String
   lastName             String
   jobTitle             String
   department           String
   grade                String?
-  employmentType       EmploymentType     @default(PERMANENT)
-  workLocation         WorkLocation       @default(ON_SITE)
+  employmentType       EmploymentType          @default(PERMANENT)
+  workLocation         WorkLocation            @default(ON_SITE)
   city                 String?
   /// Work email, also for staff who have no portal login yet
-  workEmail            String?            @unique
+  workEmail            String?                 @unique
   mobilePhone          String?
   personalEmail        String?
   gender               String?
-  dateOfBirth          DateTime?          @db.Date
+  dateOfBirth          DateTime?               @db.Date
   maritalStatus        String?
-  dependants           Int                @default(0)
+  dependants           Int                     @default(0)
   /// Sensitive identifiers: shown only to the employee, HR, payroll and admins
   nationalIdNumber     String?
   taxId                String?
@@ -187,20 +193,20 @@ model Employee {
   /// Storage key of the profile photo
   photoKey             String?
   exitReason           String?
-  hireDate             DateTime           @db.Date
-  exitDate             DateTime?          @db.Date
-  status               EmploymentStatus   @default(ACTIVE)
+  hireDate             DateTime                @db.Date
+  exitDate             DateTime?               @db.Date
+  status               EmploymentStatus        @default(ACTIVE)
   /// Monthly base pay in the company's currency
-  monthlyBasic         Decimal            @db.Decimal(14, 2)
+  monthlyBasic         Decimal                 @db.Decimal(14, 2)
   /// Monthly taxable cash allowances (housing, transport, remote work)
-  monthlyAllowances    Decimal            @default(0) @db.Decimal(14, 2)
+  monthlyAllowances    Decimal                 @default(0) @db.Decimal(14, 2)
   companyId            String
-  company              Company            @relation(fields: [companyId], references: [id])
-  userId               String?            @unique
-  user                 User?              @relation(fields: [userId], references: [id])
+  company              Company                 @relation(fields: [companyId], references: [id])
+  userId               String?                 @unique
+  user                 User?                   @relation(fields: [userId], references: [id])
   managerId            String?
-  manager              Employee?          @relation("Reports", fields: [managerId], references: [id])
-  reports              Employee[]         @relation("Reports")
+  manager              Employee?               @relation("Reports", fields: [managerId], references: [id])
+  reports              Employee[]              @relation("Reports")
   payslips             Payslip[]
   nextOfKin            NextOfKin[]
   documents            EmployeeDocument[]
@@ -209,10 +215,13 @@ model Employee {
   loans                Loan[]
   benefitEnrolments    BenefitEnrolment[]
   giftVouchers         GiftVoucher[]
+  acknowledgements     PolicyAcknowledgement[]
+  attendance           AttendanceSession[]
+  workLogs             WorkLog[]
   /// Set when an admin deletes the employee. Records are kept for legal retention.
   deletedAt            DateTime?
-  createdAt            DateTime           @default(now())
-  updatedAt            DateTime           @updatedAt
+  createdAt            DateTime                @default(now())
+  updatedAt            DateTime                @updatedAt
 
   @@index([companyId, status])
 }
@@ -523,4 +532,206 @@ model GiftVoucher {
 
   @@index([employeeId, status])
   @@index([status, stage])
+}
+
+// ---------- Milestone 6: policies and forms, chat, community page, activity tracker ----------
+
+enum LibraryKind {
+  POLICY
+  FORM
+}
+
+/// A policy or HR form in the Policy Centre. Replacing the file publishes a new version.
+model LibraryItem {
+  id               String                  @id @default(cuid())
+  kind             LibraryKind
+  /// POL-01 or HR-F01
+  code             String                  @unique
+  title            String
+  category         String
+  summary          String?
+  owner            String?
+  version          String
+  fileKey          String
+  fileName         String
+  /// Policies every employee must confirm they have read
+  mustRead         Boolean                 @default(true)
+  active           Boolean                 @default(true)
+  /// When the current version was published
+  publishedAt      DateTime                @default(now())
+  updatedById      String?
+  acknowledgements PolicyAcknowledgement[]
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+}
+
+model PolicyAcknowledgement {
+  id         String      @id @default(cuid())
+  itemId     String
+  item       LibraryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  version    String
+  employeeId String
+  employee   Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  createdAt  DateTime    @default(now())
+
+  @@unique([itemId, version, employeeId])
+  @@index([employeeId])
+}
+
+enum ConversationKind {
+  DIRECT
+  GROUP
+}
+
+model Conversation {
+  id            String               @id @default(cuid())
+  kind          ConversationKind
+  name          String?
+  /// For direct chats: the two user ids, sorted and joined, so a pair has one chat
+  directKey     String?              @unique
+  createdById   String
+  lastMessageAt DateTime             @default(now())
+  members       ConversationMember[]
+  messages      ChatMessage[]
+  createdAt     DateTime             @default(now())
+}
+
+model ConversationMember {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime     @default(now())
+  /// Set when the member leaves a group; they keep read access to what was said before
+  leftAt         DateTime?
+  joinedAt       DateTime     @default(now())
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+}
+
+/// Chat messages are company records (POL-20 3.10): removed ones are hidden, not deleted.
+model ChatMessage {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id])
+  body           String
+  removedAt      DateTime?
+  removedById    String?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model CommunityPost {
+  id          String        @id @default(cuid())
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id])
+  body        String
+  /// [{ mime, name, size }] in upload order; files are stored as community/<postId>/<index>
+  attachments Json          @default("[]")
+  removedAt   DateTime?
+  removedById String?
+  likes       PostLike[]
+  comments    PostComment[]
+  createdAt   DateTime      @default(now())
+
+  @@index([createdAt])
+}
+
+model PostLike {
+  postId    String
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now())
+
+  @@id([postId, userId])
+}
+
+model PostComment {
+  id          String        @id @default(cuid())
+  postId      String
+  post        CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String
+  author      User          @relation(fields: [authorId], references: [id])
+  body        String
+  removedAt   DateTime?
+  removedById String?
+  createdAt   DateTime      @default(now())
+
+  @@index([postId, createdAt])
+}
+
+enum ReportTarget {
+  MESSAGE
+  POST
+  COMMENT
+}
+
+enum ReportStatus {
+  OPEN
+  REMOVED
+  DISMISSED
+}
+
+/// The Report button on a chat message, post or comment (POL-20 3.7)
+model ContentReport {
+  id           String       @id @default(cuid())
+  target       ReportTarget
+  targetId     String
+  reporterId   String
+  reporter     User         @relation(fields: [reporterId], references: [id])
+  reason       String
+  status       ReportStatus @default(OPEN)
+  reviewedById String?
+  reviewedAt   DateTime?
+  note         String?
+  createdAt    DateTime     @default(now())
+
+  @@unique([target, targetId, reporterId])
+  @@index([status, createdAt])
+}
+
+enum WorkMode {
+  OFFICE
+  REMOTE
+  FIELD
+}
+
+/// Clock-in and clock-out (POL-21 3.1). No location is recorded.
+model AttendanceSession {
+  id         String    @id @default(cuid())
+  employeeId String
+  employee   Employee  @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  /// The employee's local date at clock-in
+  date       DateTime  @db.Date
+  clockIn    DateTime
+  clockOut   DateTime?
+  mode       WorkMode
+  /// Closed by the portal because the employee forgot to clock out
+  autoClosed Boolean   @default(false)
+  editedAt   DateTime?
+  editReason String?
+  createdAt  DateTime  @default(now())
+
+  @@index([employeeId, date])
+}
+
+/// What the employee worked on, in hours, for a day
+model WorkLog {
+  id          String   @id @default(cuid())
+  employeeId  String
+  employee    Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  date        DateTime @db.Date
+  hours       Decimal  @db.Decimal(4, 2)
+  project     String
+  description String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([employeeId, date])
 }

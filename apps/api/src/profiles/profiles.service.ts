@@ -166,7 +166,7 @@ export class ProfilesService {
     await this.requireEdit(actor, id);
     if (!file) throw new BadRequestException('Choose a file to upload');
     const kind = detectFileKind(file.buffer);
-    if (!kind) throw new BadRequestException('Upload a PDF, PNG, JPEG or WebP file');
+    if (!kind || kind === 'mp4') throw new BadRequestException('Upload a PDF, PNG, JPEG or WebP file');
     const hr = isHrEditor(actor);
     const key = `documents/${id}/${randomUUID()}.${FILE_TYPES[kind].ext}`;
     await this.storage.put(key, file.buffer);
