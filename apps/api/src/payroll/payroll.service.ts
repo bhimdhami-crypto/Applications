@@ -57,7 +57,7 @@ export class PayrollService {
     if (!company) throw new BadRequestException('Unknown company');
     const pack = rulesFor(company.countryCode);
     if (!pack) {
-      throw new UnprocessableEntityException(`Payroll rules for ${company.country} are not built yet`);
+      throw new UnprocessableEntityException(`${company.country} has no payroll rules in the portal`);
     }
     const exists = await this.prisma.payrollRun.findUnique({
       where: { companyId_periodYear_periodMonth: { companyId, periodYear: year, periodMonth: month } },
@@ -212,6 +212,8 @@ export class PayrollService {
         benefitsInKind: perk?.benefitsInKind,
         voluntary: [...(loan?.voluntary ?? []), ...(perk?.voluntary ?? [])],
         staffLoans: loan?.staffLoans,
+        period: { year: run.periodYear, month: run.periodMonth },
+        birthDate: e.dateOfBirth ? toIso(e.dateOfBirth) : undefined,
       });
       gross += r.gross; deductions += r.deductions; net += r.net; employerCost += r.employerCost;
       return {

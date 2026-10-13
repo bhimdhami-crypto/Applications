@@ -60,6 +60,10 @@ export interface PayLine {
   /** BENEFIT: received in kind (meal card, gym, voucher), taxed but not paid in cash */
   kind: 'EARNING' | 'DEDUCTION' | 'EMPLOYER' | 'BENEFIT';
   amount: string;
+  /** The loan, advance or IOU a deduction repays */
+  ref?: string;
+  /** An after-tax deduction the employee agreed to, not a statutory one */
+  voluntary?: boolean;
 }
 
 export interface Payslip {

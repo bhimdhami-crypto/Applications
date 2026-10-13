@@ -11,6 +11,8 @@ export interface PayLine {
   ref?: string;
   /** Interest included in a loan deduction, in minor units */
   interest?: number;
+  /** An after-tax deduction the employee agreed to (loan, advance, benefit share), not a statutory one */
+  voluntary?: boolean;
 }
 
 export interface PayItem {
@@ -40,6 +42,10 @@ export interface PayInput {
   voluntary?: PayItem[];
   /** Staff loans below the market rate, for countries that tax that benefit */
   staffLoans?: Array<{ outstanding: number; yearlyRate: number }>;
+  /** The month being paid; some countries change rates mid-year or deduct levies in set months */
+  period?: { year: number; month: number };
+  /** ISO date of birth, for age-based tax rebates */
+  birthDate?: string;
 }
 
 export interface PayResult {
@@ -82,7 +88,7 @@ export function applyVoluntary(lines: PayLine[], voluntary: PayItem[] = [], minS
     room -= take;
     // Interest is paid before principal when only part of an instalment fits
     const interest = item.interest === undefined ? undefined : Math.min(item.interest, take);
-    out.push({ code: item.code, label: take < item.amount ? `${item.label} (part)` : item.label, kind: 'DEDUCTION', amount: take, ref: item.ref, interest });
+    out.push({ code: item.code, label: take < item.amount ? `${item.label} (part)` : item.label, kind: 'DEDUCTION', amount: take, ref: item.ref, interest, voluntary: true });
   }
   return out;
 }

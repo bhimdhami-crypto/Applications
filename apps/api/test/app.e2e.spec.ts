@@ -174,9 +174,28 @@ describe('Mindspace HR API', () => {
       expect(line('AHL')).toBe(1920);
     });
 
-    it('refuses payroll for a country whose rules are not built yet', async () => {
+    it('refuses payroll for the US parent company, which has no payroll rules', async () => {
+      const parent = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-INC' } });
+      await api('post', '/payroll/runs', 'payroll').send({ companyId: parent.id, year: 2026, month: 9 }).expect(422);
+    });
+
+    it('runs payroll in Uganda with PAYE, NSSF and Local Service Tax', async () => {
       const uganda = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-UG' } });
-      await api('post', '/payroll/runs', 'payroll').send({ companyId: uganda.id, year: 2026, month: 9 }).expect(422);
+      const emp = await prisma.employee.create({
+        data: { employeeNo: 'MSA-UG-T00001', firstName: 'Ruth', lastName: 'Nakato', jobTitle: 'Developer', department: 'Engineering', hireDate: new Date('2025-01-06'), monthlyBasic: '1000000.00', companyId: uganda.id },
+      });
+      const res = await api('post', '/payroll/runs', 'payroll').send({ companyId: uganda.id, year: 2026, month: 9 }).expect(201);
+      const run = await api('get', `/payroll/runs/${res.body.id}`, 'payroll').expect(200);
+      expect(run.body.rulesVersion).toBe('UG-2026.1-draft');
+      const slip = run.body.payslips.find((p: { employeeId: string }) => p.employeeId === emp.id);
+      const line = (code: string) => Number(slip.lines.find((l: { code: string }) => l.code === code).amount);
+      expect(line('PAYE')).toBe(202000);
+      expect(line('NSSF')).toBe(50000);
+      expect(line('LST')).toBe(22500);
+      expect(Number(slip.net)).toBe(725500);
+      await prisma.payslip.deleteMany({ where: { runId: res.body.id } });
+      await prisma.payrollRun.delete({ where: { id: res.body.id } });
+      await prisma.employee.delete({ where: { id: emp.id } });
     });
 
     it('keeps payslips hidden from employees until the run is finalized', async () => {
@@ -202,7 +221,8 @@ describe('Mindspace HR API', () => {
 
     it('creates month-end drafts for every country with rules', async () => {
       const created = await app.get(PayrollService).createMonthEndDrafts(new Date(Date.UTC(2026, 9, 20)));
-      expect(created).toHaveLength(1);
+      // Every country except the US parent company
+      expect(created).toHaveLength(8);
       const again = await app.get(PayrollService).createMonthEndDrafts(new Date(Date.UTC(2026, 9, 20)));
       expect(again).toHaveLength(0);
     });

@@ -3,7 +3,10 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import { api, Company, money, PayrollRun, periodName } from '@/lib/api';
+import { api, Company, PayrollRun, periodName } from '@/lib/api';
+
+/** Run totals in whole units, so eight currencies fit side by side */
+const whole = (v: string | number) => Math.round(Number(v)).toLocaleString('en-GB');
 
 const now = new Date();
 
@@ -65,7 +68,7 @@ export default function PayrollPage() {
         <button type="submit">Create draft</button>
         {notReady.length > 0 && (
           <p className="muted" style={{ marginBottom: 0 }}>
-            Not available yet (tax rules still being built): {notReady.map((c) => c.country).join(', ')}.
+            No payroll rules in the portal for: {notReady.map((c) => c.country).join(', ')}.
           </p>
         )}
       </form>
@@ -87,12 +90,12 @@ export default function PayrollPage() {
             {runs.map((r) => (
               <tr key={r.id}>
                 <td><Link href={`/payroll/${r.id}`}>{periodName(r.periodYear, r.periodMonth)}</Link></td>
-                <td>{r.company.name}</td>
+                <td className="wrap">{r.company.name.replace(/^Mindspace (Artificial Intelligence|Inteligencia Artificial) /, '')}<div className="muted small">{r.company.currency}</div></td>
                 <td><span className={`badge ${r.status}`}>{r.status}</span></td>
                 <td className="num">{r._count?.payslips}</td>
-                <td className="num">{money(r.totalGross, r.company.currency)}</td>
-                <td className="num">{money(r.totalNet, r.company.currency)}</td>
-                <td className="num">{money(r.totalEmployerCost, r.company.currency)}</td>
+                <td className="num">{whole(r.totalGross)}</td>
+                <td className="num">{whole(r.totalNet)}</td>
+                <td className="num">{whole(r.totalEmployerCost)}</td>
               </tr>
             ))}
             {runs.length === 0 && <tr><td colSpan={7} className="muted">No payroll runs yet.</td></tr>}

@@ -4,10 +4,11 @@ HR and payroll portal for **Mindspace Artificial Intelligence Inc.** and its sub
 
 Done so far:
 
-- **Milestone 1:** secure sign-in, employee records, and the month-end payroll run with payslips. Kenya is the first country with payroll rules; the other countries come next.
+- **Milestone 1:** secure sign-in, employee records, and the month-end payroll run with payslips. Kenya was the first country with payroll rules.
 - **Milestone 2:** staff profiles with photos, contact details, IDs, education, next of kin and HR documents, plus an import of 12,408 sample staff.
 - **Milestone 3:** leave requests and approvals, balances, a team leave calendar and public holidays for all eight countries. Unpaid leave comes off pay.
 - **Milestone 4:** salary advances, staff loans and IOUs with their approvals and payroll recovery; meal vouchers, gym memberships and gift vouchers, taxed as benefits on the payslip.
+- **Milestone 5:** payroll rules for Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand, so every subsidiary can run month-end payroll.
 
 | Part | Stack |
 |---|---|
@@ -144,13 +145,29 @@ Deleting an employee is a soft delete: their login stops at once, and their reco
 
 PAYE bands with KES 2,400 personal relief; NSSF 6% up to KES 72,000 pensionable pay (employer matches); SHIF 2.75% (minimum KES 300); Affordable Housing Levy 1.5% each side; NITA KES 50 employer levy. NSSF, SHIF and the housing levy are deducted before PAYE. Benefits in kind over KES 5,000 a month are taxed; voluntary deductions never take pay below a third of gross (Employment Act s.19).
 
-**These rules are marked unverified.** A Kenyan payroll adviser must sign them off before real pay. Until then the portal shows a warning on every run.
+### Other countries
+
+| Country | Rules | Employee pays | Employer pays |
+|---|---|---|---|
+| Uganda | `UG-2026.1-draft` | PAYE (nil to UGX 235,000 a month, then 10%, 20%, 30%, plus 10% above 10 million); NSSF 5%; Local Service Tax in four parts, July to October | NSSF 10% |
+| Tanzania | `TZ-2026.1-draft` | PAYE (nil to TZS 270,000 a month, then 8% to 30%) after NSSF 10% | NSSF 10%, Skills Development Levy 3.5%, WCF 0.5% |
+| South Africa | `ZA-2026.1-draft` | PAYE on annualised pay (18% to 45%) less age rebates; UIF 1% up to R17,712 | UIF 1%, Skills Development Levy 1% |
+| Egypt | `EG-2026.1-draft` | Salary tax (0% to 27.5% after the EGP 20,000 exemption; high earners lose the lower bands); social insurance 11% on EGP 2,700 to 16,700; Martyrs' Fund 0.05% | Social insurance 18.75% |
+| Nigeria | `NG-2026.1-draft` | PAYE under the Nigeria Tax Act 2025 (nil to NGN 800,000 a year, then 15% to 25%); pension 8%; NHF 2.5% of basic | Pension 10%, NSITF 1%, ITF 1% |
+| Mexico | `MX-2026.1-draft` | ISR monthly table less the employment subsidy; IMSS on the integrated daily wage | IMSS, INFONAVIT 5%, state payroll tax 3% |
+| New Zealand | `NZ-2026.1-draft` | PAYE (10.5% to 39%); ACC earners' levy 1.75%; KiwiSaver 3.5% from April 2026 | KiwiSaver 3.5% less ESCT; fringe benefit tax on benefits in kind |
+
+Every country keeps take-home pay above a third of gross when loans and benefit shares are deducted. Each rules file under `apps/api/src/payroll/rules/` explains its rates.
+
+Some figures are assumptions to check: South Africa uses the 2025/26 tables until the 2026 Budget figures are confirmed, and Mexico assumes a 3% state payroll tax and class I work risk. Kenya's fringe benefit tax on staff loans is the only loan benefit tax built so far. The US parent company has no payroll in the portal.
+
+**All eight rule sets are marked unverified.** A payroll adviser in each country must sign them off before real pay. Until then the portal shows a warning on every run.
 
 ## Tests
 
 ```bash
 npm run db:test:setup   # migrates the hrportal_test database (created by docker compose)
-npm test                # Kenya rule unit tests + full API flow
+npm test                # payroll rule unit tests for all eight countries + full API flow
 ```
 
 The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, leave from request to payslip, and advances, loans, IOUs and benefits from request to repayment. It wipes its database, so it only runs against a database whose name ends in `_test`.
@@ -177,3 +194,9 @@ The API test signs in through the email code, checks every role boundary, adds a
 | ![Benefits](docs/screenshots/14-benefits.png) | ![Payslip with deductions and benefits](docs/screenshots/15-payslip-benefits.png) |
 
 ![Loan book](docs/screenshots/16-loan-book.png)
+
+![Payroll runs for every country](docs/screenshots/17-payroll-all-countries.png)
+
+| | |
+|---|---|
+| ![South Africa payslip](docs/screenshots/18-payslip-south-africa.png) | ![New Zealand payslip](docs/screenshots/19-payslip-new-zealand.png) |
