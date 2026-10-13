@@ -10,6 +10,7 @@ export default function ApprovalsPage() {
   const [notes, setNotes] = useState<Record<string, string>>({});
   const [error, setError] = useState('');
   const [notice, setNotice] = useState('');
+  const [busy, setBusy] = useState('');
 
   const load = useCallback(() => {
     api<LeaveRequest[]>('/leave/approvals').then(setRows).catch((e) => setError(e.message));
@@ -20,6 +21,8 @@ export default function ApprovalsPage() {
   }, []);
 
   async function decide(r: LeaveRequest, approve: boolean) {
+    if (busy) return;
+    setBusy(r.id);
     setError('');
     setNotice('');
     try {
@@ -29,6 +32,9 @@ export default function ApprovalsPage() {
       load();
     } catch (err) {
       setError((err as Error).message);
+      load();
+    } finally {
+      setBusy('');
     }
   }
 
@@ -69,8 +75,8 @@ export default function ApprovalsPage() {
                 <td className="decide">
                   <input placeholder="Note (optional)" value={notes[r.id] ?? ''} onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })} />
                   <div>
-                    <button className="small" onClick={() => decide(r, true)}>Approve</button>{' '}
-                    <button className="danger small" onClick={() => decide(r, false)}>Decline</button>
+                    <button className="small" disabled={!!busy} onClick={() => decide(r, true)}>Approve</button>{' '}
+                    <button className="danger small" disabled={!!busy} onClick={() => decide(r, false)}>Decline</button>
                   </div>
                 </td>
               </tr>
