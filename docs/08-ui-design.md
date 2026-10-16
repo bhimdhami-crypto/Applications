@@ -2,7 +2,7 @@
 
 ## Visual identity
 
-The palette follows KTM's motorcycle branding: **orange `#FF6600`** on near-black and white. Tokens live in `packages/shared/src/theme.ts` and are shared by the web portal and the future mobile app.
+The palette is **orange `#FF6600`** on near-black and white. Tokens live in `packages/shared/src/theme.ts` and are shared by the web portal and the future mobile app.
 
 | Token | Light | Dark | Use |
 |---|---|---|---|

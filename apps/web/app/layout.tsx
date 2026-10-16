@@ -22,7 +22,7 @@ const kebab = (s: string) => s.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`);
 const vars = (t: Record<string, string>) => Object.entries(t).map(([k, v]) => `--${kebab(k)}:${v};`).join('');
 
 // Design tokens come from the shared package, so the web and mobile apps use the same colours
-// Accent presets override the accent colours for each theme; KTM orange is the default
+// Accent presets override the accent colours for each theme; orange is the default
 const accents = Object.entries(ACCENTS)
   .map(([key, a]) => `[data-theme=light][data-accent=${key}]{${vars({ ...a.light })}}[data-theme=dark][data-accent=${key}]{${vars({ ...a.dark })}}`)
   .join('');

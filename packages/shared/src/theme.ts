@@ -1,5 +1,5 @@
 /**
- * Design tokens for the web portal and mobile app. The accent is KTM orange (#FF6600) with
+ * Design tokens for the web portal and mobile app. The accent is orange (#FF6600) with
  * near-black and white, the motorcycle brand's palette. Orange on white fails WCAG contrast
  * for small text, so text-on-light uses the deeper `accentText` shade instead.
  */
@@ -54,12 +54,12 @@ export interface AccentTokens {
 }
 
 /**
- * Accent colour presets users can pick in the portal. KTM orange is the default.
+ * Accent colour presets users can pick in the portal. Orange is the default.
  * Each pair is checked for WCAG AA contrast in reference.spec.ts.
  */
 export const ACCENTS: Record<string, { label: string; light: AccentTokens; dark: AccentTokens }> = {
   ktm: {
-    label: 'KTM orange',
+    label: 'Orange',
     light: { accent: THEME.light.accent, accentHover: THEME.light.accentHover, accentText: THEME.light.accentText, onAccent: THEME.light.onAccent, focus: THEME.light.focus },
     dark: { accent: THEME.dark.accent, accentHover: THEME.dark.accentHover, accentText: THEME.dark.accentText, onAccent: THEME.dark.onAccent, focus: THEME.dark.focus },
   },

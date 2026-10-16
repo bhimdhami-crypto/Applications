@@ -1,4 +1,4 @@
-/* Mindspace Portal. KTM orange on near-black and white. Colour tokens are injected from
+/* Mindspace Portal. Orange on near-black and white. Colour tokens are injected from
    @gpp/shared/theme in the root layout. Logical properties keep the layout right for RTL. */
 
 *, *::before, *::after { box-sizing: border-box; }

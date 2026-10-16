@@ -41,7 +41,7 @@ export default function Account() {
       <PageHead title={t('nav.account')} sub={`${me.user.displayName} · ${me.user.email}`} />
       <section className="card" style={{ marginBottom: '1rem' }}>
         <h2>Appearance</h2>
-        <p className="muted">Light with KTM orange is the default. Your choice is kept on this device.</p>
+        <p className="muted">Light with orange is the default. Your choice is kept on this device.</p>
         <AppearancePicker />
       </section>
       <div className="grid two">

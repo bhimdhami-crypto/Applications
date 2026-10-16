@@ -23,9 +23,9 @@ Done in this pull request:
 - Local environment: Postgres, Redis, MinIO and Mailpit in Docker Compose; npm workspaces; CI on every push.
 - Shared package: the 15 countries, 14 currencies with their decimal places, the language catalogue with text direction, roles and permissions, brand and theme tokens.
 - API: sign-in with password and emailed one-time code, rotating refresh tokens with reuse detection, sign-out and session list; role assignments scoped to group, country or company; the organisation hierarchy with create and edit; countries and currencies that admins can extend; feature switches per company; audit log; OpenAPI docs at `/api/docs`.
-- Web portal: sign-in, light and dark themes in KTM orange, language switcher with right-to-left Arabic, company switcher limited to the user's access, dashboard, organisation explorer, users and roles, countries and currencies, audit log, and the developer credit on every page.
+- Web portal: sign-in, light and dark themes in orange, language switcher with right-to-left Arabic, company switcher limited to the user's access, dashboard, organisation explorer, users and roles, countries and currencies, audit log, and the developer credit on every page.
 - Seeded demo group: Mindspace Artificial Intelligence Inc. with 15 countries and 18 legal entities, their business units, branches, departments and cost centres, and 13 test accounts.
-- Light theme with KTM orange as the default; dark theme and six colour presets in the top bar and on My account.
+- Light theme with orange as the default; dark theme and six colour presets in the top bar and on My account.
 
 ## Carrying over the first build (decided 16 October 2026)
 

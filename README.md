@@ -13,7 +13,7 @@ This rebuild replaces the first Mindspace HR Portal (PR #2) on a new multi-count
 - The demo group: 15 countries, 14 currencies, 18 legal entities, each with business units, branches, departments and cost centres. Admins add countries, currencies, companies and structure from the portal.
 - Modules switched on or off per company.
 - Append-only audit log.
-- Light theme in KTM orange by default, with a dark theme and six colour presets to choose from; English, Kiswahili, French and Arabic (right to left) for the portal shell.
+- Light theme in orange by default, with a dark theme and six colour presets to choose from; English, Kiswahili, French and Arabic (right to left) for the portal shell.
 - OpenAPI docs at `/api/docs`.
 
 See [docs/](docs/README.md) for requirements, architecture, data model, navigation map, plan, security model and known limitations.
