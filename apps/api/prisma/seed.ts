@@ -1,114 +1,133 @@
-// Seeds the companies and the six sample accounts used for testing.
-// Every email uses the reserved .test domain, so mail only ever lands in the local Mailpit inbox.
-import { PrismaClient, Role, WorkLocation } from '@prisma/client';
+// Seeds reference data, the demo organisation and the test accounts. Safe to run more than once.
+import { PrismaClient, Role, ScopeType } from '@prisma/client';
+import { COUNTRIES, CURRENCIES, GROUP_REPORTING_CURRENCY, LANGUAGES } from '@gpp/shared';
 import * as bcrypt from 'bcryptjs';
+import { DEMO_BUSINESS_UNITS, DEMO_DEPARTMENTS, DEMO_ENTITIES, DEMO_FEATURES, DEMO_USERS, NO_PAYROLL, SHARED_SERVICE_DEPARTMENTS } from './demo-org';
 
-const COMPANIES = [
-  { code: 'MSA-INC', name: 'Mindspace Artificial Intelligence Inc.', country: 'United States', countryCode: 'US', currency: 'USD' },
-  { code: 'MSA-KE', name: 'Mindspace Artificial Intelligence Kenya Ltd', country: 'Kenya', countryCode: 'KE', currency: 'KES' },
-  { code: 'MSA-UG', name: 'Mindspace Artificial Intelligence Uganda Ltd', country: 'Uganda', countryCode: 'UG', currency: 'UGX' },
-  { code: 'MSA-TZ', name: 'Mindspace Artificial Intelligence Tanzania Ltd', country: 'Tanzania', countryCode: 'TZ', currency: 'TZS' },
-  { code: 'MSA-ZA', name: 'Mindspace Artificial Intelligence South Africa (Pty) Ltd', country: 'South Africa', countryCode: 'ZA', currency: 'ZAR' },
-  { code: 'MSA-EG', name: 'Mindspace Artificial Intelligence Egypt LLC', country: 'Egypt', countryCode: 'EG', currency: 'EGP' },
-  { code: 'MSA-NG', name: 'Mindspace Artificial Intelligence Nigeria Ltd', country: 'Nigeria', countryCode: 'NG', currency: 'NGN' },
-  { code: 'MSA-MX', name: 'Mindspace Artificial Intelligence México S. de R.L. de C.V.', country: 'Mexico', countryCode: 'MX', currency: 'MXN' },
-  { code: 'MSA-NZ', name: 'Mindspace Artificial Intelligence New Zealand Ltd', country: 'New Zealand', countryCode: 'NZ', currency: 'NZD' },
-];
+export const DEMO_GROUP_CODE = 'MINDSPACE';
 
-type SeedPerson = {
-  email: string;
-  role: Role;
-  employee?: {
-    employeeNo: string;
-    firstName: string;
-    lastName: string;
-    jobTitle: string;
-    department: string;
-    workLocation: WorkLocation;
-    hireDate: string;
-    monthlyBasic: number;
-    monthlyAllowances: number;
-    reportsTo?: string;
-  };
-};
+export async function seed(prisma: PrismaClient, opts: { password?: string; quiet?: boolean } = {}) {
+  const password = opts.password ?? process.env.SEED_PASSWORD;
+  if (process.env.NODE_ENV === 'production' && !process.env.SEED_PASSWORD) throw new Error('Set SEED_PASSWORD before seeding a production-mode database');
+  const passwordHash = await bcrypt.hash(password ?? 'Demo#Mindspace2026', 10);
 
-// The admin is a system account. The other five are Kenya staff paid in KES.
-const PEOPLE: SeedPerson[] = [
-  { email: 'admin@mindspace-ai.test', role: Role.ADMIN },
-  {
-    email: 'hr@mindspace-ai.test',
-    role: Role.HR,
-    employee: { employeeNo: 'MSA-KE-000001', firstName: 'Wanjiru', lastName: 'Kamau', jobTitle: 'HR Business Partner', department: 'People', workLocation: WorkLocation.ON_SITE, hireDate: '2019-03-04', monthlyBasic: 180000, monthlyAllowances: 20000 },
-  },
-  {
-    email: 'payroll@mindspace-ai.test',
-    role: Role.PAYROLL,
-    employee: { employeeNo: 'MSA-KE-000002', firstName: 'Brian', lastName: 'Otieno', jobTitle: 'Payroll Specialist', department: 'Finance', workLocation: WorkLocation.HYBRID, hireDate: '2020-07-01', monthlyBasic: 150000, monthlyAllowances: 15000 },
-  },
-  {
-    email: 'manager@mindspace-ai.test',
-    role: Role.MANAGER,
-    employee: { employeeNo: 'MSA-KE-000003', firstName: 'Amina', lastName: 'Hassan', jobTitle: 'Engineering Manager', department: 'Engineering', workLocation: WorkLocation.HYBRID, hireDate: '2018-01-15', monthlyBasic: 420000, monthlyAllowances: 50000 },
-  },
-  {
-    email: 'developer@mindspace-ai.test',
-    role: Role.EMPLOYEE,
-    employee: { employeeNo: 'MSA-KE-000004', firstName: 'Kevin', lastName: 'Mwangi', jobTitle: 'Software Engineer', department: 'Engineering', workLocation: WorkLocation.FULLY_REMOTE, hireDate: '2022-09-05', monthlyBasic: 230000, monthlyAllowances: 10000, reportsTo: 'manager@mindspace-ai.test' },
-  },
-  {
-    email: 'tester@mindspace-ai.test',
-    role: Role.EMPLOYEE,
-    employee: { employeeNo: 'MSA-KE-000005', firstName: 'Faith', lastName: 'Njeri', jobTitle: 'QA Engineer', department: 'Engineering', workLocation: WorkLocation.ON_SITE, hireDate: '2023-02-13', monthlyBasic: 120000, monthlyAllowances: 8000, reportsTo: 'manager@mindspace-ai.test' },
-  },
-];
-
-export async function seed(prisma: PrismaClient) {
-  const adminPassword = process.env.SEED_ADMIN_PASSWORD;
-  const userPassword = process.env.SEED_USER_PASSWORD;
-  if (process.env.NODE_ENV === 'production' && (!adminPassword || !userPassword)) {
-    throw new Error('Set SEED_ADMIN_PASSWORD and SEED_USER_PASSWORD before seeding a production database');
+  for (const c of CURRENCIES) {
+    await prisma.currency.upsert({ where: { code: c.code }, create: c, update: {} });
   }
-  const adminHash = await bcrypt.hash(adminPassword ?? 'Admin#Mindspace2026', 10);
-  const userHash = await bcrypt.hash(userPassword ?? 'Test#Mindspace2026', 10);
-
-  for (const c of COMPANIES) {
-    await prisma.company.upsert({ where: { code: c.code }, update: { name: c.name, currency: c.currency }, create: c });
+  for (const l of LANGUAGES) {
+    await prisma.language.upsert({ where: { code: l.code }, create: l, update: {} });
   }
-  const kenya = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-KE' } });
-
-  const employeeIdByEmail = new Map<string, string>();
-  for (const p of PEOPLE) {
-    const passwordHash = p.role === Role.ADMIN ? adminHash : userHash;
-    const user = await prisma.user.upsert({
-      where: { email: p.email },
-      update: { role: p.role, isActive: true, passwordHash },
-      create: { email: p.email, role: p.role, passwordHash },
+  for (const c of COUNTRIES) {
+    await prisma.country.upsert({
+      where: { code: c.code },
+      create: { code: c.code, name: c.name, currencyCode: c.currency, languages: c.languages, timeZone: c.timeZone, weekendDays: c.weekendDays, region: c.region },
+      update: {},
     });
-    if (!p.employee) continue;
-    const { reportsTo, hireDate, ...e } = p.employee;
-    const data = {
-      ...e,
-      hireDate: new Date(`${hireDate}T00:00:00Z`),
-      companyId: kenya.id,
-      userId: user.id,
-      managerId: reportsTo ? employeeIdByEmail.get(reportsTo) ?? null : null,
-    };
-    const emp = await prisma.employee.upsert({ where: { employeeNo: e.employeeNo }, update: data, create: data });
-    employeeIdByEmail.set(p.email, emp.id);
   }
 
-  return PEOPLE.map((p) => ({ email: p.email, role: p.role }));
+  const group = await prisma.group.upsert({
+    where: { code: DEMO_GROUP_CODE },
+    create: { code: DEMO_GROUP_CODE, name: 'Mindspace Global Group', reportingCurrency: GROUP_REPORTING_CURRENCY },
+    update: {},
+  });
+
+  const entityIds = new Map<string, string>();
+  for (const e of DEMO_ENTITIES) {
+    const country = COUNTRIES.find((c) => c.code === e.countryCode)!;
+    const entity = await prisma.legalEntity.upsert({
+      where: { groupId_code: { groupId: group.id, code: e.code } },
+      create: {
+        groupId: group.id,
+        code: e.code,
+        name: e.name,
+        countryCode: e.countryCode,
+        functionalCurrency: country.currency,
+        timeZone: country.timeZone,
+        weekendDays: country.weekendDays,
+        defaultLanguage: country.languages[0],
+        // Demo fiscal years: July in Australia, April in India and Japan, January elsewhere
+        fiscalYearStartMonth: e.countryCode === 'AU' ? 7 : e.countryCode === 'IN' || e.countryCode === 'JP' ? 4 : 1,
+        isSharedServiceCentre: e.isSharedServiceCentre ?? false,
+      },
+      update: {},
+    });
+    entityIds.set(e.code, entity.id);
+
+    const buIds = new Map<string, string>();
+    for (const bu of DEMO_BUSINESS_UNITS) {
+      const row = await prisma.businessUnit.upsert({
+        where: { legalEntityId_code: { legalEntityId: entity.id, code: bu.code } },
+        create: { legalEntityId: entity.id, ...bu },
+        update: {},
+      });
+      buIds.set(bu.code, row.id);
+    }
+    const branchIds: string[] = [];
+    for (const [i, city] of e.cities.entries()) {
+      const code = `${e.code}-B${String(i + 1).padStart(2, '0')}`;
+      const row = await prisma.branch.upsert({
+        where: { legalEntityId_code: { legalEntityId: entity.id, code } },
+        create: { legalEntityId: entity.id, code, name: `${city} ${i === 0 ? 'head office' : 'office'}`, city },
+        update: {},
+      });
+      branchIds.push(row.id);
+    }
+    const depts = e.isSharedServiceCentre ? DEMO_DEPARTMENTS.filter((d) => SHARED_SERVICE_DEPARTMENTS.includes(d.code)) : DEMO_DEPARTMENTS;
+    for (const d of depts) {
+      const dept = await prisma.department.upsert({
+        where: { legalEntityId_code: { legalEntityId: entity.id, code: d.code } },
+        create: { legalEntityId: entity.id, code: d.code, name: d.name, businessUnitId: buIds.get(d.bu), branchId: branchIds[0] },
+        update: {},
+      });
+      const ccCode = `${e.code}-${d.code}`;
+      await prisma.costCentre.upsert({
+        where: { legalEntityId_code: { legalEntityId: entity.id, code: ccCode } },
+        create: { legalEntityId: entity.id, code: ccCode, name: `${d.name} (${e.code})`, departmentId: dept.id, glCode: `6100-${ccCode}` },
+        update: {},
+      });
+    }
+    for (const module of DEMO_FEATURES) {
+      const enabled = !(module === 'payroll' && NO_PAYROLL.includes(e.code));
+      await prisma.entityFeature.upsert({
+        where: { legalEntityId_module: { legalEntityId: entity.id, module } },
+        create: { legalEntityId: entity.id, module, enabled },
+        update: {},
+      });
+    }
+  }
+
+  for (const u of DEMO_USERS) {
+    const user = await prisma.user.upsert({
+      where: { email: u.email },
+      create: { groupId: group.id, email: u.email, displayName: u.displayName, passwordHash },
+      update: {},
+    });
+    const existing = await prisma.roleAssignment.count({ where: { userId: user.id } });
+    if (existing) continue;
+    for (const r of u.roles) {
+      await prisma.roleAssignment.create({
+        data: {
+          userId: user.id,
+          role: r.role as Role,
+          scopeType: r.scopeType as ScopeType,
+          countryCode: r.countryCode ?? null,
+          legalEntityId: r.entityCode ? entityIds.get(r.entityCode)! : null,
+        },
+      });
+    }
+  }
+
+  if (!opts.quiet) {
+    console.log(`Seeded ${COUNTRIES.length} countries, ${DEMO_ENTITIES.length} companies and ${DEMO_USERS.length} test accounts in ${group.name}.`);
+  }
+  return group;
 }
 
 if (require.main === module) {
   const prisma = new PrismaClient();
   seed(prisma)
-    .then((accounts) => {
-      console.log(`Seeded ${COMPANIES.length} companies and ${accounts.length} accounts:`);
-      for (const a of accounts) console.log(`  ${a.role.padEnd(8)} ${a.email}`);
-    })
-    .catch((err) => {
-      console.error(err);
+    .catch((e) => {
+      console.error(e);
       process.exitCode = 1;
     })
     .finally(() => prisma.$disconnect());

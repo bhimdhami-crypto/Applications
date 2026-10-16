@@ -1,45 +1,82 @@
 'use client';
 
+import type { Permission } from '@gpp/shared';
 import { useRouter } from 'next/navigation';
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
-import { api, getToken, Me, Role, setToken } from './api';
+import { createContext, ReactNode, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { api, ApiError, logout } from './api';
+import type { Me } from './types';
 
 interface Session {
   me: Me;
-  signOut: () => void;
-  can: (...roles: Role[]) => boolean;
+  reload: () => Promise<void>;
+  /** The company chosen in the switcher, or null for all of the user's companies */
+  entityId: string | null;
+  setEntityId: (id: string | null) => void;
+  can: (permission: Permission, entityId?: string) => boolean;
+  signOut: () => Promise<void>;
 }
 
 const SessionContext = createContext<Session | null>(null);
 
-/** Loads the signed-in user, sending anyone without a valid token back to the sign-in page. */
-export function SessionProvider({ children }: { children: React.ReactNode }) {
+export function SessionProvider({ children, fallback }: { children: ReactNode; fallback: ReactNode }) {
   const router = useRouter();
   const [me, setMe] = useState<Me | null>(null);
+  const [entityId, setEntityIdState] = useState<string | null>(null);
+
+  const reload = useCallback(async () => {
+    try {
+      setMe(await api<Me>('/me'));
+    } catch (e) {
+      if (e instanceof ApiError && e.status === 401) router.replace('/sign-in');
+      else throw e;
+    }
+  }, [router]);
 
   useEffect(() => {
-    if (!getToken()) {
-      router.replace('/');
-      return;
+    reload();
+    try {
+      setEntityIdState(sessionStorage.getItem('gpp.entity'));
+    } catch {
+      // storage unavailable: start on all companies
     }
-    api<Me>('/auth/me')
-      .then(setMe)
-      .catch(() => router.replace('/'));
-  }, [router]);
+  }, [reload]);
 
-  const signOut = useCallback(() => {
-    setToken(null);
-    router.replace('/');
-  }, [router]);
+  const setEntityId = useCallback((id: string | null) => {
+    setEntityIdState(id);
+    try {
+      if (id) sessionStorage.setItem('gpp.entity', id);
+      else sessionStorage.removeItem('gpp.entity');
+    } catch {
+      // ignore
+    }
+  }, []);
 
-  if (!me) return <div className="loading">Loading…</div>;
-  // Admin passes every role check, matching the API.
-  const can = (...roles: Role[]) => me.role === 'ADMIN' || roles.includes(me.role);
-  return <SessionContext.Provider value={{ me, signOut, can }}>{children}</SessionContext.Provider>;
+  const value = useMemo<Session | null>(() => {
+    if (!me) return null;
+    const valid = entityId && me.entities.some((e) => e.id === entityId) ? entityId : null;
+    return {
+      me,
+      reload,
+      entityId: valid,
+      setEntityId,
+      can: (p, id) => {
+        const s = me.permissions[p];
+        if (!s) return false;
+        return id === undefined || s.group || s.legalEntityIds.includes(id);
+      },
+      signOut: async () => {
+        await logout();
+        router.replace('/sign-in');
+      },
+    };
+  }, [me, entityId, reload, setEntityId, router]);
+
+  if (!value) return <>{fallback}</>;
+  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
 }
 
 export function useSession() {
-  const session = useContext(SessionContext);
-  if (!session) throw new Error('useSession must be used inside SessionProvider');
-  return session;
+  const ctx = useContext(SessionContext);
+  if (!ctx) throw new Error('useSession outside SessionProvider');
+  return ctx;
 }

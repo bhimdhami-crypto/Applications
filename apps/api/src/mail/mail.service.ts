@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { BRAND } from '@gpp/shared';
 import * as nodemailer from 'nodemailer';
 
 export interface SentMail {
@@ -8,9 +9,7 @@ export interface SentMail {
   text: string;
 }
 
-/**
- * Sends email over SMTP (Mailpit in development) or keeps it in memory for tests.
- */
+/** Sends email over SMTP (Mailpit in development) or keeps it in memory for tests. */
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -31,11 +30,12 @@ export class MailService {
   }
 
   async send(mail: SentMail) {
+    const text = `${mail.text}\n\n--\n${BRAND.shortName} · ${BRAND.productName}\n${BRAND.developerCredit}. ${BRAND.copyright()}`;
     if (this.transport === 'memory') {
-      this.outbox.push(mail);
+      this.outbox.push({ ...mail, text });
       return;
     }
-    await this.smtp!.sendMail({ from: this.config.get('MAIL_FROM', 'Mindspace HR <no-reply@mindspace-ai.test>'), ...mail });
+    await this.smtp!.sendMail({ from: this.config.get('MAIL_FROM', `${BRAND.shortName} <no-reply@mindspace.test>`), ...mail, text });
     this.logger.log(`Sent "${mail.subject}" to ${mail.to}`);
   }
 }

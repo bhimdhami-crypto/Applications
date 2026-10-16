@@ -1,46 +1,19 @@
 'use client';
 
-import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import { ROLE_LABEL } from '@/lib/api';
-import { SessionProvider, useSession } from '@/lib/session';
+import { ReactNode } from 'react';
+import { Shell } from '@/components/Shell';
+import { Loading } from '@/components/ui';
+import { SessionProvider } from '@/lib/session';
 
-function Shell({ children }: { children: React.ReactNode }) {
-  const { me, can, signOut } = useSession();
-  const path = usePathname();
-  const links = [
-    { href: '/dashboard', label: 'Home', show: true },
-    { href: '/employees', label: 'Employees', show: can('HR', 'PAYROLL', 'MANAGER') },
-    { href: '/payroll', label: 'Payroll', show: can('PAYROLL') },
-    { href: '/payslips', label: 'My payslips', show: !!me.employee },
-  ];
+export default function PortalLayout({ children }: { children: ReactNode }) {
   return (
-    <div className="shell">
-      <nav className="sidebar">
-        <img src="/logo.svg" alt="Mindspace" />
-        {links
-          .filter((l) => l.show)
-          .map((l) => (
-            <Link key={l.href} href={l.href} className={path.startsWith(l.href) ? 'active' : ''}>
-              {l.label}
-            </Link>
-          ))}
-        <div className="who">
-          <div>{me.employee ? `${me.employee.firstName} ${me.employee.lastName}` : me.email}</div>
-          <div>{ROLE_LABEL[me.role]}</div>
-          <button className="secondary small" onClick={signOut}>
-            Sign out
-          </button>
+    <SessionProvider
+      fallback={
+        <div className="auth-form">
+          <Loading />
         </div>
-      </nav>
-      <main>{children}</main>
-    </div>
-  );
-}
-
-export default function PortalLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <SessionProvider>
+      }
+    >
       <Shell>{children}</Shell>
     </SessionProvider>
   );

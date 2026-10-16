@@ -1,4 +1,7 @@
-// Mindspace Artificial Intelligence Inc. HR and payroll data model (milestone 1).
+// Global People & Payroll Enterprise Platform: database schema.
+// Phase 2, slice 1: identity, access and the organisation hierarchy.
+// Table and column naming: PascalCase models mapped to snake_case tables.
+
 generator client {
   provider = "prisma-client-js"
 }
@@ -8,154 +11,340 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ───────────────────────── Reference data (admin-configurable) ─────────────────────────
+
+model Currency {
+  code      String    @id @db.Char(3)
+  name      String
+  /// ISO 4217 minor-unit digits, used for rounding and display
+  decimals  Int
+  symbol    String
+  isActive  Boolean   @default(true) @map("is_active")
+  createdAt DateTime  @default(now()) @map("created_at")
+  countries Country[]
+  entities  LegalEntity[]
+
+  @@map("currency")
+}
+
+model Language {
+  code        String  @id
+  englishName String  @map("english_name")
+  nativeName  String  @map("native_name")
+  /// ltr or rtl
+  dir         String  @default("ltr")
+  /// interface: portal translated; catalogue: available for content only
+  status      String  @default("catalogue")
+  isActive    Boolean @default(true) @map("is_active")
+
+  @@map("language")
+}
+
+model Country {
+  code         String        @id @db.Char(2)
+  name         String
+  currencyCode String        @map("currency_code") @db.Char(3)
+  currency     Currency      @relation(fields: [currencyCode], references: [code])
+  /// Language codes, most used first
+  languages    String[]
+  timeZone     String        @map("time_zone")
+  /// 0 = Sunday ... 6 = Saturday
+  weekendDays  Int[]         @map("weekend_days")
+  region       String
+  isActive     Boolean       @default(true) @map("is_active")
+  createdAt    DateTime      @default(now()) @map("created_at")
+  entities     LegalEntity[]
+
+  @@map("country")
+}
+
+// ───────────────────────── Organisation ─────────────────────────
+
+/// The top of the hierarchy: one multinational group.
+model Group {
+  id                String        @id @default(cuid())
+  code              String        @unique
+  name              String
+  reportingCurrency String        @map("reporting_currency") @db.Char(3)
+  defaultLanguage   String        @default("en") @map("default_language")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  entities          LegalEntity[]
+  users             User[]
+
+  @@map("org_group")
+}
+
+enum OrgStatus {
+  ACTIVE
+  INACTIVE
+}
+
+/// A legal employer. Each runs its own payroll in its functional currency.
+model LegalEntity {
+  id                    String          @id @default(cuid())
+  groupId               String          @map("group_id")
+  group                 Group           @relation(fields: [groupId], references: [id])
+  code                  String
+  name                  String
+  countryCode           String          @map("country_code") @db.Char(2)
+  country               Country         @relation(fields: [countryCode], references: [code])
+  functionalCurrency    String          @map("functional_currency") @db.Char(3)
+  currency              Currency        @relation(fields: [functionalCurrency], references: [code])
+  registrationNumber    String?         @map("registration_number")
+  taxNumber             String?         @map("tax_number")
+  address               String?
+  timeZone              String          @map("time_zone")
+  weekendDays           Int[]           @map("weekend_days")
+  defaultLanguage       String          @map("default_language")
+  /// Month the fiscal year starts (1 = January)
+  fiscalYearStartMonth  Int             @default(1) @map("fiscal_year_start_month")
+  /// Provides HR or payroll services to other companies in the group
+  isSharedServiceCentre Boolean         @default(false) @map("is_shared_service_centre")
+  status                OrgStatus       @default(ACTIVE)
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+  businessUnits         BusinessUnit[]
+  branches              Branch[]
+  departments           Department[]
+  costCentres           CostCentre[]
+  features              EntityFeature[]
+
+  @@unique([groupId, code])
+  @@index([countryCode])
+  @@map("legal_entity")
+}
+
+model BusinessUnit {
+  id            String       @id @default(cuid())
+  legalEntityId String       @map("legal_entity_id")
+  legalEntity   LegalEntity  @relation(fields: [legalEntityId], references: [id])
+  code          String
+  name          String
+  status        OrgStatus    @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  departments   Department[]
+
+  @@unique([legalEntityId, code])
+  @@map("business_unit")
+}
+
+model Branch {
+  id            String       @id @default(cuid())
+  legalEntityId String       @map("legal_entity_id")
+  legalEntity   LegalEntity  @relation(fields: [legalEntityId], references: [id])
+  code          String
+  name          String
+  city          String
+  address       String?
+  /// Overrides the company's time zone, for branches in another zone
+  timeZone      String?      @map("time_zone")
+  status        OrgStatus    @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  departments   Department[]
+
+  @@unique([legalEntityId, code])
+  @@map("branch")
+}
+
+model Department {
+  id             String        @id @default(cuid())
+  legalEntityId  String        @map("legal_entity_id")
+  legalEntity    LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  businessUnitId String?       @map("business_unit_id")
+  businessUnit   BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  branchId       String?       @map("branch_id")
+  branch         Branch?       @relation(fields: [branchId], references: [id])
+  parentId       String?       @map("parent_id")
+  parent         Department?   @relation("DepartmentTree", fields: [parentId], references: [id])
+  children       Department[]  @relation("DepartmentTree")
+  code           String
+  name           String
+  status         OrgStatus     @default(ACTIVE)
+  createdAt      DateTime      @default(now()) @map("created_at")
+  costCentres    CostCentre[]
+
+  @@unique([legalEntityId, code])
+  @@map("department")
+}
+
+model CostCentre {
+  id            String      @id @default(cuid())
+  legalEntityId String      @map("legal_entity_id")
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  departmentId  String?     @map("department_id")
+  department    Department? @relation(fields: [departmentId], references: [id])
+  code          String
+  name          String
+  /// The general-ledger code finance posts this cost centre's payroll to
+  glCode        String?     @map("gl_code")
+  status        OrgStatus   @default(ACTIVE)
+  createdAt     DateTime    @default(now()) @map("created_at")
+
+  @@unique([legalEntityId, code])
+  @@map("cost_centre")
+}
+
+/// A feature module switched on or off for one company
+model EntityFeature {
+  legalEntityId String      @map("legal_entity_id")
+  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
+  module        String
+  enabled       Boolean
+  updatedById   String?     @map("updated_by_id")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+
+  @@id([legalEntityId, module])
+  @@map("entity_feature")
+}
+
+// ───────────────────────── Identity and access ─────────────────────────
+
 enum Role {
-  ADMIN
+  GROUP_ADMIN
+  HR_ADMIN
   HR
-  PAYROLL
+  PAYROLL_OPERATOR
+  PAYROLL_APPROVER
+  FINANCE
+  TREASURY
+  AUDITOR
+  EXECUTIVE
   MANAGER
   EMPLOYEE
 }
 
-enum EmploymentStatus {
-  ACTIVE
-  TERMINATED
+enum ScopeType {
+  GROUP
+  COUNTRY
+  LEGAL_ENTITY
 }
 
-enum WorkLocation {
-  ON_SITE
-  HYBRID
-  FULLY_REMOTE
-}
-
-enum PayrollStatus {
-  DRAFT
-  APPROVED
-  FINALIZED
-}
-
-/// One legal entity: the parent Inc. or a country subsidiary.
-model Company {
-  id          String       @id @default(cuid())
-  code        String       @unique
-  name        String
-  country     String
-  countryCode String       @db.Char(2)
-  currency    String       @db.Char(3)
-  employees   Employee[]
-  payrollRuns PayrollRun[]
-  createdAt   DateTime     @default(now())
-}
-
-/// A login account. Admin accounts need not have an employee record.
 model User {
-  id           String           @id @default(cuid())
-  email        String           @unique
-  passwordHash String
-  role         Role             @default(EMPLOYEE)
-  isActive     Boolean          @default(true)
-  employee     Employee?
-  challenges   LoginChallenge[]
-  lastLoginAt  DateTime?
-  createdAt    DateTime         @default(now())
-  updatedAt    DateTime         @updatedAt
+  id                String           @id @default(cuid())
+  groupId           String           @map("group_id")
+  group             Group            @relation(fields: [groupId], references: [id])
+  /// Stored lower-case
+  email             String           @unique
+  displayName       String           @map("display_name")
+  /// Null until the user accepts their invitation
+  passwordHash      String?          @map("password_hash")
+  preferredLanguage String?          @map("preferred_language")
+  isActive          Boolean          @default(true) @map("is_active")
+  failedLoginCount  Int              @default(0) @map("failed_login_count")
+  lockedUntil       DateTime?        @map("locked_until")
+  lastLoginAt       DateTime?        @map("last_login_at")
+  createdAt         DateTime         @default(now()) @map("created_at")
+  updatedAt         DateTime         @updatedAt @map("updated_at")
+  roles             RoleAssignment[] @relation("RoleHolder")
+  grantedRoles      RoleAssignment[] @relation("RoleGranter")
+  challenges        LoginChallenge[]
+  sessions          Session[]
+  invites           UserInvite[]
+
+  @@index([groupId])
+  @@map("app_user")
 }
 
-/// A pending second step of sign-in: the code emailed to the user.
+/// One role held by a user over the whole group, one country or one company
+model RoleAssignment {
+  id            String    @id @default(cuid())
+  userId        String    @map("user_id")
+  user          User      @relation("RoleHolder", fields: [userId], references: [id], onDelete: Cascade)
+  role          Role
+  scopeType     ScopeType @map("scope_type")
+  countryCode   String?   @map("country_code") @db.Char(2)
+  legalEntityId String?   @map("legal_entity_id")
+  grantedById   String?   @map("granted_by_id")
+  grantedBy     User?     @relation("RoleGranter", fields: [grantedById], references: [id])
+  createdAt     DateTime  @default(now()) @map("created_at")
+
+  @@index([userId])
+  @@index([legalEntityId])
+  @@index([countryCode])
+  @@map("role_assignment")
+}
+
+/// Second sign-in step: a one-time code sent by email
 model LoginChallenge {
   id         String    @id @default(cuid())
-  userId     String
+  userId     String    @map("user_id")
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  codeHash   String
-  expiresAt  DateTime
+  codeHash   String    @map("code_hash")
+  expiresAt  DateTime  @map("expires_at")
   attempts   Int       @default(0)
-  consumedAt DateTime?
-  createdAt  DateTime  @default(now())
+  consumedAt DateTime? @map("consumed_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
 
   @@index([userId, createdAt])
+  @@map("login_challenge")
 }
 
-model Employee {
-  id                String           @id @default(cuid())
-  employeeNo        String           @unique
-  firstName         String
-  lastName          String
-  jobTitle          String
-  department        String
-  workLocation      WorkLocation     @default(ON_SITE)
-  hireDate          DateTime         @db.Date
-  exitDate          DateTime?        @db.Date
-  status            EmploymentStatus @default(ACTIVE)
-  /// Monthly base pay in the company's currency
-  monthlyBasic      Decimal          @db.Decimal(14, 2)
-  /// Monthly taxable cash allowances (housing, transport, remote work)
-  monthlyAllowances Decimal          @default(0) @db.Decimal(14, 2)
-  companyId         String
-  company           Company          @relation(fields: [companyId], references: [id])
-  userId            String?          @unique
-  user              User?            @relation(fields: [userId], references: [id])
-  managerId         String?
-  manager           Employee?        @relation("Reports", fields: [managerId], references: [id])
-  reports           Employee[]       @relation("Reports")
-  payslips          Payslip[]
-  /// Set when an admin deletes the employee. Records are kept for legal retention.
-  deletedAt         DateTime?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
+/// A signed-in device. Access tokens name the session, so revoking it signs the device out at once.
+model Session {
+  id            String         @id @default(cuid())
+  userId        String         @map("user_id")
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// web or mobile
+  client        String
+  userAgent     String?        @map("user_agent")
+  ip            String?
+  createdAt     DateTime       @default(now()) @map("created_at")
+  lastUsedAt    DateTime       @default(now()) @map("last_used_at")
+  /// Absolute end of the session, however often it is refreshed
+  expiresAt     DateTime       @map("expires_at")
+  revokedAt     DateTime?      @map("revoked_at")
+  revokedReason String?        @map("revoked_reason")
+  refreshTokens RefreshToken[]
 
-  @@index([companyId, status])
+  @@index([userId])
+  @@map("session")
 }
 
-model PayrollRun {
-  id                String        @id @default(cuid())
-  companyId         String
-  company           Company       @relation(fields: [companyId], references: [id])
-  periodYear        Int
-  periodMonth       Int
-  status            PayrollStatus @default(DRAFT)
-  rulesPack         String
-  rulesVersion      String
-  totalGross        Decimal       @default(0) @db.Decimal(16, 2)
-  totalDeductions   Decimal       @default(0) @db.Decimal(16, 2)
-  totalNet          Decimal       @default(0) @db.Decimal(16, 2)
-  totalEmployerCost Decimal       @default(0) @db.Decimal(16, 2)
-  createdById       String?
-  approvedById      String?
-  approvedAt        DateTime?
-  finalizedById     String?
-  finalizedAt       DateTime?
-  payslips          Payslip[]
-  createdAt         DateTime      @default(now())
-  updatedAt         DateTime      @updatedAt
+/// Refresh tokens rotate on every use. Presenting a used one again revokes the whole session.
+model RefreshToken {
+  id        String    @id @default(cuid())
+  sessionId String    @map("session_id")
+  session   Session   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  createdAt DateTime  @default(now()) @map("created_at")
+  usedAt    DateTime? @map("used_at")
 
-  @@unique([companyId, periodYear, periodMonth])
+  @@index([sessionId])
+  @@map("refresh_token")
 }
 
-model Payslip {
-  id           String     @id @default(cuid())
-  runId        String
-  run          PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
-  employeeId   String
-  employee     Employee   @relation(fields: [employeeId], references: [id])
-  currency     String     @db.Char(3)
-  gross        Decimal    @db.Decimal(14, 2)
-  deductions   Decimal    @db.Decimal(14, 2)
-  net          Decimal    @db.Decimal(14, 2)
-  employerCost Decimal    @db.Decimal(14, 2)
-  /// Line items: [{ code, label, kind: EARNING | DEDUCTION | EMPLOYER, amount }]
-  lines        Json
-  createdAt    DateTime   @default(now())
+/// Invitation to set a password, emailed when an administrator creates a user
+model UserInvite {
+  id        String    @id @default(cuid())
+  userId    String    @map("user_id")
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
 
-  @@unique([runId, employeeId])
+  @@map("user_invite")
 }
 
+// ───────────────────────── Audit ─────────────────────────
+
+/// Append-only record of sensitive reads, changes, approvals, exports and sign-ins
 model AuditLog {
-  id        String   @id @default(cuid())
-  actorId   String?
-  action    String
-  entity    String
-  entityId  String?
-  details   Json?
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  groupId       String?  @map("group_id")
+  actorId       String?  @map("actor_id")
+  action        String
+  targetType    String?  @map("target_type")
+  targetId      String?  @map("target_id")
+  /// The company the record belongs to; null for group-level events
+  legalEntityId String?  @map("legal_entity_id")
+  detail        Json?
+  ip            String?
+  createdAt     DateTime @default(now()) @map("created_at")
 
-  @@index([entity, entityId])
+  @@index([groupId, createdAt])
+  @@index([legalEntityId, createdAt])
+  @@index([actorId, createdAt])
+  @@map("audit_log")
 }
