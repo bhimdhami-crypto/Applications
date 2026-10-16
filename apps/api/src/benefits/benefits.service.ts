@@ -502,23 +502,7 @@ export class BenefitsService {
       }),
       this.prisma.giftVoucher.findMany({ where: { employmentId: { in: employmentIds }, status: RequestStatus.APPROVED, taxMonth: period }, orderBy: { createdAt: 'asc' } }),
     ]);
-    const result = new Map<string, { cashAllowances: PayItem[]; benefitsInKind: PayItem[]; voluntary: PayItem[] }>();
-    const entry = (id: string) => {
-      const e = result.get(id) ?? { cashAllowances: [], benefitsInKind: [], voluntary: [] };
-      result.set(id, e);
-      return e;
-    };
-    for (const e of enrolments) {
-      const into = entry(e.employmentId);
-      const kind = e.kind === BenefitKind.MEAL ? 'Meal' : 'Gym';
-      const company = toMinor(e.plan.companyShare);
-      const own = toMinor(e.plan.employeeShare);
-      if (e.plan.paidAsCash && company > 0) into.cashAllowances.push({ code: `${e.kind}_CASH`, label: e.plan.name, amount: company });
-      else if (company > 0) into.benefitsInKind.push({ code: e.kind, label: `${kind}: ${e.plan.name}`, amount: company });
-      if (own > 0) into.voluntary.push({ code: `${e.kind}_SHARE`, label: `${kind}: ${e.plan.name} (your share)`, amount: own });
-    }
-    for (const v of vouchers) entry(v.employmentId).benefitsInKind.push({ code: 'VOUCHER', label: `Gift voucher: ${OCCASION_LABEL[v.occasion]}`, amount: toMinor(v.value) });
-    return result;
+    return benefitPayItems(enrolments, vouchers);
   }
 
   // ---------- helpers ----------
@@ -618,4 +602,31 @@ export class BenefitsService {
       createdAt: v.createdAt,
     };
   }
+}
+
+/**
+ * Payslip items from running meal and gym memberships and issued vouchers: the company's share as a
+ * benefit in kind (or cash for cash plans), the employee's share as a deduction. Also used by the demo seed.
+ */
+export function benefitPayItems(
+  enrolments: Array<{ employmentId: string; kind: BenefitKind; plan: { name: string; companyShare: Prisma.Decimal; employeeShare: Prisma.Decimal; paidAsCash: boolean } }>,
+  vouchers: Array<{ employmentId: string; occasion: VoucherOccasion; value: Prisma.Decimal }>,
+) {
+  const result = new Map<string, { cashAllowances: PayItem[]; benefitsInKind: PayItem[]; voluntary: PayItem[] }>();
+  const entry = (id: string) => {
+    const e = result.get(id) ?? { cashAllowances: [], benefitsInKind: [], voluntary: [] };
+    result.set(id, e);
+    return e;
+  };
+  for (const e of enrolments) {
+    const into = entry(e.employmentId);
+    const kind = e.kind === BenefitKind.MEAL ? 'Meal' : 'Gym';
+    const company = toMinor(e.plan.companyShare);
+    const own = toMinor(e.plan.employeeShare);
+    if (e.plan.paidAsCash && company > 0) into.cashAllowances.push({ code: `${e.kind}_CASH`, label: e.plan.name, amount: company });
+    else if (company > 0) into.benefitsInKind.push({ code: e.kind, label: `${kind}: ${e.plan.name}`, amount: company });
+    if (own > 0) into.voluntary.push({ code: `${e.kind}_SHARE`, label: `${kind}: ${e.plan.name} (your share)`, amount: own });
+  }
+  for (const v of vouchers) entry(v.employmentId).benefitsInKind.push({ code: 'VOUCHER', label: `Gift voucher: ${OCCASION_LABEL[v.occasion]}`, amount: toMinor(v.value) });
+  return result;
 }

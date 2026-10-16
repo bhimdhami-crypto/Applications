@@ -66,3 +66,7 @@ Each person has an employment, a job history (about a third were promoted), pay 
 ## Chat, community and activity
 
 `prisma/workplace-generator.ts` adds two chats (Amina Mwangi and Kevin Otieno, and a "Kenya engineering" group with Wanjiru Kamau), two community posts with likes and comments, and one open report on an off-topic comment for Kenyan HR to review. It also records the last 10 working days of clock-ins and work notes for the Kenyan companies: about 86% attendance per day, about 1% forgotten clock-outs and 1.5% corrected sessions, and work notes on about 40% of days, skipping approved leave and public holidays. Staff who have started by the time the seed runs are shown clocked in today. Every name and note is fictional.
+
+## Payroll
+
+`prisma/payroll-generator.ts` finalises September 2026 for the nine companies with a draft pack and payroll switched on (KE01, KE02, UG01, TZ01, EG01, ZA01, NG01, MX01, NZ01), using the same calculation as the portal: about 5,400 payslips. Loan lines repeat the September repayments the loans seed recorded, and each repayment is linked to its payslip. The runs show "Demo history" as preparer. October is left for the test accounts to prepare and approve.

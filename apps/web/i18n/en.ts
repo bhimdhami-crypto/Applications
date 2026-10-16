@@ -35,6 +35,8 @@ export const en = {
   'nav.moderation': 'Moderation',
   'nav.myDay': 'My day',
   'nav.teamActivity': 'Team activity',
+  'nav.payslips': 'Payslips',
+  'nav.payrollRuns': 'Payroll runs',
   'nav.insight': 'Dashboards and reports',
   'top.allCompanies': 'All my companies',
   'top.company': 'Company',

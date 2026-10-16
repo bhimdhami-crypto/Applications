@@ -9,14 +9,16 @@ Updated at the end of each phase.
 - **Rate limits are per API process** (in memory). With several API servers they need the Redis store (phase 3).
 - **Translations are drafts.** Kiswahili, French and Arabic cover the portal shell only and have not been reviewed by professional translators. Page content is still English.
 - **Redis and MinIO** run in Docker Compose but the code does not use them yet.
-- **Statutory rules: none yet.** Nothing in this release calculates pay or tax.
+- **Payroll uses unverified draft packs.** Month-end payroll calculates tax and social security with the first build's eight country packs, all marked `verified: false`. No figure is a certified calculation, and every run and payslip says so. The other seven countries cannot run payroll until a pack is written and signed off.
 - **Leave rules are an unverified draft** (`LEAVE-2026.1-draft`), carried over from the first build. Entitlements, carry-over and the country overrides have not been checked against current law. Holiday dates for the first build's eight countries are generated drafts (Islamic holidays are estimates); the other seven countries have none until HR enters them.
-- **Loan rules and payroll packs are unverified drafts** (`LOANS-2026.1-draft`, and the eight country payroll packs from the first build). Net pay, limits and instalments are estimates. Instalments are not deducted yet; that arrives with month-end payroll, until then the demo history stops at September 2026.
+- **Loan rules and payroll packs are unverified drafts** (`LOANS-2026.1-draft`, and the eight country payroll packs from the first build). Net pay, limits and instalments are estimates. Instalments are deducted in month-end payroll; the demo history stops at September 2026, the last finalised month.
 - **Advances and loans only in the eight countries with a draft payroll pack.** France, India, China, Australia, the Netherlands, Japan and Korea can request IOUs only.
-- **Benefit prices are drafts.** Kenya's six meal and gym options come from the first build and await HR's confirmation; the other fourteen companies have no options until HR adds them. Payslip lines for benefits in kind, cash meal allowances and employee shares arrive with month-end payroll.
+- **Benefit prices are drafts.** Kenya's six meal and gym options come from the first build and await HR's confirmation; the other fourteen companies have no options until HR adds them. Their payslip lines follow the draft country packs.
 - **The policy pack is a draft** (version 0.1) carried over from the first build. It has not been reviewed against each country's law.
 - **Chat refreshes by polling** every few seconds rather than over a live connection, and there are no push notifications yet.
 - **The activity tracker's 8-hour day** is a planning figure for its totals, not a contractual or legal working-time rule; overtime is not calculated from it.
+- **No exchange rates yet.** Payroll totals stay in each company's currency; group totals in USD wait for an approved, effective-dated rate table rather than invented rates.
+- **No payroll reversals, payment files or GL journals yet.** A finalised run cannot be reopened in the portal.
 - **Half days** are not supported yet; leave counts whole working days.
 - **Docker image tags** in `docker-compose.yml` were pinned without pulling them in this environment; check `docker compose up -d` on first use.
 - The earlier build (PR #2) is left untouched. Its features are being carried over one by one (see the implementation plan); its four extra countries are already part of the fifteen.

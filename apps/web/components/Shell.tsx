@@ -57,6 +57,13 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
     ],
   },
   {
+    title: 'nav.payroll',
+    items: [
+      { href: '/payslips', label: 'nav.payslips', needs: ['self.service'] },
+      { href: '/payroll', label: 'nav.payrollRuns', needs: ['payroll.read'] },
+    ],
+  },
+  {
     title: 'nav.workplace',
     items: [
       { href: '/policies', label: 'nav.policies', needs: ['self.service'] },
@@ -80,7 +87,6 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
 ];
 
 const COMING: { label: MessageKey; phase: number }[] = [
-  { label: 'nav.payroll', phase: 4 },
   { label: 'nav.insight', phase: 6 },
 ];
 

@@ -112,6 +112,7 @@ model LegalEntity {
   costCentres           CostCentre[]
   features              EntityFeature[]
   employments           Employment[]
+  payrollRuns           PayrollRun[]
 
   @@unique([groupId, code])
   @@index([countryCode])
@@ -523,6 +524,7 @@ model Employment {
   policyAcknowledgements PolicyAcknowledgement[]
   attendanceSessions     AttendanceSession[]
   workLogs               WorkLog[]
+  payslips               Payslip[]
 
   @@index([legalEntityId, status])
   @@index([personId])
@@ -1193,4 +1195,76 @@ model WorkLog {
 
   @@index([employmentId, date])
   @@map("work_log")
+}
+
+// ───────────────────────── Payroll ─────────────────────────
+
+enum PayrollStatus {
+  DRAFT
+  SUBMITTED
+  APPROVED
+  FINALIZED
+}
+
+/// One company's payroll for one month: prepared (maker), approved by someone else (checker), then finalised
+model PayrollRun {
+  id                String        @id @default(cuid())
+  legalEntityId     String        @map("legal_entity_id")
+  legalEntity       LegalEntity   @relation(fields: [legalEntityId], references: [id])
+  year              Int
+  month             Int
+  status            PayrollStatus @default(DRAFT)
+  currency          String        @db.Char(3)
+  /// The country rule pack used, and whether a local expert had signed it off
+  rulesVersion      String        @map("rules_version")
+  rulesVerified     Boolean       @default(false) @map("rules_verified")
+  headcount         Int           @default(0)
+  totalGross        Decimal       @default(0) @map("total_gross") @db.Decimal(18, 4)
+  totalDeductions   Decimal       @default(0) @map("total_deductions") @db.Decimal(18, 4)
+  totalNet          Decimal       @default(0) @map("total_net") @db.Decimal(18, 4)
+  totalEmployerCost Decimal       @default(0) @map("total_employer_cost") @db.Decimal(18, 4)
+  /// People left out and why, e.g. no pay record: [{ employmentId, employeeNumber, name, reason }]
+  exceptions        Json          @default("[]")
+  calculatedAt      DateTime?     @map("calculated_at")
+  createdById       String?       @map("created_by_id")
+  submittedById     String?       @map("submitted_by_id")
+  submittedAt       DateTime?     @map("submitted_at")
+  approvedById      String?       @map("approved_by_id")
+  approvedAt        DateTime?     @map("approved_at")
+  finalizedById     String?       @map("finalized_by_id")
+  finalizedAt       DateTime?     @map("finalized_at")
+  /// Why the approver sent it back, until it is submitted again
+  returnNote        String?       @map("return_note")
+  createdAt         DateTime      @default(now()) @map("created_at")
+  updatedAt         DateTime      @updatedAt @map("updated_at")
+  payslips          Payslip[]
+
+  @@unique([legalEntityId, year, month])
+  @@index([legalEntityId, status])
+  @@map("payroll_run")
+}
+
+/// One employee's pay for a run. Lines and the employee details are copied in, so a payslip never changes once final.
+model Payslip {
+  id              String     @id @default(cuid())
+  runId           String     @map("run_id")
+  run             PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employmentId    String     @map("employment_id")
+  employment      Employment @relation(fields: [employmentId], references: [id])
+  legalEntityId   String     @map("legal_entity_id")
+  currency        String     @db.Char(3)
+  gross           Decimal    @db.Decimal(18, 4)
+  deductions      Decimal    @db.Decimal(18, 4)
+  net             Decimal    @db.Decimal(18, 4)
+  employerCost    Decimal    @map("employer_cost") @db.Decimal(18, 4)
+  /// [{ code, label, kind, amount, ref?, interest?, voluntary? }] in major units
+  lines           Json
+  /// { employeeNumber, name, jobTitle, department, hireDate }
+  employee        Json
+  annualLeaveLeft Int?       @map("annual_leave_left")
+  createdAt       DateTime   @default(now()) @map("created_at")
+
+  @@unique([runId, employmentId])
+  @@index([employmentId])
+  @@map("payslip")
 }

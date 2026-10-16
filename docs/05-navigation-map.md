@@ -55,7 +55,8 @@ flowchart TB
   end
 
   subgraph Payroll[Payroll]
-    Runs[Payroll runs (4)]
+    Runs[Payroll runs (4) ✓]
+    Payslips[Payslips (4) ✓]
     Sim[Simulations (4)]
     Exceptions[Exceptions (4)]
     Payments[Payment files (4)]
@@ -113,7 +114,8 @@ flowchart TB
 | Workplace: moderation | | | own companies | | | | ✓ |
 | Workplace: team activity | | team | own companies | own companies | | read | ✓ |
 | People | | | ✓ | read | | read | ✓ |
-| Payroll | | | | ✓ | read | read | ✓ |
+| Payroll: my payslips | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Payroll: runs | | | | prepare or approve, own companies | | read | prepare (not approve) |
 | Finance | | | | | ✓ | read | ✓ |
 | Insight | | team only | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Administration | | | org, users in scope | | | audit | ✓ |

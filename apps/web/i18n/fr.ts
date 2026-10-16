@@ -37,6 +37,8 @@ export const fr: Messages = {
   'nav.moderation': 'Modération',
   'nav.myDay': 'Ma journée',
   'nav.teamActivity': 'Activité de l’équipe',
+  'nav.payslips': 'Bulletins de paie',
+  'nav.payrollRuns': 'Cycles de paie',
   'nav.insight': 'Tableaux de bord et rapports',
   'top.allCompanies': 'Toutes mes sociétés',
   'top.company': 'Société',

@@ -7,6 +7,7 @@ import { generateLeave } from './leave-generator';
 import { generateLibrary } from './library-generator';
 import { generateBenefits } from './benefits-generator';
 import { generateWorkplace } from './workplace-generator';
+import { generatePayroll } from './payroll-generator';
 import { generateMoney } from './money-generator';
 import { DEFAULT_STAFF, generateStaff, StaffOptions } from './staff-generator';
 
@@ -138,6 +139,7 @@ export async function seed(prisma: PrismaClient, opts: SeedOptions = {}) {
     await generateLeave(prisma, group.id, log);
     await generateMoney(prisma, group.id, log);
     await generateBenefits(prisma, group.id, log);
+    await generatePayroll(prisma, group.id, log);
   }
   await generateLibrary(prisma, group.id, log);
   if (opts.staff !== false) await generateWorkplace(prisma, group.id, log);

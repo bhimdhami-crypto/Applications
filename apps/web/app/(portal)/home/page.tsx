@@ -8,9 +8,9 @@ import { useSession } from '@/lib/session';
 
 const PHASES = [
   ['1', 'Requirements, architecture, data model, security and UI design', 'done'],
-  ['2', 'Sign-in, roles, organisation set-up, employee records, company isolation', 'active'],
-  ['3', 'Self-service, manager workflows, documents, leave and attendance', 'next'],
-  ['4', 'Payroll engine, controls, journals and synthetic payroll history', 'next'],
+  ['2', 'Sign-in, roles, organisation set-up, employee records, company isolation', 'done'],
+  ['3', 'Self-service, manager workflows, documents, leave and attendance', 'done'],
+  ['4', 'Payroll engine, controls, journals and synthetic payroll history', 'active'],
   ['5', 'Country statutory rules with verification status', 'next'],
   ['6', 'Dashboards, report builder, AI assistant, full translations', 'next'],
   ['7', 'Android and iOS apps with push notifications', 'next'],

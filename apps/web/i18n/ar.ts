@@ -37,6 +37,8 @@ export const ar: Messages = {
   'nav.moderation': 'الإشراف على المحتوى',
   'nav.myDay': 'يومي',
   'nav.teamActivity': 'نشاط الفريق',
+  'nav.payslips': 'قسائم الرواتب',
+  'nav.payrollRuns': 'دورات الرواتب',
   'nav.insight': 'لوحات المعلومات والتقارير',
   'top.allCompanies': 'جميع شركاتي',
   'top.company': 'الشركة',

@@ -277,3 +277,17 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 .inline-form .field { margin-bottom: 0; }
 .toolbar { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin: 1rem 0; }
 td.wrap { white-space: normal; min-width: 14rem; }
+
+/* ───── Payroll ───── */
+.payslip { position: relative; margin-top: 1rem; overflow: hidden; }
+.payslip.unverified::before { content: 'UNVERIFIED DRAFT'; position: absolute; inset: 40% 0 auto; text-align: center; font-size: clamp(2rem, 8vw, 4.5rem); font-weight: 800; letter-spacing: .1em; color: var(--warning); opacity: .12; transform: rotate(-18deg); pointer-events: none; }
+.payslip-head { display: flex; justify-content: space-between; gap: 1rem; flex-wrap: wrap; border-bottom: 1px solid var(--border); padding-bottom: .8rem; margin-bottom: .6rem; }
+.payslip-who { text-align: end; }
+.payslip h3 { font-size: .95rem; margin: 1rem 0 .3rem; }
+.payslip table { width: 100%; border-collapse: collapse; }
+.payslip td { padding: .3rem 0; border-bottom: 1px dashed var(--border); }
+.payslip-totals { margin-top: 1rem; border-top: 2px solid var(--text); }
+.payslip footer { margin-top: 1rem; }
+@media print { .payslip { border: none; } .page-head .row, .crumbs { display: none; } }
+.stat .value.money.long { font-size: clamp(1rem, 1.45vw, 1.3rem); }
+.payslip td.num { white-space: nowrap; padding-inline-start: 1rem; }

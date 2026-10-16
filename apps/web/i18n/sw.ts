@@ -37,6 +37,8 @@ export const sw: Messages = {
   'nav.moderation': 'Udhibiti wa maudhui',
   'nav.myDay': 'Siku yangu',
   'nav.teamActivity': 'Shughuli za timu',
+  'nav.payslips': 'Hati za mishahara',
+  'nav.payrollRuns': 'Mizunguko ya mishahara',
   'nav.insight': 'Dashibodi na ripoti',
   'top.allCompanies': 'Kampuni zangu zote',
   'top.company': 'Kampuni',

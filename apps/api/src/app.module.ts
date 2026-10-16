@@ -16,6 +16,7 @@ import { LibraryModule } from './library/library.module';
 import { PeopleModule } from './people/people.module';
 import { UsersModule } from './users/users.module';
 import { WorkplaceModule } from './workplace/workplace.module';
+import { PayrollModule } from './payroll/payroll.module';
 
 @Module({
   imports: [
@@ -34,6 +35,7 @@ import { WorkplaceModule } from './workplace/workplace.module';
     ApprovalsModule,
     LibraryModule,
     WorkplaceModule,
+    PayrollModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: AccessGuard }],

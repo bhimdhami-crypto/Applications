@@ -620,3 +620,87 @@ export interface ActivityReport {
   expectedHours: number;
   rows: { employeeNumber: string; name: string; daysPresent: number; hoursWorked: number; hoursLogged: number; overExpected: number; forgotClockOut: number; edited: number }[];
 }
+
+export type PayrollStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'FINALIZED';
+
+export interface PayrollRunSummary {
+  id: string;
+  year: number;
+  month: number;
+  period: string;
+  status: PayrollStatus;
+  currency: string;
+  rulesVersion: string;
+  rulesVerified: boolean;
+  headcount: number;
+  totalGross: string;
+  totalDeductions: string;
+  totalNet: string;
+  totalEmployerCost: string;
+  exceptions: number;
+}
+
+export interface PayrollCompany {
+  id: string;
+  code: string;
+  name: string;
+  countryCode: string;
+  currency: string;
+  payrollOn: boolean;
+  rules: { version: string; verified: boolean } | null;
+  canPrepare: boolean;
+  canApprove: boolean;
+  runs: PayrollRunSummary[];
+}
+
+export interface PayrollRunDetail extends Omit<PayrollRunSummary, 'exceptions'> {
+  entity: { id: string; code: string; name: string; countryCode: string };
+  exceptions: Array<{ employmentId: string; employeeNumber: string; name: string; reason: string }>;
+  calculatedAt: string | null;
+  returnNote: string | null;
+  trail: Record<'createdBy' | 'submittedBy' | 'approvedBy' | 'finalizedBy', string | null> & Record<'createdAt' | 'submittedAt' | 'approvedAt' | 'finalizedAt', string | null>;
+  can: { prepare: boolean; approve: boolean; sendBack: boolean; finalize: boolean; preparedByYou: boolean };
+  payslips: Array<{ id: string; employmentId: string; employeeNumber: string; name: string; jobTitle: string | null; department: string | null; gross: string; deductions: string; net: string; employerCost: string }>;
+}
+
+export interface PayslipLine {
+  code: string;
+  label: string;
+  kind: 'EARNING' | 'DEDUCTION' | 'EMPLOYER' | 'BENEFIT';
+  amount: number;
+  interest?: number;
+  voluntary?: boolean;
+}
+
+export interface Payslip {
+  id: string;
+  runId: string;
+  period: string;
+  status: PayrollStatus;
+  company: { code: string; name: string; address: string | null; taxNumber: string | null; countryCode: string };
+  employee: { employeeNumber: string; name: string; jobTitle: string | null; department: string | null; hireDate: string };
+  currency: string;
+  gross: string;
+  deductions: string;
+  net: string;
+  employerCost: string;
+  lines: PayslipLine[];
+  annualLeaveLeft: number | null;
+  rulesVersion: string;
+  rulesVerified: boolean;
+  finalizedAt: string | null;
+}
+
+export interface MyPayslip {
+  id: string;
+  period: string;
+  year: number;
+  month: number;
+  company: { code: string; name: string };
+  currency: string;
+  gross: string;
+  deductions: string;
+  net: string;
+  rulesVersion: string;
+  rulesVerified: boolean;
+}

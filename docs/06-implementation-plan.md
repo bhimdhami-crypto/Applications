@@ -36,9 +36,9 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 | Staff profiles: job, contact, IDs, education, next of kin, photo, HR documents | Phase 2 employee master | Done |
 | Sample staff | Generator: 500 to 1,000 per country, reproducible seed ([report](demo-data-report.md)) | Done |
 | Leave: requests, approvals, balances, team calendar, public holidays | Phase 3, draft rule pack marked unverified | Done |
-| Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4, draft rules marked unverified | Done, except deduction in month-end payroll, which comes with payroll |
-| Meal, gym and gift-voucher benefits | Phase 3-4 | Done, except the payslip lines, which come with payroll |
-| Month-end payroll and payslips for the first build's eight countries | Phase 4, rule packs marked unverified | Planned |
+| Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4, draft rules marked unverified | Done |
+| Meal, gym and gift-voucher benefits | Phase 3-4 | Done |
+| Month-end payroll and payslips for the first build's eight countries | Phase 4, rule packs marked unverified | Done |
 | Policies and forms library (22 policies, 20 fillable forms) with read confirmations | Phase 3 | Done |
 | Staff chat, community page with moderation, daily activity tracker | Phase 3 | Done |
 
@@ -94,4 +94,13 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 - Team activity: managers see everyone below them; HR and Payroll see a whole company, with a monthly report and CSV export. Switched off with the company's time and attendance module.
 - Sample chats, two posts with one open report, and two weeks of fictional clock-ins and work notes for the Kenyan companies.
 
-Next: month-end payroll and payslips for the first build's eight countries, with loan and benefit deductions.
+## Phase 4, first slice: month-end payroll and payslips from the first build (this pull request)
+
+- Payroll prepares a company's month from its draft country pack: pay records in force, part months for joiners and leavers, unpaid and half-pay sick leave, advance, loan and IOU instalments, and meal, gym and voucher lines. Staff without a pay record, or paid in another currency, are listed to check rather than guessed.
+- Maker and checker: Payroll prepares, recalculates and sends for approval; a payroll approver who did not prepare it approves or sends it back with a note, then finalises. Finalising locks the month (new deductions start the month after), records each loan repayment against its payslip, closes repaid loans and emails employees that their payslip is ready, without amounts.
+- A company cannot have two runs for a month or a new run before one already under way. Companies with payroll switched off, or without a pack (France, India, China, Australia, the Netherlands, Japan, Korea), are refused; "Prepare for all my companies" skips them and says why.
+- Every run, payslip, register CSV and approval email says the rules are unverified drafts. Payslips are printable and watermarked "Unverified draft".
+- Totals stay in each company's currency: there is no approved exchange-rate table yet, so no USD figures are shown.
+- A finalised September 2026 for the nine companies with a pack in the demo data, with about 5,400 payslips; September's loan repayments are linked to their payslips.
+
+Next: the rest of phase 4 (pay groups, reversals, payment files, GL journals and exchange rates).

@@ -11,10 +11,15 @@ const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 
 export const ymLabel = (value: number) => `${MONTHS[(value % 100) - 1]} ${Math.floor(value / 100)}`;
 
 /**
- * The first payroll month that can still take a new deduction or benefit for a company.
- * Until month-end payroll is carried over this is always the current month; the payroll slice
- * moves it on once a month's run is approved.
+ * The first payroll month that can still take a new deduction or benefit for a company: the current
+ * month, or the month after the latest approved or finalised run when payroll has already moved past it.
  */
-export async function openPayMonth(_prisma: PrismaService, _legalEntityId: string) {
-  return ymOf(new Date());
+export async function openPayMonth(prisma: PrismaService, legalEntityId: string) {
+  const locked = await prisma.payrollRun.findFirst({
+    where: { legalEntityId, status: { in: ['APPROVED', 'FINALIZED'] } },
+    orderBy: [{ year: 'desc' }, { month: 'desc' }],
+    select: { year: true, month: true },
+  });
+  const now = ymOf(new Date());
+  return locked ? Math.max(now, addMonths(ym(locked.year, locked.month), 1)) : now;
 }
