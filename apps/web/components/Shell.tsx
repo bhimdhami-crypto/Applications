@@ -57,6 +57,13 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
     ],
   },
   {
+    title: 'nav.workplace',
+    items: [
+      { href: '/policies', label: 'nav.policies', needs: ['self.service'] },
+      { href: '/policies/manage', label: 'nav.policiesManage', anyOf: ['policies.manage', 'people.read'] },
+    ],
+  },
+  {
     title: 'nav.admin',
     items: [
       { href: '/organisation', label: 'nav.organisation', needs: ['org.read'] },

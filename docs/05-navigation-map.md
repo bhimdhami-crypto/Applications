@@ -44,6 +44,11 @@ flowchart TB
     BenefitOptions[Benefit options (3) ✓]
   end
 
+  subgraph Workplace[Workplace]
+    Policies[Policies and forms (3) ✓]
+    PoliciesManage[Manage policies and forms (3) ✓]
+  end
+
   subgraph Payroll[Payroll]
     Runs[Payroll runs (4)]
     Sim[Simulations (4)]
@@ -79,6 +84,7 @@ flowchart TB
   Home --> Team
   Home --> People
   Home --> Money
+  Home --> Workplace
   Home --> Payroll
   Home --> Finance
   Home --> Insight
@@ -96,6 +102,8 @@ flowchart TB
 | Money: loan book | | | | ✓ | ✓ | | |
 | Money: benefits | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Money: benefit options | | | ✓ | read | read | | |
+| Workplace: policies and forms | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Workplace: manage policies | | | read report (group HR admins publish) | read report | | read report | ✓ |
 | People | | | ✓ | read | | read | ✓ |
 | Payroll | | | | ✓ | read | read | ✓ |
 | Finance | | | | | ✓ | read | ✓ |

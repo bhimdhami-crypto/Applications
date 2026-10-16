@@ -480,40 +480,41 @@ model PersonIdentifier {
 
 /// One period of employment with one company
 model Employment {
-  id                String             @id @default(cuid())
-  personId          String             @map("person_id")
-  person            Person             @relation(fields: [personId], references: [id])
-  legalEntityId     String             @map("legal_entity_id")
-  legalEntity       LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  id                     String                  @id @default(cuid())
+  personId               String                  @map("person_id")
+  person                 Person                  @relation(fields: [personId], references: [id])
+  legalEntityId          String                  @map("legal_entity_id")
+  legalEntity            LegalEntity             @relation(fields: [legalEntityId], references: [id])
   /// Employee number, unique across the group
-  employeeNumber    String             @unique @map("employee_number")
+  employeeNumber         String                  @unique @map("employee_number")
   /// The portal account of this employee, if they have one
-  userId            String?            @unique @map("user_id")
-  user              User?              @relation(fields: [userId], references: [id])
-  workEmail         String?            @unique @map("work_email")
-  employmentType    EmploymentType     @default(PERMANENT) @map("employment_type")
-  workLocation      WorkLocation       @default(ON_SITE) @map("work_location")
-  hireDate          DateTime           @map("hire_date") @db.Date
-  probationEndDate  DateTime?          @map("probation_end_date") @db.Date
-  endDate           DateTime?          @map("end_date") @db.Date
-  exitReason        String?            @map("exit_reason")
-  status            EmploymentStatus   @default(ACTIVE)
-  createdAt         DateTime           @default(now()) @map("created_at")
-  updatedAt         DateTime           @updatedAt @map("updated_at")
-  assignments       Assignment[]       @relation("AssignmentOf")
-  reports           Assignment[]       @relation("ManagerOf")
-  compensation      Compensation[]
-  bankAccounts      BankAccount[]
-  documents         EmployeeDocument[]
-  changeRequests    ChangeRequest[]
-  leaveRequests     LeaveRequest[]     @relation("LeaveOf")
-  leaveToApprove    LeaveRequest[]     @relation("LeaveApprover")
-  leaveAdjustments  LeaveAdjustment[]
-  loans             Loan[]             @relation("LoanOf")
-  loansToApprove    Loan[]             @relation("LoanApprover")
-  benefits          BenefitEnrolment[] @relation("BenefitOf")
-  giftVouchers      GiftVoucher[]      @relation("VoucherFor")
-  vouchersToApprove GiftVoucher[]      @relation("VoucherApprover")
+  userId                 String?                 @unique @map("user_id")
+  user                   User?                   @relation(fields: [userId], references: [id])
+  workEmail              String?                 @unique @map("work_email")
+  employmentType         EmploymentType          @default(PERMANENT) @map("employment_type")
+  workLocation           WorkLocation            @default(ON_SITE) @map("work_location")
+  hireDate               DateTime                @map("hire_date") @db.Date
+  probationEndDate       DateTime?               @map("probation_end_date") @db.Date
+  endDate                DateTime?               @map("end_date") @db.Date
+  exitReason             String?                 @map("exit_reason")
+  status                 EmploymentStatus        @default(ACTIVE)
+  createdAt              DateTime                @default(now()) @map("created_at")
+  updatedAt              DateTime                @updatedAt @map("updated_at")
+  assignments            Assignment[]            @relation("AssignmentOf")
+  reports                Assignment[]            @relation("ManagerOf")
+  compensation           Compensation[]
+  bankAccounts           BankAccount[]
+  documents              EmployeeDocument[]
+  changeRequests         ChangeRequest[]
+  leaveRequests          LeaveRequest[]          @relation("LeaveOf")
+  leaveToApprove         LeaveRequest[]          @relation("LeaveApprover")
+  leaveAdjustments       LeaveAdjustment[]
+  loans                  Loan[]                  @relation("LoanOf")
+  loansToApprove         Loan[]                  @relation("LoanApprover")
+  benefits               BenefitEnrolment[]      @relation("BenefitOf")
+  giftVouchers           GiftVoucher[]           @relation("VoucherFor")
+  vouchersToApprove      GiftVoucher[]           @relation("VoucherApprover")
+  policyAcknowledgements PolicyAcknowledgement[]
 
   @@index([legalEntityId, status])
   @@index([personId])
@@ -959,4 +960,52 @@ model GiftVoucher {
   @@index([legalEntityId, status, stage])
   @@index([approverId, status])
   @@map("gift_voucher")
+}
+
+enum LibraryKind {
+  POLICY
+  FORM
+}
+
+/// A group policy or HR form in the Policy Centre. Publishing a new file makes a new version.
+model LibraryItem {
+  id               String                  @id @default(cuid())
+  groupId          String                  @map("group_id")
+  kind             LibraryKind
+  /// POL-01 or HR-F01
+  code             String
+  title            String
+  category         String
+  summary          String?
+  owner            String?
+  version          String
+  fileKey          String                  @map("file_key")
+  fileName         String                  @map("file_name")
+  /// Policies every employee must confirm they have read
+  mustRead         Boolean                 @default(true) @map("must_read")
+  active           Boolean                 @default(true)
+  /// When the current version was published
+  publishedAt      DateTime                @default(now()) @map("published_at")
+  updatedById      String?                 @map("updated_by_id")
+  acknowledgements PolicyAcknowledgement[]
+  createdAt        DateTime                @default(now()) @map("created_at")
+  updatedAt        DateTime                @updatedAt @map("updated_at")
+
+  @@unique([groupId, code])
+  @@map("library_item")
+}
+
+/// An employee's confirmation that they read one version of a policy
+model PolicyAcknowledgement {
+  id           String      @id @default(cuid())
+  itemId       String      @map("item_id")
+  item         LibraryItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  version      String
+  employmentId String      @map("employment_id")
+  employment   Employment  @relation(fields: [employmentId], references: [id], onDelete: Cascade)
+  createdAt    DateTime    @default(now()) @map("created_at")
+
+  @@unique([itemId, version, employmentId])
+  @@index([employmentId])
+  @@map("policy_acknowledgement")
 }

@@ -60,13 +60,15 @@ export const PERMISSIONS = [
   'reports.read',
   /** Approval steps that need a country head, such as a housing loan above the usual limit */
   'requests.executive',
+  /** Publish and change the group's policies and HR forms. Group scope only. */
+  'policies.manage',
   'team.read',
   'self.service',
 ] as const;
 export type Permission = (typeof PERMISSIONS)[number];
 
 /** Permissions that only make sense across the whole group */
-export const GROUP_ONLY_PERMISSIONS: readonly Permission[] = ['org.entities.manage', 'geo.manage'];
+export const GROUP_ONLY_PERMISSIONS: readonly Permission[] = ['org.entities.manage', 'geo.manage', 'policies.manage'];
 
 const ALL = [...PERMISSIONS] as Permission[];
 
@@ -74,7 +76,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   // Group admins configure everything but cannot approve payroll or release payments: those
   // need the checker and treasury roles, so one person cannot push a payroll through alone.
   GROUP_ADMIN: ALL.filter((p) => p !== 'payroll.approve' && p !== 'payments.release' && p !== 'people.relations.read'),
-  HR_ADMIN: ['org.read', 'org.structure.manage', 'features.manage', 'users.read', 'users.manage', 'audit.read', 'people.read', 'people.manage', 'people.sensitive.read', 'people.relations.read', 'reports.read', 'self.service'],
+  HR_ADMIN: ['org.read', 'org.structure.manage', 'features.manage', 'users.read', 'users.manage', 'audit.read', 'people.read', 'people.manage', 'people.sensitive.read', 'people.relations.read', 'policies.manage', 'reports.read', 'self.service'],
   HR: ['org.read', 'users.read', 'people.read', 'people.manage', 'reports.read', 'self.service'],
   PAYROLL_OPERATOR: ['org.read', 'people.read', 'people.sensitive.read', 'payroll.read', 'payroll.prepare', 'reports.read', 'self.service'],
   PAYROLL_APPROVER: ['org.read', 'people.read', 'payroll.read', 'payroll.approve', 'reports.read', 'self.service'],

@@ -206,3 +206,11 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 .plan { border: 1px solid var(--border); border-radius: 10px; padding: .8rem .9rem; background: var(--surface); }
 .plan h3 { margin: 0 0 .2rem; font-size: 1rem; }
 .plan.off { opacity: .65; }
+.library { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: .75rem; }
+.doc { border: 1px solid var(--border); border-radius: 10px; padding: .8rem .9rem; background: var(--surface); display: flex; flex-direction: column; gap: .35rem; }
+.doc h3 { margin: 0; font-size: 1rem; }
+.doc.off { opacity: .65; }
+.doc-head { display: flex; justify-content: space-between; gap: .5rem; flex-wrap: wrap; align-items: center; }
+.doc-actions { margin-top: auto; display: flex; gap: .4rem; flex-wrap: wrap; padding-top: .3rem; }
+.chip { display: inline-block; font-size: .8rem; padding: .15rem .5rem; border: 1px solid var(--border); border-radius: 99px; background: var(--surface-alt); }
+.chip.muted { color: var(--text-muted); }

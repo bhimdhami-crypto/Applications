@@ -452,3 +452,25 @@ export interface Voucher {
   canCancel?: boolean;
   employee?: { id: string; name: string; employeeNumber: string };
 }
+
+export interface LibraryItem {
+  id: string;
+  kind: 'POLICY' | 'FORM';
+  code: string;
+  title: string;
+  category: string;
+  summary: string | null;
+  owner: string | null;
+  version: string;
+  fileName: string;
+  mustRead: boolean;
+  active: boolean;
+  publishedAt: string;
+  readAt: string | null;
+  readEarlier: boolean;
+}
+export interface LibraryList {
+  canEdit: boolean;
+  canReport: boolean;
+  items: LibraryItem[];
+}

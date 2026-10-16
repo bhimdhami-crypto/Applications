@@ -93,3 +93,16 @@ export async function logout() {
   await fetch('/api/auth/logout', { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: '{}' }).catch(() => undefined);
   accessToken = null;
 }
+
+/** Opens a protected file (a PDF policy, receipts) in a new tab, fetched with the session's token */
+export async function openFile(path: string, fileName?: string) {
+  const blob = await apiBlob(path);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.target = '_blank';
+  link.rel = 'noopener';
+  if (fileName && blob.type !== 'application/pdf') link.download = fileName;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 60_000);
+}

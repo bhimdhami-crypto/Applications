@@ -47,9 +47,10 @@ Section numbers refer to the project brief. **Status:** ✅ done and tested · �
 | R-41 | 26 | Light (default) and dark themes, colour presets, WCAG 2.2 AA colours | 1-2 | ✅ | `theme.ts` `ACCENTS`; contrast tests for every preset |
 | R-47 | — | Keep every feature, form and policy of the first build (Bhim, 16 Oct 2026) | 2-4 | 🟡 | Port plan in `docs/06-implementation-plan.md` |
 | R-42 | 26 | Company switcher limited to access rights | 2 | ✅ | `Shell.tsx`, `/me` entities |
-| R-43 | 27 | Automated tests and CI | 1 | ✅ | 145 tests in CI (120 API, 25 shared) |
+| R-43 | 27 | Automated tests and CI | 1 | ✅ | 150 tests in CI (125 API, 25 shared) |
 | R-44 | 28 | Paginated APIs, server-side filtering | 2 | ✅ | `/users`, `/audit`, `/employees` paginated and filtered on the server |
 | R-45 | 29 | Product requirements, architecture, ERD, plans | 1 | ✅ | `docs/01` to `docs/09` |
 | R-47 | — (first build) | Salary advances, staff loans and IOUs: limits, approval steps, payroll recovery, IOU settlement with receipts, loan book | 3-4 | 🟡 | Requests, quotes, staged approvals (manager, HR, Payroll, Finance, Country Head; one step per person, none on your own request), IOU settlement, cash repayments, loan book. Rules `LOANS-2026.1-draft` and the eight draft payroll packs, all marked unverified. `loan-rules.spec.ts`, `loans.e2e.spec.ts`. Deduction through month-end payroll comes with payroll |
 | R-48 | — (first build) | Meal, gym and gift-voucher benefits with approvals | 3-4 | 🟡 | Options per company, enrolments (HR then Payroll), nominations (manager then HR), inbox, overview. `benefits.e2e.spec.ts`. Payslip lines come with payroll |
+| R-49 | — (first build) | Policies and forms library with read confirmations | 3 | ✅ | `library.e2e.spec.ts`; group-only `policies.manage`; read report and reminders scoped to the HR user's companies |
 | R-46 | — | Developer credit and copyright on the product | 1 | ✅ | `BRAND` in shared; footer, sidebar, sign-in, emails, API docs |

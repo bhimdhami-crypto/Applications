@@ -39,7 +39,7 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 | Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4, draft rules marked unverified | Done, except deduction in month-end payroll, which comes with payroll |
 | Meal, gym and gift-voucher benefits | Phase 3-4 | Done, except the payslip lines, which come with payroll |
 | Month-end payroll and payslips for the first build's eight countries | Phase 4, rule packs marked unverified | Planned |
-| Policies and forms library (22 policies, 20 fillable forms) with read confirmations | Phase 3 | Planned |
+| Policies and forms library (22 policies, 20 fillable forms) with read confirmations | Phase 3 | Done |
 | Staff chat, community page with moderation, daily activity tracker | Phase 3 | Planned |
 
 ## Phase 2, slice 2: employee master (this pull request)
@@ -77,5 +77,12 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 - The approvals inbox now carries enrolments and nominations next to loans. The employee's share of gym and meal plans counts against what an advance or loan may take.
 - HR, Payroll and Finance see each company's options, members, monthly cost and the year's vouchers; only HR changes options.
 - About 220 memberships and 26 vouchers for the Kenyan companies in the demo data.
+
+## Phase 3, fourth slice: policies and forms from the first build (this pull request)
+
+- The first build's 22 group policies and 20 HR forms (draft pack, version 0.1), with the original PDFs under `sample-data/library`. The page says the pack is a draft not yet reviewed by lawyers in each country.
+- Staff open a policy and confirm they have read it; the portal counts what is still to read. A new version asks everyone again, unless HR marks it a small correction.
+- Only group HR administrators publish, change or hide policies and forms (new group-only permission `policies.manage`). HR in each country sees, for their own companies, who has read the current version and emails a reminder to those with a portal account.
+- About 19,000 fictional read confirmations for three widely read policies in the demo data.
 
 Next: the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.

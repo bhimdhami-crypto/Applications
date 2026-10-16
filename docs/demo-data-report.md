@@ -58,3 +58,7 @@ Each person has an employment, a job history (about a third were promoted), pay 
 ## Meal, gym and gift-voucher benefits
 
 `prisma/benefits-generator.ts` gives each Kenyan company the first build's six meal and gym options (draft prices in KES), then memberships for about 18% (meal) and 8% (gym) of staff hired before 2026 who have no portal account, and gift vouchers for about 3%. The demo employee (Kevin Otieno) has a Standard gym membership and a recognition voucher his manager nominated that waits for HR; a teammate's canteen wallet also waits for HR. About 220 memberships and 26 vouchers in total.
+
+## Policies and forms
+
+`prisma/library-generator.ts` loads the first build's 22 policies and 20 forms from `sample-data/library/catalogue.json` and copies the PDFs into storage. About 80% of staff without a portal account have confirmed POL-01 (Code of Conduct) and about 55% POL-08 and POL-09, about 19,000 fictional confirmations in total. Test accounts start with everything still to read.

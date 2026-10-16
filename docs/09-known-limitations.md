@@ -14,6 +14,7 @@ Updated at the end of each phase.
 - **Loan rules and payroll packs are unverified drafts** (`LOANS-2026.1-draft`, and the eight country payroll packs from the first build). Net pay, limits and instalments are estimates. Instalments are not deducted yet; that arrives with month-end payroll, until then the demo history stops at September 2026.
 - **Advances and loans only in the eight countries with a draft payroll pack.** France, India, China, Australia, the Netherlands, Japan and Korea can request IOUs only.
 - **Benefit prices are drafts.** Kenya's six meal and gym options come from the first build and await HR's confirmation; the other fourteen companies have no options until HR adds them. Payslip lines for benefits in kind, cash meal allowances and employee shares arrive with month-end payroll.
+- **The policy pack is a draft** (version 0.1) carried over from the first build. It has not been reviewed against each country's law.
 - **Half days** are not supported yet; leave counts whole working days.
 - **Docker image tags** in `docker-compose.yml` were pinned without pulling them in this environment; check `docker compose up -d` on first use.
 - The earlier build (PR #2) is left untouched. Its features are being carried over one by one (see the implementation plan); its four extra countries are already part of the fifteen.
