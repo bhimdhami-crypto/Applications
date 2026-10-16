@@ -509,6 +509,8 @@ model Employment {
   leaveRequests    LeaveRequest[]     @relation("LeaveOf")
   leaveToApprove   LeaveRequest[]     @relation("LeaveApprover")
   leaveAdjustments LeaveAdjustment[]
+  loans            Loan[]             @relation("LoanOf")
+  loansToApprove   Loan[]             @relation("LoanApprover")
 
   @@index([legalEntityId, status])
   @@index([personId])
@@ -545,8 +547,8 @@ model Assignment {
   createdById    String?       @map("created_by_id")
   createdAt      DateTime      @default(now()) @map("created_at")
 
-  @@index([employmentId, effectiveFrom])
   @@unique([employmentId, effectiveFrom], map: "assignment_unique_start")
+  @@index([employmentId, effectiveFrom])
   @@index([legalEntityId, departmentId])
   @@index([managerId])
   @@map("assignment")
@@ -570,8 +572,8 @@ model Compensation {
   createdById   String?    @map("created_by_id")
   createdAt     DateTime   @default(now()) @map("created_at")
 
-  @@index([employmentId, effectiveFrom])
   @@unique([employmentId, effectiveFrom], map: "compensation_unique_start")
+  @@index([employmentId, effectiveFrom])
   @@index([legalEntityId])
   @@map("compensation")
 }
@@ -741,4 +743,114 @@ model PublicHoliday {
 
   @@unique([countryCode, date])
   @@map("public_holiday")
+}
+
+/// One approval step of a loan, advance, IOU, voucher or benefit enrolment
+enum ApprovalStage {
+  MANAGER
+  HR
+  PAYROLL
+  FINANCE
+  COUNTRY_HEAD
+}
+
+/// PENDING: in approval. APPROVED: approved and running (a loan being repaid, an active membership,
+/// an issued voucher). CLOSED: repaid, settled or ended.
+enum RequestStatus {
+  PENDING
+  APPROVED
+  CLOSED
+  DECLINED
+  CANCELLED
+}
+
+enum LoanKind {
+  ADVANCE
+  LOAN
+  IOU
+}
+
+enum LoanProduct {
+  PERSONAL
+  EDUCATION
+  EMERGENCY
+  HOUSING
+  VEHICLE
+}
+
+/// Salary advance (HR-F02), staff loan (HR-F03) or IOU (HR-F04) under POL-22
+model Loan {
+  id                    String          @id @default(cuid())
+  employmentId          String          @map("employment_id")
+  employment            Employment      @relation("LoanOf", fields: [employmentId], references: [id], onDelete: Cascade)
+  legalEntityId         String          @map("legal_entity_id")
+  kind                  LoanKind
+  product               LoanProduct?
+  amount                Decimal         @db.Decimal(18, 4)
+  currency              String          @db.Char(3)
+  /// Repayment period: 1 for advances and IOUs
+  months                Int             @default(1)
+  /// Yearly interest rate in percent, fixed when the loan is requested
+  interestRate          Decimal         @default(0) @map("interest_rate") @db.Decimal(5, 2)
+  /// Monthly payroll deduction, interest included
+  instalment            Decimal         @db.Decimal(18, 4)
+  /// Amount to recover through payroll: the amount lent, or an IOU's unspent balance once settled
+  recoverable           Decimal         @default(0) @db.Decimal(18, 4)
+  /// First payroll month to deduct from, as year * 100 + month
+  firstMonth            Int?            @map("first_month")
+  purpose               String
+  guarantor             String?
+  /// IOU: cost centre or project code, date needed and settlement deadline
+  costCentre            String?         @map("cost_centre")
+  neededOn              DateTime?       @map("needed_on") @db.Date
+  settleBy              DateTime?       @map("settle_by") @db.Date
+  /// IOU settlement sent by the employee, then confirmed by Finance
+  spent                 Decimal?        @db.Decimal(18, 4)
+  cashReturned          Decimal?        @map("cash_returned") @db.Decimal(18, 4)
+  receiptDocumentId     String?         @map("receipt_document_id")
+  settlementSubmittedAt DateTime?       @map("settlement_submitted_at")
+  settledById           String?         @map("settled_by_id")
+  settledAt             DateTime?       @map("settled_at")
+  status                RequestStatus
+  /// Approval steps in order, the one waiting now, and the manager who must approve
+  stages                ApprovalStage[]
+  stage                 ApprovalStage?
+  approverId            String?         @map("approver_id")
+  approver              Employment?     @relation("LoanApprover", fields: [approverId], references: [id])
+  /// [{ stage, byId, byName, at, approved, note }]
+  decisions             Json            @default("[]")
+  /// The loan rule pack in force when the request was made
+  rulesVersion          String          @map("rules_version")
+  createdById           String?         @map("created_by_id")
+  cancelledById         String?         @map("cancelled_by_id")
+  cancelledAt           DateTime?       @map("cancelled_at")
+  repayments            LoanRepayment[]
+  createdAt             DateTime        @default(now()) @map("created_at")
+  updatedAt             DateTime        @updatedAt @map("updated_at")
+
+  @@index([employmentId, status])
+  @@index([legalEntityId, status, stage])
+  @@index([approverId, status])
+  @@map("loan")
+}
+
+/// Money paid back: from a payslip, from final dues, or in cash to Finance
+model LoanRepayment {
+  id          String   @id @default(cuid())
+  loanId      String   @map("loan_id")
+  loan        Loan     @relation(fields: [loanId], references: [id], onDelete: Cascade)
+  payslipId   String?  @map("payslip_id")
+  year        Int
+  month       Int
+  amount      Decimal  @db.Decimal(18, 4)
+  principal   Decimal  @db.Decimal(18, 4)
+  interest    Decimal  @default(0) @db.Decimal(18, 4)
+  /// PAYROLL, FINAL_DUES or CASH
+  source      String
+  note        String?
+  createdById String?  @map("created_by_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  @@index([loanId])
+  @@map("loan_repayment")
 }

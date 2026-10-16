@@ -36,7 +36,7 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 | Staff profiles: job, contact, IDs, education, next of kin, photo, HR documents | Phase 2 employee master | Done |
 | Sample staff | Generator: 500 to 1,000 per country, reproducible seed ([report](demo-data-report.md)) | Done |
 | Leave: requests, approvals, balances, team calendar, public holidays | Phase 3, draft rule pack marked unverified | Done |
-| Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4 | Planned |
+| Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4, draft rules marked unverified | Done, except deduction in month-end payroll, which comes with payroll |
 | Meal, gym and gift-voucher benefits | Phase 3-4 | Planned |
 | Month-end payroll and payslips for the first build's eight countries | Phase 4, rule packs marked unverified | Planned |
 | Policies and forms library (22 policies, 20 fillable forms) with read confirmations | Phase 3 | Planned |
@@ -60,4 +60,13 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 - Companies with leave switched off refuse new requests.
 - About 18,600 fictional leave requests for 2026 in the demo data.
 
-Next: advances, loans and IOUs, benefits, the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.
+## Phase 3, second slice: advances, loans and IOUs from the first build (this pull request)
+
+- Salary advances, five kinds of staff loan and IOUs, with the first build's limits as rule pack `LOANS-2026.1-draft`: an advance up to half of net pay once in any 3 months, loans up to 3 times gross pay (housing more, with the Country Head), take-home pay kept above a third of gross. Every screen says the rules are unverified.
+- Advances and loans only where one of the first build's eight draft payroll packs can work out net pay and recover them (Kenya, Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico, New Zealand). Those packs are copied as they were and marked `verified: false`. IOUs work everywhere.
+- One approvals inbox. Steps run in order (manager, HR, Payroll, Finance, Country Head as the request needs), each step by a different person, never on your own request, and two people deciding at once cannot both win.
+- IOUs are settled with receipts that only Finance in that company can open; Finance confirms, sends back, recovers an overdue IOU through payroll, or records cash repayments.
+- The loan book for Payroll and Finance, limited to their companies. Loan details are visible only to the employee, their approvers, Payroll and Finance.
+- Companies with loans switched off refuse new requests. About 970 fictional requests in the demo data.
+
+Next: benefits, the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.

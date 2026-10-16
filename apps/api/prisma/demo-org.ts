@@ -57,7 +57,7 @@ export const DEMO_DEPARTMENTS: { code: string; name: string; bu: string }[] = [
 export const SHARED_SERVICE_DEPARTMENTS = ['FIN', 'HRM', 'ITS', 'OPS'];
 
 /** Feature modules switched on for every demo company; payroll is on except where noted */
-export const DEMO_FEATURES = ['leave', 'attendance', 'payroll', 'expenses', 'performance', 'learning', 'assistant'];
+export const DEMO_FEATURES = ['leave', 'attendance', 'payroll', 'expenses', 'loans', 'performance', 'learning', 'assistant'];
 export const NO_PAYROLL = ['NL02'];
 
 export interface DemoUser {

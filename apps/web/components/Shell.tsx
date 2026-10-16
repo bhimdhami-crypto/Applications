@@ -47,6 +47,14 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
     ],
   },
   {
+    title: 'nav.money',
+    items: [
+      { href: '/money', label: 'nav.myMoney', needs: ['self.service'] },
+      { href: '/approvals', label: 'nav.approvals', anyOf: ['team.read', 'people.manage', 'payroll.prepare', 'finance.manage', 'requests.executive'] },
+      { href: '/money/book', label: 'nav.loanBook', anyOf: ['payroll.read', 'finance.read'] },
+    ],
+  },
+  {
     title: 'nav.admin',
     items: [
       { href: '/organisation', label: 'nav.organisation', needs: ['org.read'] },

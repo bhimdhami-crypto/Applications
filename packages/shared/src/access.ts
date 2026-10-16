@@ -58,6 +58,8 @@ export const PERMISSIONS = [
   'finance.read',
   'finance.manage',
   'reports.read',
+  /** Approval steps that need a country head, such as a housing loan above the usual limit */
+  'requests.executive',
   'team.read',
   'self.service',
 ] as const;
@@ -79,7 +81,7 @@ export const ROLE_PERMISSIONS: Record<Role, readonly Permission[]> = {
   FINANCE: ['org.read', 'payroll.read', 'finance.read', 'finance.manage', 'reports.read', 'self.service'],
   TREASURY: ['org.read', 'payroll.read', 'finance.read', 'payments.release', 'self.service'],
   AUDITOR: ['org.read', 'users.read', 'audit.read', 'people.read', 'payroll.read', 'finance.read', 'reports.read', 'self.service'],
-  EXECUTIVE: ['org.read', 'reports.read', 'self.service'],
+  EXECUTIVE: ['org.read', 'reports.read', 'requests.executive', 'self.service'],
   MANAGER: ['org.read', 'team.read', 'self.service'],
   EMPLOYEE: ['self.service'],
 };

@@ -36,6 +36,12 @@ flowchart TB
     ER[Employee relations, restricted (3)]
   end
 
+  subgraph Money[Money]
+    MyMoney[Advances and loans (3) ✓]
+    MoneyApprovals[Approvals (3) ✓]
+    LoanBook[Loan book (3) ✓]
+  end
+
   subgraph Payroll[Payroll]
     Runs[Payroll runs (4)]
     Sim[Simulations (4)]
@@ -70,6 +76,7 @@ flowchart TB
   Home --> Me
   Home --> Team
   Home --> People
+  Home --> Money
   Home --> Payroll
   Home --> Finance
   Home --> Insight
@@ -82,6 +89,9 @@ flowchart TB
 |---|---|---|---|---|---|---|---|
 | Me | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | My team | | ✓ | | | | | |
+| Money: advances and loans | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Money: approvals | | ✓ | ✓ | ✓ | ✓ | | |
+| Money: loan book | | | | ✓ | ✓ | | |
 | People | | | ✓ | read | | read | ✓ |
 | Payroll | | | | ✓ | read | read | ✓ |
 | Finance | | | | | ✓ | read | ✓ |

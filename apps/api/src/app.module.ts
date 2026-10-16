@@ -10,6 +10,7 @@ import { IdentityModule } from './identity/identity.module';
 import { MailModule } from './mail/mail.module';
 import { OrgModule } from './org/org.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ApprovalsModule } from './approvals/approvals.module';
 import { LeaveModule } from './leave/leave.module';
 import { PeopleModule } from './people/people.module';
 import { UsersModule } from './users/users.module';
@@ -28,6 +29,7 @@ import { UsersModule } from './users/users.module';
     UsersModule,
     PeopleModule,
     LeaveModule,
+    ApprovalsModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: AccessGuard }],

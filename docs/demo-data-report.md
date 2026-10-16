@@ -50,3 +50,7 @@ Each person has an employment, a job history (about a third were promoted), pay 
 ## Leave history
 
 `prisma/leave-generator.ts` adds fictional leave for 2026 to staff hired before 2026 who have no portal account: past annual leave in different months, some sick and family care days, some leave in October 2026, and some booked or waiting for HR in November and December. The demo employee (Kevin Otieno) has a holiday in July, a sick day in March, and a year-end request waiting for his manager, Amina Mwangi. About 18,600 requests in total, all counted under rule pack `LEAVE-2026.1-draft`. Draft public holidays are stored for 2026 and 2027 for Kenya, Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand only.
+
+## Advances, loans and IOUs
+
+`prisma/money-generator.ts` adds fictional requests for staff hired before October 2025 who have no portal account. In the eight countries with a draft payroll pack, about 6% of permanent staff have a staff loan (repaid through September 2026 payroll) and about 3% a past salary advance; settled IOUs go to about 1% of staff in those countries and about 10% in the other seven, where IOUs are the only option. The demo employee (Kevin Otieno) has a personal loan being repaid since May 2026 and a salary advance waiting for his manager, Amina Mwangi. About 970 requests in total, all under rule pack `LOANS-2026.1-draft`.

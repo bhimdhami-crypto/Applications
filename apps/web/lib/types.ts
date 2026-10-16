@@ -294,3 +294,103 @@ export interface Holiday {
   name: string;
   source: 'DRAFT' | 'MANUAL';
 }
+
+export type LoanKind = 'ADVANCE' | 'LOAN' | 'IOU';
+export type LoanProduct = 'PERSONAL' | 'EDUCATION' | 'EMERGENCY' | 'HOUSING' | 'VEHICLE';
+export type RequestStatusKey = 'PENDING' | 'APPROVED' | 'CLOSED' | 'DECLINED' | 'CANCELLED';
+
+export interface Decision {
+  stage: string;
+  byName: string;
+  at: string;
+  approved: boolean;
+  note: string | null;
+}
+
+export interface RulePackInfo {
+  version: string;
+  status: 'UNVERIFIED';
+  summary: string;
+}
+
+export interface Loan {
+  id: string;
+  kind: LoanKind;
+  product: LoanProduct | null;
+  title: string;
+  amount: string;
+  currency: string;
+  months: number;
+  interestRate: number;
+  instalment: string;
+  firstMonthLabel: string | null;
+  purpose: string;
+  status: RequestStatusKey;
+  stage: string | null;
+  stageLabel: string | null;
+  rulesVersion: string;
+  createdAt: string;
+  settleBy: string | null;
+  settledAt: string | null;
+  guarantor: string | null;
+  costCentre: string | null;
+  neededOn: string | null;
+  spent: string | null;
+  cashReturned: string | null;
+  stages: string[];
+  decisions: Decision[];
+  outstanding: string;
+  repaid: string;
+  repayments: { id: string; label: string; amount: string; interest: string; source: string; note: string | null }[];
+  upcoming: { label: string; payment: string; balance: string }[];
+  canCancel: boolean;
+  canSettle: boolean;
+  hasReceipt: boolean;
+}
+
+export interface LoanOptions {
+  rulePack: RulePackInfo;
+  payrollPack: { version: string; verified: boolean } | null;
+  currency: string;
+  hasPayroll: boolean;
+  gross: string | null;
+  net: string | null;
+  commitments: string;
+  maxAdvance: string | null;
+  maxLoan: string | null;
+  maxHousingLoan: string | null;
+  maxMonths: number;
+  iouSettleDays: number;
+  loanBlock: string | null;
+  firstMonthLabel: string;
+  products: { product: LoanProduct; label: string; yearlyRate: number; note: string }[];
+}
+
+export interface LoanQuote {
+  instalment: string;
+  months: number;
+  totalInterest: string;
+  firstMonthLabel: string;
+  lastMonthLabel: string;
+  takeHome: string | null;
+  takeHomeFloor: string | null;
+  stageLabels: string[];
+  problems: string[];
+}
+
+export interface ApprovalItem {
+  entity: 'loan';
+  id: string;
+  title: string;
+  employee: { id: string; name: string; employeeNumber: string; entity: { code: string; name: string } };
+  amount: string | null;
+  currency: string;
+  details: string[];
+  stage: string;
+  stageLabel: string;
+  stages: string[];
+  decisions: Decision[];
+  receipt: boolean;
+  rulesVersion: string;
+  createdAt: string;
+}
