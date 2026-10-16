@@ -13,6 +13,7 @@
     "dev:web": "npm run dev -w apps/web",
     "db:migrate": "npm run prisma:migrate -w apps/api",
     "db:seed": "npm run prisma:seed -w apps/api",
+    "db:report": "npm run prisma:report -w apps/api",
     "db:test:setup": "DATABASE_URL=${TEST_DATABASE_URL:-postgresql://hr:hr@localhost:5432/hrportal_test} npm run prisma:migrate -w apps/api",
     "typecheck": "npm run build:shared && npm run typecheck -w packages/shared -w apps/api -w apps/web",
     "test": "npm run build:shared && npm test -w packages/shared -w apps/api",

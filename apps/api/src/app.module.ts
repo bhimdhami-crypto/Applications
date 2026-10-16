@@ -10,6 +10,7 @@ import { IdentityModule } from './identity/identity.module';
 import { MailModule } from './mail/mail.module';
 import { OrgModule } from './org/org.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { PeopleModule } from './people/people.module';
 import { UsersModule } from './users/users.module';
 
 @Module({
@@ -24,6 +25,7 @@ import { UsersModule } from './users/users.module';
     IdentityModule,
     OrgModule,
     UsersModule,
+    PeopleModule,
   ],
   controllers: [HealthController],
   providers: [{ provide: APP_GUARD, useClass: AccessGuard }],

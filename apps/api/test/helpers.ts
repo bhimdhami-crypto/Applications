@@ -6,15 +6,16 @@ import { AppModule } from '../src/app.module';
 import { MailService } from '../src/mail/mail.service';
 import { setupApp } from '../src/setup-app';
 import { seed } from '../prisma/seed';
+import { StaffOptions } from '../prisma/staff-generator';
 
 export const PASSWORD = 'Test#Password2026';
 
-/** Empties every table (TRUNCATE skips the audit log's row trigger) and seeds the demo group */
-export async function resetDatabase() {
+/** Empties every table (TRUNCATE skips the audit log's row trigger) and seeds the demo group, without staff unless asked */
+export async function resetDatabase(staff: StaffOptions | false = false) {
   const prisma = new PrismaClient();
   const tables = await prisma.$queryRaw<{ tablename: string }[]>`SELECT tablename FROM pg_tables WHERE schemaname = 'public' AND tablename <> '_prisma_migrations'`;
   await prisma.$executeRawUnsafe(`TRUNCATE ${tables.map((t) => `"${t.tablename}"`).join(', ')} CASCADE`);
-  await seed(prisma, { password: PASSWORD, quiet: true });
+  await seed(prisma, { password: PASSWORD, quiet: true, staff });
   return prisma;
 }
 

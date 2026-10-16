@@ -102,3 +102,134 @@ export interface AuditRow {
   createdAt: string;
   actor: { displayName: string; email: string } | null;
 }
+
+// ───── People ─────
+
+export interface EmployeeRow {
+  id: string;
+  employeeNumber: string;
+  name: string;
+  localName: string | null;
+  personId: string;
+  status: 'ACTIVE' | 'TERMINATED';
+  hireDate: string;
+  endDate: string | null;
+  workEmail: string | null;
+  entity: { id: string; code: string; name: string; countryCode: string };
+  jobTitle: string | null;
+  grade: string | null;
+  department: { id: string; name: string } | null;
+  manager: { id: string; name: string } | null;
+  level?: number;
+}
+
+export interface Job {
+  id: string;
+  effectiveFrom: string;
+  effectiveTo: string | null;
+  reason: string;
+  jobTitle: string;
+  grade: { code: string; name: string } | null;
+  businessUnit: { id: string; name: string } | null;
+  department: { id: string; name: string } | null;
+  branch: { id: string; name: string; city: string } | null;
+  costCentre: { id: string; code: string; name: string } | null;
+  manager: { id: string; employeeNumber: string; name: string } | null;
+  fte: string;
+}
+
+export interface PersonContact {
+  id: string;
+  name: string;
+  relationship: string;
+  phone: string;
+  email: string | null;
+  isEmergencyContact: boolean;
+  isBeneficiary: boolean;
+}
+
+export interface EmployeeProfile {
+  id: string;
+  employeeNumber: string;
+  status: 'ACTIVE' | 'TERMINATED';
+  employmentType: 'PERMANENT' | 'FIXED_TERM' | 'INTERN';
+  workLocation: 'ON_SITE' | 'HYBRID' | 'FULLY_REMOTE';
+  hireDate: string;
+  probationEndDate: string | null;
+  endDate: string | null;
+  exitReason: string | null;
+  workEmail: string | null;
+  hasAccount: boolean;
+  entity: { id: string; code: string; name: string; countryCode: string; functionalCurrency: string };
+  person: { id: string; personNumber: string; firstName: string; lastName: string; localName: string | null; preferredName: string | null; hasPhoto: boolean };
+  personal: null | {
+    gender: string | null;
+    dateOfBirth: string | null;
+    nationality: string | null;
+    maritalStatus: string | null;
+    dependants: number;
+    personalEmail: string | null;
+    mobilePhone: string | null;
+    highestQualification: string | null;
+    institution: string | null;
+    qualificationYear: number | null;
+    contacts: PersonContact[];
+  };
+  job: Job | null;
+  directReports: number;
+  relation: 'HR' | 'SELF' | 'MANAGER';
+  can: {
+    viewPersonal: boolean;
+    editPersonal: boolean;
+    editNames: boolean;
+    editJob: boolean;
+    viewPay: boolean;
+    editPay: boolean;
+    revealSensitive: boolean;
+    viewDocuments: boolean;
+    uploadDocuments: boolean;
+    verifyDocuments: boolean;
+    requestBankChange: boolean;
+    terminate: boolean;
+  };
+}
+
+export interface PayInfo {
+  compensation: { id: string; effectiveFrom: string; effectiveTo: string | null; currency: string; payFrequency: string; baseAmount: string; allowances: string; reason: string }[];
+  bankAccounts: { id: string; bankName: string; branchCode: string | null; accountName: string; accountNumber: string; currency: string; effectiveFrom: string; effectiveTo: string | null }[];
+  identifiers: { id: string; kind: string; countryCode: string; value: string; expiryDate: string | null }[];
+}
+
+export interface EmployeeDocument {
+  id: string;
+  type: string;
+  fileName: string;
+  mimeType: string | null;
+  sizeBytes: number | null;
+  issuedDate: string | null;
+  expiryDate: string | null;
+  status: 'PENDING' | 'VERIFIED' | 'CLEARED' | 'EXPIRED' | 'REJECTED';
+  hrOnly: boolean;
+  hasFile: boolean;
+  createdAt: string;
+  verifiedAt: string | null;
+}
+
+export interface ChangeRequest {
+  id: string;
+  kind: string;
+  summary: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'CANCELLED';
+  createdAt: string;
+  decidedAt: string | null;
+  decisionNote: string | null;
+  requestedById: string;
+  employee: { id: string; employeeNumber: string; name: string; entity: { code: string; name: string } };
+}
+
+export interface Headcount {
+  asOf: string;
+  total: number;
+  countries: { countryCode: string; active: number; left: number }[];
+  companies: { id: string; code: string; name: string; countryCode: string; active: number; left: number; departments: { id: string; code: string; name: string; active: number }[] }[];
+}

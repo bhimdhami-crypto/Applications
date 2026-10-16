@@ -7,7 +7,7 @@ flowchart TB
   Home[Home dashboard]
 
   subgraph Me[Me]
-    Profile[My profile (2)]
+    Profile[My profile (2) ✓]
     Payslips[My payslips (4)]
     Leave[My leave (3)]
     Time[My time and attendance (3)]
@@ -18,14 +18,17 @@ flowchart TB
   end
 
   subgraph Team[My team]
-    TeamList[Team (3)]
+    TeamList[My team (2) ✓]
     Approvals[Approvals inbox (3)]
     TeamCal[Team calendar (3)]
     Reviews[Reviews and goals (3)]
   end
 
   subgraph People[People]
-    Directory[Employees (2)]
+    Directory[Staff directory (2) ✓]
+    Hire[Hire someone (2) ✓]
+    Headcount[Headcount (2) ✓]
+    Changes[Change requests (2) ✓]
     Lifecycle[Hires, transfers, exits (3)]
     Recruit[Recruitment (3)]
     Talent[Performance, learning, succession (3)]

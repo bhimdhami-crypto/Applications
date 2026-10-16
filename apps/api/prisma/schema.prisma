@@ -1,5 +1,5 @@
 // Global People & Payroll Enterprise Platform: database schema.
-// Phase 2, slice 1: identity, access and the organisation hierarchy.
+// Phase 2: identity, access, the organisation hierarchy and the employee master.
 // Table and column naming: PascalCase models mapped to snake_case tables.
 
 generator client {
@@ -14,13 +14,13 @@ datasource db {
 // ───────────────────────── Reference data (admin-configurable) ─────────────────────────
 
 model Currency {
-  code      String    @id @db.Char(3)
+  code      String        @id @db.Char(3)
   name      String
   /// ISO 4217 minor-unit digits, used for rounding and display
   decimals  Int
   symbol    String
-  isActive  Boolean   @default(true) @map("is_active")
-  createdAt DateTime  @default(now()) @map("created_at")
+  isActive  Boolean       @default(true) @map("is_active")
+  createdAt DateTime      @default(now()) @map("created_at")
   countries Country[]
   entities  LegalEntity[]
 
@@ -71,6 +71,8 @@ model Group {
   updatedAt         DateTime      @updatedAt @map("updated_at")
   entities          LegalEntity[]
   users             User[]
+  people            Person[]
+  grades            JobGrade[]
 
   @@map("org_group")
 }
@@ -109,6 +111,7 @@ model LegalEntity {
   departments           Department[]
   costCentres           CostCentre[]
   features              EntityFeature[]
+  employments           Employment[]
 
   @@unique([groupId, code])
   @@index([countryCode])
@@ -124,6 +127,7 @@ model BusinessUnit {
   status        OrgStatus    @default(ACTIVE)
   createdAt     DateTime     @default(now()) @map("created_at")
   departments   Department[]
+  assignments   Assignment[]
 
   @@unique([legalEntityId, code])
   @@map("business_unit")
@@ -142,6 +146,7 @@ model Branch {
   status        OrgStatus    @default(ACTIVE)
   createdAt     DateTime     @default(now()) @map("created_at")
   departments   Department[]
+  assignments   Assignment[]
 
   @@unique([legalEntityId, code])
   @@map("branch")
@@ -163,23 +168,25 @@ model Department {
   status         OrgStatus     @default(ACTIVE)
   createdAt      DateTime      @default(now()) @map("created_at")
   costCentres    CostCentre[]
+  assignments    Assignment[]
 
   @@unique([legalEntityId, code])
   @@map("department")
 }
 
 model CostCentre {
-  id            String      @id @default(cuid())
-  legalEntityId String      @map("legal_entity_id")
-  legalEntity   LegalEntity @relation(fields: [legalEntityId], references: [id])
-  departmentId  String?     @map("department_id")
-  department    Department? @relation(fields: [departmentId], references: [id])
+  id            String       @id @default(cuid())
+  legalEntityId String       @map("legal_entity_id")
+  legalEntity   LegalEntity  @relation(fields: [legalEntityId], references: [id])
+  departmentId  String?      @map("department_id")
+  department    Department?  @relation(fields: [departmentId], references: [id])
   code          String
   name          String
   /// The general-ledger code finance posts this cost centre's payroll to
-  glCode        String?     @map("gl_code")
-  status        OrgStatus   @default(ACTIVE)
-  createdAt     DateTime    @default(now()) @map("created_at")
+  glCode        String?      @map("gl_code")
+  status        OrgStatus    @default(ACTIVE)
+  createdAt     DateTime     @default(now()) @map("created_at")
+  assignments   Assignment[]
 
   @@unique([legalEntityId, code])
   @@map("cost_centre")
@@ -241,6 +248,7 @@ model User {
   challenges        LoginChallenge[]
   sessions          Session[]
   invites           UserInvite[]
+  employment        Employment[]
 
   @@index([groupId])
   @@map("app_user")
@@ -347,4 +355,289 @@ model AuditLog {
   @@index([legalEntityId, createdAt])
   @@index([actorId, createdAt])
   @@map("audit_log")
+}
+
+// ───────────────────────── Employee master ─────────────────────────
+// A person can be employed by several companies over time (transfers, secondments). Job and pay
+// are effective-dated: a change ends the current row and adds a new one, so history is never lost.
+
+enum EmploymentStatus {
+  ACTIVE
+  TERMINATED
+}
+
+enum EmploymentType {
+  PERMANENT
+  FIXED_TERM
+  INTERN
+}
+
+enum WorkLocation {
+  ON_SITE
+  HYBRID
+  FULLY_REMOTE
+}
+
+enum DocumentStatus {
+  PENDING
+  VERIFIED
+  CLEARED
+  EXPIRED
+  REJECTED
+}
+
+enum ChangeRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
+}
+
+/// Global job grades; companies give them local job titles
+model JobGrade {
+  id          String       @id @default(cuid())
+  groupId     String       @map("group_id")
+  group       Group        @relation(fields: [groupId], references: [id])
+  code        String
+  name        String
+  /// 1 = most junior
+  level       Int
+  assignments Assignment[]
+
+  @@unique([groupId, code])
+  @@map("job_grade")
+}
+
+/// A human being, once per group however many companies employ them
+model Person {
+  id                   String             @id @default(cuid())
+  groupId              String             @map("group_id")
+  group                Group              @relation(fields: [groupId], references: [id])
+  /// Group-wide person number
+  personNumber         String             @unique @map("person_number")
+  firstName            String             @map("first_name")
+  lastName             String             @map("last_name")
+  /// Name in the local script (Chinese, Japanese, Korean, Arabic, Devanagari)
+  localName            String?            @map("local_name")
+  preferredName        String?            @map("preferred_name")
+  gender               String?
+  dateOfBirth          DateTime?          @map("date_of_birth") @db.Date
+  /// ISO country code
+  nationality          String?            @db.Char(2)
+  maritalStatus        String?            @map("marital_status")
+  dependants           Int                @default(0)
+  personalEmail        String?            @map("personal_email")
+  mobilePhone          String?            @map("mobile_phone")
+  highestQualification String?            @map("highest_qualification")
+  institution          String?
+  qualificationYear    Int?               @map("qualification_year")
+  /// Storage key of an uploaded photo; without one the portal draws an avatar
+  photoKey             String?            @map("photo_key")
+  createdAt            DateTime           @default(now()) @map("created_at")
+  updatedAt            DateTime           @updatedAt @map("updated_at")
+  employments          Employment[]
+  contacts             PersonContact[]
+  identifiers          PersonIdentifier[]
+
+  @@index([groupId, lastName])
+  @@map("person")
+}
+
+/// Next of kin, emergency contacts and beneficiaries
+model PersonContact {
+  id                 String   @id @default(cuid())
+  personId           String   @map("person_id")
+  person             Person   @relation(fields: [personId], references: [id], onDelete: Cascade)
+  name               String
+  relationship       String
+  phone              String
+  email              String?
+  isEmergencyContact Boolean  @default(true) @map("is_emergency_contact")
+  isBeneficiary      Boolean  @default(false) @map("is_beneficiary")
+  createdAt          DateTime @default(now()) @map("created_at")
+
+  @@index([personId])
+  @@map("person_contact")
+}
+
+/// National ID, passport, tax and social security numbers. The value is encrypted at rest.
+model PersonIdentifier {
+  id             String    @id @default(cuid())
+  personId       String    @map("person_id")
+  person         Person    @relation(fields: [personId], references: [id], onDelete: Cascade)
+  /// NATIONAL_ID, PASSPORT, TAX_ID, SOCIAL_SECURITY, WORK_PERMIT
+  kind           String
+  countryCode    String    @map("country_code") @db.Char(2)
+  valueEncrypted String    @map("value_encrypted")
+  /// Last four characters, for display without decrypting
+  valueLast4     String    @map("value_last4")
+  expiryDate     DateTime? @map("expiry_date") @db.Date
+  createdAt      DateTime  @default(now()) @map("created_at")
+
+  @@unique([personId, kind, countryCode])
+  @@map("person_identifier")
+}
+
+/// One period of employment with one company
+model Employment {
+  id               String             @id @default(cuid())
+  personId         String             @map("person_id")
+  person           Person             @relation(fields: [personId], references: [id])
+  legalEntityId    String             @map("legal_entity_id")
+  legalEntity      LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  /// Employee number, unique across the group
+  employeeNumber   String             @unique @map("employee_number")
+  /// The portal account of this employee, if they have one
+  userId           String?            @unique @map("user_id")
+  user             User?              @relation(fields: [userId], references: [id])
+  workEmail        String?            @unique @map("work_email")
+  employmentType   EmploymentType     @default(PERMANENT) @map("employment_type")
+  workLocation     WorkLocation       @default(ON_SITE) @map("work_location")
+  hireDate         DateTime           @map("hire_date") @db.Date
+  probationEndDate DateTime?          @map("probation_end_date") @db.Date
+  endDate          DateTime?          @map("end_date") @db.Date
+  exitReason       String?            @map("exit_reason")
+  status           EmploymentStatus   @default(ACTIVE)
+  createdAt        DateTime           @default(now()) @map("created_at")
+  updatedAt        DateTime           @updatedAt @map("updated_at")
+  assignments      Assignment[]       @relation("AssignmentOf")
+  reports          Assignment[]       @relation("ManagerOf")
+  compensation     Compensation[]
+  bankAccounts     BankAccount[]
+  documents        EmployeeDocument[]
+  changeRequests   ChangeRequest[]
+
+  @@index([legalEntityId, status])
+  @@index([personId])
+  @@map("employment")
+}
+
+/// Effective-dated job: title, grade, place in the organisation and line manager
+model Assignment {
+  id             String        @id @default(cuid())
+  employmentId   String        @map("employment_id")
+  employment     Employment    @relation("AssignmentOf", fields: [employmentId], references: [id], onDelete: Cascade)
+  /// Copied from the employment so scope filters need no join
+  legalEntityId  String        @map("legal_entity_id")
+  effectiveFrom  DateTime      @map("effective_from") @db.Date
+  /// Exclusive; null while current
+  effectiveTo    DateTime?     @map("effective_to") @db.Date
+  /// HIRE, PROMOTION, TRANSFER, CHANGE, CORRECTION
+  reason         String
+  jobTitle       String        @map("job_title")
+  gradeId        String?       @map("grade_id")
+  grade          JobGrade?     @relation(fields: [gradeId], references: [id])
+  businessUnitId String?       @map("business_unit_id")
+  businessUnit   BusinessUnit? @relation(fields: [businessUnitId], references: [id])
+  departmentId   String?       @map("department_id")
+  department     Department?   @relation(fields: [departmentId], references: [id])
+  branchId       String?       @map("branch_id")
+  branch         Branch?       @relation(fields: [branchId], references: [id])
+  costCentreId   String?       @map("cost_centre_id")
+  costCentre     CostCentre?   @relation(fields: [costCentreId], references: [id])
+  managerId      String?       @map("manager_id")
+  manager        Employment?   @relation("ManagerOf", fields: [managerId], references: [id])
+  /// Full-time equivalent, 1 = full time
+  fte            Decimal       @default(1) @db.Decimal(5, 4)
+  createdById    String?       @map("created_by_id")
+  createdAt      DateTime      @default(now()) @map("created_at")
+
+  @@index([employmentId, effectiveFrom])
+  @@index([legalEntityId, departmentId])
+  @@index([managerId])
+  @@map("assignment")
+}
+
+/// Effective-dated pay in the company's currency
+model Compensation {
+  id            String     @id @default(cuid())
+  employmentId  String     @map("employment_id")
+  employment    Employment @relation(fields: [employmentId], references: [id], onDelete: Cascade)
+  legalEntityId String     @map("legal_entity_id")
+  effectiveFrom DateTime   @map("effective_from") @db.Date
+  effectiveTo   DateTime?  @map("effective_to") @db.Date
+  currency      String     @db.Char(3)
+  /// MONTHLY for now
+  payFrequency  String     @default("MONTHLY") @map("pay_frequency")
+  baseAmount    Decimal    @map("base_amount") @db.Decimal(18, 4)
+  /// Regular taxable cash allowances per pay period
+  allowances    Decimal    @default(0) @db.Decimal(18, 4)
+  reason        String
+  createdById   String?    @map("created_by_id")
+  createdAt     DateTime   @default(now()) @map("created_at")
+
+  @@index([employmentId, effectiveFrom])
+  @@index([legalEntityId])
+  @@map("compensation")
+}
+
+/// Where pay goes. The account number is encrypted at rest.
+model BankAccount {
+  id                     String     @id @default(cuid())
+  employmentId           String     @map("employment_id")
+  employment             Employment @relation(fields: [employmentId], references: [id], onDelete: Cascade)
+  legalEntityId          String     @map("legal_entity_id")
+  bankName               String     @map("bank_name")
+  branchCode             String?    @map("branch_code")
+  accountName            String     @map("account_name")
+  accountNumberEncrypted String     @map("account_number_encrypted")
+  accountNumberLast4     String     @map("account_number_last4")
+  currency               String     @db.Char(3)
+  effectiveFrom          DateTime   @map("effective_from") @db.Date
+  /// Replaced accounts are kept with an end date
+  effectiveTo            DateTime?  @map("effective_to") @db.Date
+  createdAt              DateTime   @default(now()) @map("created_at")
+
+  @@index([employmentId])
+  @@map("bank_account")
+}
+
+/// An HR document on file. storageKey is null when only the paper copy is held.
+model EmployeeDocument {
+  id            String         @id @default(cuid())
+  employmentId  String         @map("employment_id")
+  employment    Employment     @relation(fields: [employmentId], references: [id], onDelete: Cascade)
+  legalEntityId String         @map("legal_entity_id")
+  type          String
+  fileName      String         @map("file_name")
+  storageKey    String?        @map("storage_key")
+  mimeType      String?        @map("mime_type")
+  sizeBytes     Int?           @map("size_bytes")
+  issuedDate    DateTime?      @map("issued_date") @db.Date
+  expiryDate    DateTime?      @map("expiry_date") @db.Date
+  status        DocumentStatus @default(PENDING)
+  /// Hidden from the employee themself (for example background checks)
+  hrOnly        Boolean        @default(false) @map("hr_only")
+  uploadedById  String?        @map("uploaded_by_id")
+  verifiedById  String?        @map("verified_by_id")
+  verifiedAt    DateTime?      @map("verified_at")
+  createdAt     DateTime       @default(now()) @map("created_at")
+
+  @@index([employmentId])
+  @@index([legalEntityId, status])
+  @@map("employee_document")
+}
+
+/// A self-service change that HR must approve before it applies (bank details for now)
+model ChangeRequest {
+  id               String              @id @default(cuid())
+  employmentId     String              @map("employment_id")
+  employment       Employment          @relation(fields: [employmentId], references: [id], onDelete: Cascade)
+  legalEntityId    String              @map("legal_entity_id")
+  /// BANK_ACCOUNT
+  kind             String
+  /// The requested values, encrypted because they can hold bank details
+  payloadEncrypted String              @map("payload_encrypted")
+  /// What reviewers see before opening the request
+  summary          String
+  status           ChangeRequestStatus @default(PENDING)
+  requestedById    String              @map("requested_by_id")
+  decidedById      String?             @map("decided_by_id")
+  decidedAt        DateTime?           @map("decided_at")
+  decisionNote     String?             @map("decision_note")
+  createdAt        DateTime            @default(now()) @map("created_at")
+
+  @@index([legalEntityId, status])
+  @@index([employmentId])
+  @@map("change_request")
 }

@@ -33,8 +33,8 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 
 | First-build feature | Where it lands | Status |
 |---|---|---|
-| Staff profiles: job, contact, IDs, education, next of kin, photo, HR documents | Phase 2 employee master | Next |
-| Sample staff | Generator: 500 to 1,000 per country, reproducible seed | Next |
+| Staff profiles: job, contact, IDs, education, next of kin, photo, HR documents | Phase 2 employee master | Done |
+| Sample staff | Generator: 500 to 1,000 per country, reproducible seed ([report](demo-data-report.md)) | Done |
 | Leave: requests, approvals, balances, team calendar, public holidays | Phase 3 | Planned |
 | Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4 | Planned |
 | Meal, gym and gift-voucher benefits | Phase 3-4 | Planned |
@@ -42,4 +42,13 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 | Policies and forms library (22 policies, 20 fillable forms) with read confirmations | Phase 3 | Planned |
 | Staff chat, community page with moderation, daily activity tracker | Phase 3 | Planned |
 
-Next in phase 2: the employee master (persons, employments, effective-dated job and pay records, profile details, documents and next of kin) and the synthetic staff generator with its verification report.
+## Phase 2, slice 2: employee master (this pull request)
+
+- Persons, employments, effective-dated job records (grade, business unit, department, branch, cost centre, manager) and pay records, with the database refusing overlapping open records.
+- Profile details, next of kin and beneficiaries, photos (or a drawn avatar), the HR document register with uploads, verification and HR-only documents.
+- Identity and bank numbers encrypted at rest, masked on screen, and every reveal written to the audit log.
+- Bank detail changes go to HR for approval by someone other than the requester.
+- Staff directory with search and filters, My profile, My team for managers, Hire someone, Headcount, Change requests.
+- 11,153 fictional people across the 15 countries, 500 to 1,000 per country, with the verification report in [demo-data-report.md](demo-data-report.md).
+
+Next: leave (requests, approvals, balances, team calendar, public holidays), then advances, loans and IOUs, benefits, the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.

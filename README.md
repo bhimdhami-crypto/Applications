@@ -34,7 +34,8 @@ docker compose up -d                 # Postgres, Redis, MinIO and the Mailpit te
 cp .env.example apps/api/.env
 npm install                          # also builds packages/shared
 npm run db:migrate
-npm run db:seed                      # 15 countries, 18 companies, 13 test accounts
+npm run db:seed                      # 15 countries, 18 companies, 13 test accounts, ~11,000 fictional staff
+npm run db:report                    # optional: headcount by country, company and department
 npm run dev:api                      # http://localhost:4000/api  (docs at /api/docs)
 npm run dev:web                      # http://localhost:3000
 ```
@@ -61,7 +62,9 @@ Password for all: `Demo#Mindspace2026` (change `SEED_PASSWORD` before seeding an
 | manager@mindspace.test | Line manager | Mindspace Artificial Intelligence Kenya Ltd |
 | employee@mindspace.test | Employee | Mindspace Artificial Intelligence Kenya Ltd |
 
-Sign in as `hr.kenya` and then `hr.france` to see the data boundaries: each sees only their own country's companies and users.
+Sign in as `hr.kenya` and then `hr.france` to see the data boundaries: each sees only their own country's companies, staff and users.
+
+`manager` (Amina Mwangi) and `employee` (Kevin Otieno) are also employees in Kenya, so My profile and My team have data; so are `hr.kenya`, `payroll.kenya` and `approver.kenya` in the shared service centre. The seed gives each country 500 to 1,000 fictional people from a fixed random seed: see [docs/demo-data-report.md](docs/demo-data-report.md).
 
 ## Tests
 

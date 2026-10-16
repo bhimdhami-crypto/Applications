@@ -20,11 +20,12 @@
 - **Segregation of duties:** one person cannot hold payroll operator with payroll approver or treasury, or approver with treasury, over the same company. Group admins configure but cannot approve payroll or release payments. Nobody can change their own roles.
 - **Delegation limits:** only group admins can hand out payroll, finance, treasury, auditor and admin roles. Country HR admins can grant HR officer, manager, employee and executive roles inside their own countries only.
 - **Not found, not forbidden:** records outside a user's scope answer 404, so other companies' data is not revealed by its existence.
-- **Field-level permissions** for bank, tax and identity data (`people.sensitive.read`) and employee-relations and medical records (`people.relations.read`) are in place for phase 2 and 3 screens.
+- **Field-level permissions** for bank, tax and identity data (`people.sensitive.read`) and employee-relations and medical records (`people.relations.read`).
+- **Employee records** are visible to HR for the record's company, to the employee themself, and to managers above them in the reporting line (work details only: no personal details, pay or documents). HR officers without `people.sensitive.read` do not see pay. Nobody can change their own pay, end their own employment, verify their own documents or approve their own change request.
 
 ## 3. Audit
 
-Append-only `audit_log`, enforced by a database trigger, records sign-ins, failed passwords, lockouts, refresh-token reuse, user and role changes, organisation changes and feature switches, with actor, company, IP and detail. Sensitive reads and exports join it from phase 2 (employee records) and phase 6 (reports). Auditors see the log within their own scope.
+Append-only `audit_log`, enforced by a database trigger, records sign-ins, failed passwords, lockouts, refresh-token reuse, user and role changes, organisation changes and feature switches, with actor, company, IP and detail. It also records every employee-record change, pay view, document download and reveal of a full identity or bank number. Report exports join it in phase 6. Auditors see the log within their own scope.
 
 ## 4. Platform
 
@@ -32,7 +33,9 @@ Append-only `audit_log`, enforced by a database trigger, records sign-ins, faile
 - Input validation on every endpoint with unknown fields rejected.
 - Secrets come from the environment; `JWT_SECRET` must be at least 16 characters or the API will not start. Production uses a secrets manager (phase 10).
 - TLS everywhere outside a laptop; `COOKIE_SECURE=true` behind HTTPS.
-- Planned: malware scanning of uploads (phase 3), encryption of sensitive columns (phase 2), PostgreSQL row-level security (phase 9), backup and restore drills (phase 9).
+- Identity and bank account numbers (and pending bank changes) are encrypted in the database with AES-256-GCM under `FIELD_ENCRYPTION_KEY`; only the last four characters are stored in clear for display. Production refuses to start without the key.
+- Uploads are checked by their first bytes (PDF, PNG, JPEG, WebP only, 10 MB limit) and stored under random names; files are served with `nosniff` and as downloads.
+- Planned: malware scanning of uploads and object storage (phase 3), PostgreSQL row-level security (phase 9), backup and restore drills (phase 9).
 
 ## 5. Privacy by jurisdiction
 

@@ -160,3 +160,19 @@ details.panel > div { padding: 0 .9rem .9rem; }
   .shell { display: block; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+
+/* ───── People ───── */
+.avatar { border-radius: 50%; object-fit: cover; flex: none; display: inline-block; vertical-align: middle; }
+.avatar.placeholder { display: inline-flex; align-items: center; justify-content: center; background: var(--surface-alt); color: var(--text-muted); font-weight: 600; }
+.person-cell { display: flex; align-items: center; gap: .6rem; }
+.person-cell a { font-weight: 600; }
+.person-cell small { display: block; color: var(--text-muted); font-weight: 400; }
+.profile-head { display: flex; gap: 1rem; align-items: center; flex-wrap: wrap; margin-bottom: 1rem; }
+.profile-head h1 { margin: 0; }
+.profile-head .local { color: var(--text-muted); font-size: 1.05rem; }
+dl.facts { display: grid; grid-template-columns: minmax(140px, max-content) 1fr; gap: .45rem 1rem; margin: 0; }
+dl.facts dt { color: var(--text-muted); }
+dl.facts dd { margin: 0; overflow-wrap: anywhere; }
+.filters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; margin-bottom: 1rem; }
+.filters input, .filters select { min-width: 0; }
+@media (max-width: 600px) { dl.facts { grid-template-columns: 1fr; gap: .1rem; } dl.facts dd { margin-bottom: .5rem; } }

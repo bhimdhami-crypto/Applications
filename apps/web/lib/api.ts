@@ -57,6 +57,26 @@ export async function api<T = unknown>(path: string, init: { method?: string; bo
   return res.json();
 }
 
+/** Sends a multipart form (file uploads) */
+export async function apiUpload<T = unknown>(path: string, form: FormData, method = 'POST'): Promise<T> {
+  const send = () => fetch(`/api${path}`, { method, credentials: 'same-origin', headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {}, body: form });
+  if (!accessToken) await refreshSession();
+  let res = await send();
+  if (res.status === 401 && (await refreshSession())) res = await send();
+  if (!res.ok) throw new ApiError(await messageOf(res), res.status);
+  return res.json();
+}
+
+/** Fetches a protected file (photo, document) as a Blob, since an <img> or link cannot send the token */
+export async function apiBlob(path: string): Promise<Blob> {
+  const send = () => fetch(`/api${path}`, { credentials: 'same-origin', headers: accessToken ? { Authorization: `Bearer ${accessToken}` } : {} });
+  if (!accessToken) await refreshSession();
+  let res = await send();
+  if (res.status === 401 && (await refreshSession())) res = await send();
+  if (!res.ok) throw new ApiError(await messageOf(res), res.status);
+  return res.blob();
+}
+
 export async function login(email: string, password: string) {
   const res = await fetch('/api/auth/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password }) });
   if (!res.ok) throw new ApiError(await messageOf(res), res.status);

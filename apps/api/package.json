@@ -10,7 +10,8 @@
     "test": "jest --runInBand",
     "postinstall": "prisma generate",
     "prisma:migrate": "prisma migrate deploy",
-    "prisma:seed": "ts-node prisma/seed.ts"
+    "prisma:seed": "ts-node prisma/seed.ts",
+    "prisma:report": "ts-node prisma/staff-report.ts"
   },
   "dependencies": {
     "@gpp/shared": "0.1.0",
