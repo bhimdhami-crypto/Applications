@@ -1,20 +1,24 @@
 {
-  "name": "mindspace-hr-portal",
+  "name": "global-people-payroll",
   "private": true,
-  "description": "Mindspace Artificial Intelligence Inc. HR and payroll portal",
+  "description": "Global People & Payroll Enterprise Platform (Mindspace Portal demo). Designed and developed by Bhim Dhami.",
   "workspaces": [
+    "packages/shared",
     "apps/api",
     "apps/web"
   ],
   "scripts": {
+    "build:shared": "npm run build -w packages/shared",
     "dev:api": "npm run start:dev -w apps/api",
     "dev:web": "npm run dev -w apps/web",
     "db:migrate": "npm run prisma:migrate -w apps/api",
     "db:seed": "npm run prisma:seed -w apps/api",
+    "db:report": "npm run prisma:report -w apps/api",
     "db:test:setup": "DATABASE_URL=${TEST_DATABASE_URL:-postgresql://hr:hr@localhost:5432/hrportal_test} npm run prisma:migrate -w apps/api",
-    "test": "npm test -w apps/api",
-    "typecheck": "npm run typecheck -w apps/api",
-    "build": "npm run build -w apps/api && npm run build -w apps/web"
+    "typecheck": "npm run build:shared && npm run typecheck -w packages/shared -w apps/api -w apps/web",
+    "test": "npm run build:shared && npm test -w packages/shared -w apps/api",
+    "build": "npm run build:shared && npm run build -w apps/api && npm run build -w apps/web",
+    "postinstall": "npm run build:shared"
   },
   "engines": {
     "node": ">=22"

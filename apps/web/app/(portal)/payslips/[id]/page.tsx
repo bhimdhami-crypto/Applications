@@ -1,64 +1,122 @@
 'use client';
 
+import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useState } from 'react';
-import { api, money, PayLine, Payslip, periodName } from '@/lib/api';
+import { money } from '@/components/MoneyBits';
+import { UnverifiedRules } from '@/components/PayrollBits';
+import { ErrorAlert, fmtDate, Loading, PageHead, useLoad } from '@/components/ui';
+import { api } from '@/lib/api';
+import { usePrefs } from '@/lib/prefs';
+import { useSession } from '@/lib/session';
+import type { Payslip, PayslipLine } from '@/lib/types';
 
-type FullPayslip = Payslip & {
-  run: { periodYear: number; periodMonth: number; status: string; rulesVersion: string; company: { name: string } };
-  employee: { employeeNo: string; firstName: string; lastName: string; jobTitle: string; department: string };
-};
+const SECTIONS: Array<[PayslipLine['kind'], string]> = [
+  ['EARNING', 'Earnings'],
+  ['DEDUCTION', 'Deductions'],
+  ['BENEFIT', 'Benefits in kind (taxed, not paid in cash)'],
+  ['EMPLOYER', 'Paid by the company on top of your pay'],
+];
 
-function Section({ title, lines, currency }: { title: string; lines: PayLine[]; currency: string }) {
-  if (lines.length === 0) return null;
-  return (
-    <>
-      <tr><th colSpan={2}>{title}</th></tr>
-      {lines.map((l) => (
-        <tr key={l.code}>
-          <td>{l.label}</td>
-          <td className="num">{money(l.amount, currency)}</td>
-        </tr>
-      ))}
-    </>
-  );
-}
-
+/** A printable payslip, watermarked while the country's rules are unverified */
 export default function PayslipPage() {
   const { id } = useParams<{ id: string }>();
-  const [slip, setSlip] = useState<FullPayslip | null>(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api<FullPayslip>(`/payslips/${id}`).then(setSlip).catch((e) => setError(e.message));
-  }, [id]);
-
-  if (!slip) return error ? <div className="notice error">{error}</div> : <div className="loading">Loading…</div>;
-  const cur = slip.currency;
-  const of = (kind: PayLine['kind']) => slip.lines.filter((l) => l.kind === kind);
-
+  const { t, lang } = usePrefs();
+  const { can } = useSession();
+  const data = useLoad(() => api<Payslip>(`/payslips/${id}`), [id]);
+  const s = data.data;
+  const crumbs = <Link href="/payslips">{t('nav.payslips')}</Link>;
+  if (!s) {
+    return (
+      <>
+        <PageHead title={t('nav.payslips')} crumbs={crumbs} />
+        {data.error ? <ErrorAlert error={data.error} /> : <Loading />}
+      </>
+    );
+  }
+  const m = (v: string | number) => money(v, s.currency, lang);
   return (
-    <div className="card" style={{ maxWidth: 640 }}>
-      <img src="/logo.svg" alt="Mindspace" style={{ width: 220 }} />
-      <h1 style={{ marginTop: '1rem' }}>Payslip, {periodName(slip.run.periodYear, slip.run.periodMonth)}</h1>
-      <p className="muted">
-        {slip.run.company.name}
-        <br />
-        {slip.employee.firstName} {slip.employee.lastName} ({slip.employee.employeeNo}), {slip.employee.jobTitle}, {slip.employee.department}
-      </p>
-      {slip.run.status !== 'FINALIZED' && <div className="notice warn">Draft: this run is still {slip.run.status.toLowerCase()}.</div>}
-      <table>
-        <tbody>
-          <Section title="Earnings" lines={of('EARNING')} currency={cur} />
-          <tr className="total"><td>Gross pay</td><td className="num">{money(slip.gross, cur)}</td></tr>
-          <Section title="Deductions" lines={of('DEDUCTION')} currency={cur} />
-          <tr className="total"><td>Total deductions</td><td className="num">{money(slip.deductions, cur)}</td></tr>
-          <tr className="total"><td>Net pay</td><td className="num">{money(slip.net, cur)}</td></tr>
-          <Section title="Paid by the employer on your behalf" lines={of('EMPLOYER')} currency={cur} />
-        </tbody>
-      </table>
-      <p className="muted" style={{ fontSize: '0.8rem' }}>Calculated with rules {slip.run.rulesVersion}.</p>
-      <button className="secondary" onClick={() => window.print()}>Print or save as PDF</button>
-    </div>
+    <>
+      <PageHead
+        title={`Payslip: ${s.period}`}
+        crumbs={can('payroll.read') ? <Link href={`/payroll/${s.runId}`}>{t('nav.payrollRuns')}</Link> : crumbs}
+        actions={
+          <button type="button" className="btn secondary small" onClick={() => window.print()}>
+            Print
+          </button>
+        }
+      />
+      <UnverifiedRules version={s.rulesVersion} verified={s.rulesVerified} />
+      {s.status !== 'FINALIZED' && <div className="alert info">This payroll is not final yet, so the employee cannot see this payslip.</div>}
+      <article className={`card payslip${s.rulesVerified ? '' : ' unverified'}`}>
+        <header className="payslip-head">
+          <div>
+            <strong>{s.company.name}</strong>
+            {s.company.address && <div className="small">{s.company.address}</div>}
+            {s.company.taxNumber && <div className="small">Tax number {s.company.taxNumber}</div>}
+          </div>
+          <div className="payslip-who">
+            <strong>{s.employee.name}</strong>
+            <div className="small">
+              {s.employee.employeeNumber}
+              {s.employee.jobTitle && ` · ${s.employee.jobTitle}`}
+            </div>
+            {s.employee.department && <div className="small">{s.employee.department}</div>}
+            <div className="small">
+              Pay period {s.period}
+              {s.finalizedAt && ` · paid ${fmtDate(s.finalizedAt, lang)}`}
+            </div>
+          </div>
+        </header>
+        {SECTIONS.map(([kind, title]) => {
+          const lines = s.lines.filter((l) => l.kind === kind);
+          if (!lines.length) return null;
+          return (
+            <section key={kind}>
+              <h3>{title}</h3>
+              <table>
+                <tbody>
+                  {lines.map((l, i) => (
+                    <tr key={`${l.code}-${i}`}>
+                      <td>
+                        {l.label}
+                        {l.interest ? <span className="muted small"> (includes {m(l.interest)} interest)</span> : null}
+                      </td>
+                      <td className="num">{m(l.amount)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </section>
+          );
+        })}
+        <table className="payslip-totals">
+          <tbody>
+            <tr>
+              <td>Gross pay</td>
+              <td className="num">{m(s.gross)}</td>
+            </tr>
+            <tr>
+              <td>Total deductions</td>
+              <td className="num">{m(s.deductions)}</td>
+            </tr>
+            <tr>
+              <td>
+                <strong>Net pay</strong>
+              </td>
+              <td className="num">
+                <strong>{m(s.net)}</strong>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+        <footer className="muted small">
+          {s.annualLeaveLeft !== null && <p>Annual leave left this year: {s.annualLeaveLeft} days.</p>}
+          <p>
+            Calculated with {s.rulesVersion}
+            {s.rulesVerified ? '.' : ', draft rules not verified by a local payroll expert. Not a certified calculation.'}
+          </p>
+        </footer>
+      </article>
+    </>
   );
 }

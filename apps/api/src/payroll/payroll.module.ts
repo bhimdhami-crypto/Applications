@@ -1,12 +1,13 @@
 import { Module } from '@nestjs/common';
-import { CompaniesController } from '../companies/companies.controller';
-import { PayrollController } from './payroll.controller';
-import { PayrollScheduler } from './payroll.scheduler';
+import { ApprovalsModule } from '../approvals/approvals.module';
+import { LeaveModule } from '../leave/leave.module';
+import { PayrollController, PayslipsController } from './payroll.controller';
 import { PayrollService } from './payroll.service';
 
+/** Month-end payroll and payslips */
 @Module({
-  controllers: [PayrollController, CompaniesController],
-  providers: [PayrollService, PayrollScheduler],
-  exports: [PayrollService],
+  imports: [LeaveModule, ApprovalsModule],
+  controllers: [PayrollController, PayslipsController],
+  providers: [PayrollService],
 })
 export class PayrollModule {}

@@ -1,0 +1,422 @@
+[
+ {
+  "kind": "FORM",
+  "code": "HR-F01",
+  "title": "Leave Application",
+  "category": "Leave",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under My leave.",
+  "version": "0.1",
+  "file": "HR-F01_Leave_Application.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F02",
+  "title": "Salary Advance Request",
+  "category": "Money",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under Advances and loans.",
+  "version": "0.1",
+  "file": "HR-F02_Salary_Advance_Request.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F03",
+  "title": "Staff Loan Application",
+  "category": "Money",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under Advances and loans.",
+  "version": "0.1",
+  "file": "HR-F03_Staff_Loan_Application.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F04",
+  "title": "Staff IOU Request and Settlement",
+  "category": "Money",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under Advances and loans.",
+  "version": "0.1",
+  "file": "HR-F04_Staff_IOU_Request_and_Settlement.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F05",
+  "title": "Gift Voucher Nomination",
+  "category": "Benefits",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under Benefits.",
+  "version": "0.1",
+  "file": "HR-F05_Gift_Voucher_Nomination.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F06",
+  "title": "Meal Voucher Enrolment",
+  "category": "Benefits",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under Benefits.",
+  "version": "0.1",
+  "file": "HR-F06_Meal_Voucher_Enrolment.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F07",
+  "title": "Gym Membership Enrolment",
+  "category": "Benefits",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under Benefits.",
+  "version": "0.1",
+  "file": "HR-F07_Gym_Membership_Enrolment.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F08",
+  "title": "Remote Work and Work from Abroad Request",
+  "category": "Work arrangements",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F08_Remote_Work_and_Work_from_Abroad_Request.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F09",
+  "title": "Business Travel Request",
+  "category": "Travel and expenses",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F09_Business_Travel_Request.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F10",
+  "title": "Expense Claim",
+  "category": "Travel and expenses",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F10_Expense_Claim.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F11",
+  "title": "Training and Education Request",
+  "category": "Learning",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F11_Training_and_Education_Request.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F12",
+  "title": "Company Vehicle Request",
+  "category": "Travel and expenses",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F12_Company_Vehicle_Request.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F13",
+  "title": "Overtime Claim",
+  "category": "Pay",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F13_Overtime_Claim.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F14",
+  "title": "Change of Personal or Bank Details",
+  "category": "Personal details",
+  "owner": "Human Resources",
+  "summary": "You can also do this online in the portal under My profile.",
+  "version": "0.1",
+  "file": "HR-F14_Change_of_Personal_or_Bank_Details.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F15",
+  "title": "Resignation and Exit Clearance",
+  "category": "Leaving",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F15_Resignation_and_Exit_Clearance.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F16",
+  "title": "Grievance Form",
+  "category": "Concerns",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F16_Grievance_Form.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F17",
+  "title": "Speak Up Whistleblowing Report",
+  "category": "Concerns",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F17_Speak_Up_Whistleblowing_Report.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F18",
+  "title": "Data Subject Access Request",
+  "category": "Personal details",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F18_Data_Subject_Access_Request.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F19",
+  "title": "New Employee Information",
+  "category": "Joining",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F19_New_Employee_Information.pdf"
+ },
+ {
+  "kind": "FORM",
+  "code": "HR-F20",
+  "title": "ESOP Exercise Request",
+  "category": "Pay",
+  "owner": "Human Resources",
+  "summary": null,
+  "version": "0.1",
+  "file": "HR-F20_ESOP_Exercise_Request.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-01",
+  "title": "Code of Conduct and Business Ethics",
+  "category": "Conduct and ethics",
+  "owner": "Chief Compliance Officer",
+  "summary": "Sets the standard of honest, lawful and respectful behaviour expected of everyone who works for or with Mindspace Artificial Intelligence Inc. and its subsidiaries.",
+  "version": "0.1",
+  "file": "POL-01_Code_of_Conduct_and_Business_Ethics.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-02",
+  "title": "Equal Opportunity and Anti-Discrimination",
+  "category": "Conduct and ethics",
+  "owner": "Chief People Officer",
+  "summary": "Guarantees fair and equal treatment in hiring, pay, promotion, training, discipline and exit.",
+  "version": "0.1",
+  "file": "POL-02_Equal_Opportunity_and_Anti-Discrimination.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-03",
+  "title": "Religious Non-Discrimination and Freedom of Belief",
+  "category": "Conduct and ethics",
+  "owner": "Chief People Officer",
+  "summary": "Protects every employee's right to hold, practise or not hold a religion or belief, free from discrimination, pressure or harassment.",
+  "version": "0.1",
+  "file": "POL-03_Religious_Non-Discrimination_and_Freedom_of_Belief.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-04",
+  "title": "Anti-Harassment and Anti-Bullying",
+  "category": "Conduct and ethics",
+  "owner": "Chief People Officer",
+  "summary": "Ensures a workplace, online and offline, where no one is harassed, bullied or intimidated.",
+  "version": "0.1",
+  "file": "POL-04_Anti-Harassment_and_Anti-Bullying.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-05",
+  "title": "Staff Protection, Health, Safety and Safeguarding",
+  "category": "Staff protection",
+  "owner": "Head of Health, Safety and Security",
+  "summary": "Protects the physical and mental health, safety and security of all staff, visitors and people affected by our work, including in robotics labs.",
+  "version": "0.1",
+  "file": "POL-05_Staff_Protection_Health_Safety_and_Safeguarding.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-06",
+  "title": "Whistleblowing (Speak Up)",
+  "category": "Staff protection",
+  "owner": "Chief Compliance Officer",
+  "summary": "Gives everyone a safe, confidential and, if they wish, anonymous way to report wrongdoing, and protects them from retaliation.",
+  "version": "0.1",
+  "file": "POL-06_Whistleblowing_Speak_Up.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-07",
+  "title": "Non-Retaliation",
+  "category": "Staff protection",
+  "owner": "Chief Compliance Officer",
+  "summary": "Protects anyone who raises a concern, files a complaint or helps an investigation in good faith.",
+  "version": "0.1",
+  "file": "POL-07_Non-Retaliation.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-08",
+  "title": "Data Privacy and Protection",
+  "category": "Data and security",
+  "owner": "Data Protection Officer",
+  "summary": "Explains how the company collects, uses, stores, shares and deletes personal data of employees, candidates and others, lawfully and transparently.",
+  "version": "0.1",
+  "file": "POL-08_Data_Privacy_and_Protection.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-09",
+  "title": "Information Security and Acceptable Use",
+  "category": "Data and security",
+  "owner": "Chief Information Security Officer",
+  "summary": "Protects company systems, devices and information, and sets rules for using email, internet, social media and AI tools.",
+  "version": "0.1",
+  "file": "POL-09_Information_Security_and_Acceptable_Use.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-10",
+  "title": "Education, Training and Development",
+  "category": "Learning and travel",
+  "owner": "Head of Learning and Development",
+  "summary": "Helps every employee grow their skills and career through training, education support and study leave.",
+  "version": "0.1",
+  "file": "POL-10_Education_Training_and_Development.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-11",
+  "title": "Business Travel and Expenses",
+  "category": "Learning and travel",
+  "owner": "Chief Financial Officer",
+  "summary": "Sets fair, safe and cost-effective rules for business travel and reimbursement of expenses.",
+  "version": "0.1",
+  "file": "POL-11_Business_Travel_and_Expenses.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-12",
+  "title": "Company Vehicle",
+  "category": "Learning and travel",
+  "owner": "Head of Administration",
+  "summary": "Sets eligibility, use, safety and cost rules for company cars, pool vehicles and car allowances.",
+  "version": "0.1",
+  "file": "POL-12_Company_Vehicle.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-13",
+  "title": "Employee Stock Ownership Plan (ESOP)",
+  "category": "Pay and benefits",
+  "owner": "Chief People Officer",
+  "summary": "Lets employees share in the success of Mindspace Artificial Intelligence Inc. through options or restricted stock units over its shares.",
+  "version": "0.1",
+  "file": "POL-13_Employee_Stock_Ownership_Plan_ESOP.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-14",
+  "title": "Leave and Holidays",
+  "category": "Time off and work",
+  "owner": "Chief People Officer",
+  "summary": "Sets the types of leave available, how they accrue and how to apply, always meeting or beating each country's legal minimum.",
+  "version": "0.1",
+  "file": "POL-14_Leave_and_Holidays.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-15",
+  "title": "Parental and Family",
+  "category": "Time off and work",
+  "owner": "Chief People Officer",
+  "summary": "Supports employees as they start or grow their families.",
+  "version": "0.1",
+  "file": "POL-15_Parental_and_Family.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-16",
+  "title": "Flexible and Hybrid Work",
+  "category": "Time off and work",
+  "owner": "Chief People Officer",
+  "summary": "Lets office-based staff combine office and home working where the role allows, while keeping teams connected.",
+  "version": "0.1",
+  "file": "POL-16_Flexible_and_Hybrid_Work.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-17",
+  "title": "Compensation and Benefits",
+  "category": "Pay and benefits",
+  "owner": "Head of Reward",
+  "summary": "Explains how pay and benefits are set, so they are fair, competitive and transparent.",
+  "version": "0.1",
+  "file": "POL-17_Compensation_and_Benefits.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-18",
+  "title": "Disciplinary and Grievance",
+  "category": "Conduct and ethics",
+  "owner": "Chief People Officer",
+  "summary": "Ensures problems at work are handled fairly, consistently and lawfully.",
+  "version": "0.1",
+  "file": "POL-18_Disciplinary_and_Grievance.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-19",
+  "title": "Remote Work Policy",
+  "category": "Time off and work",
+  "owner": "Chief People Officer",
+  "summary": "Sets the rules, support and protections for staff who work fully remotely, mostly programmers, testers and developers (about 35% of the workforce).",
+  "version": "0.1",
+  "file": "POL-19_Remote_Work_Policy.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-20",
+  "title": "Community Page, Chat and Copyright Guidelines",
+  "category": "Communication",
+  "owner": "Head of Internal Communications",
+  "summary": "Keeps the portal's chat and community page professional, safe, lawful and respectful of copyright.",
+  "version": "0.1",
+  "file": "POL-20_Community_Page_Chat_and_Copyright_Guidelines.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-21",
+  "title": "Daily Activity Tracking and Employee Monitoring Notice",
+  "category": "Data and security",
+  "owner": "Data Protection Officer",
+  "summary": "Explains openly what the daily activity tracker and company systems record about employees, why, and how the data is protected.",
+  "version": "0.1",
+  "file": "POL-21_Daily_Activity_Tracking_and_Employee_Monitoring_Notice.pdf"
+ },
+ {
+  "kind": "POLICY",
+  "code": "POL-22",
+  "title": "Staff Advances, Loans and IOUs",
+  "category": "Pay and benefits",
+  "owner": "Chief Financial Officer",
+  "summary": "Sets fair and affordable rules for salary advances, staff loans and short-term IOUs.",
+  "version": "0.1",
+  "file": "POL-22_Staff_Advances_Loans_and_IOUs.pdf"
+ }
+]

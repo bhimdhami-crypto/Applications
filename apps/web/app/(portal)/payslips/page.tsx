@@ -1,44 +1,56 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
-import { api, money, Payslip, periodName } from '@/lib/api';
+import { money } from '@/components/MoneyBits';
+import { Empty, ErrorAlert, Loading, PageHead, useLoad } from '@/components/ui';
+import { api } from '@/lib/api';
+import { usePrefs } from '@/lib/prefs';
+import type { MyPayslip } from '@/lib/types';
 
-export default function MyPayslipsPage() {
-  const [slips, setSlips] = useState<Payslip[] | null>(null);
-  const [error, setError] = useState('');
-
-  useEffect(() => {
-    api<Payslip[]>('/payslips/me').then(setSlips).catch((e) => setError(e.message));
-  }, []);
-
+/** The signed-in person's payslips from finalised payrolls */
+export default function PayslipsPage() {
+  const { t, lang } = usePrefs();
+  const data = useLoad(() => api<MyPayslip[]>('/payslips/me'), []);
+  const slips = data.data;
   return (
     <>
-      <h1>My payslips</h1>
-      {error && <div className="notice error">{error}</div>}
-      <div className="card table-wrap">
-        <table>
-          <thead>
-            <tr>
-              <th>Period</th>
-              <th className="num">Gross</th>
-              <th className="num">Deductions</th>
-              <th className="num">Net pay</th>
-            </tr>
-          </thead>
-          <tbody>
-            {slips?.map((p) => (
-              <tr key={p.id}>
-                <td><Link href={`/payslips/${p.id}`}>{p.run ? periodName(p.run.periodYear, p.run.periodMonth) : p.id}</Link></td>
-                <td className="num">{money(p.gross, p.currency)}</td>
-                <td className="num">{money(p.deductions, p.currency)}</td>
-                <td className="num">{money(p.net, p.currency)}</td>
+      <PageHead title={t('nav.payslips')} sub="Your payslip appears here once Payroll has finalised the month. We email you when it is ready, without the amounts." />
+      <ErrorAlert error={data.error} />
+      {!slips ? (
+        !data.error && <Loading />
+      ) : slips.length === 0 ? (
+        <Empty>No payslips yet.</Empty>
+      ) : (
+        <div className="table-wrap card">
+          <table>
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th>Company</th>
+                <th className="num">Gross</th>
+                <th className="num">Deductions</th>
+                <th className="num">Net pay</th>
               </tr>
-            ))}
-            {slips?.length === 0 && <tr><td colSpan={4} className="muted">Your payslips appear here once payroll is finalized.</td></tr>}
-          </tbody>
-        </table>
-      </div>
+            </thead>
+            <tbody>
+              {slips.map((s) => (
+                <tr key={s.id}>
+                  <td>
+                    <Link href={`/payslips/${s.id}`}>{s.period}</Link>
+                    {!s.rulesVerified && <span className="badge warn">Unverified rules</span>}
+                  </td>
+                  <td>{s.company.name}</td>
+                  <td className="num">{money(s.gross, s.currency, lang)}</td>
+                  <td className="num">{money(s.deductions, s.currency, lang)}</td>
+                  <td className="num">
+                    <strong>{money(s.net, s.currency, lang)}</strong>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </>
   );
 }

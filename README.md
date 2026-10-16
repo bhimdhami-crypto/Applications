@@ -1,82 +1,79 @@
-# Mindspace HR Portal
+# Global People & Payroll Enterprise Platform
 
-HR and payroll portal for **Mindspace Artificial Intelligence Inc.** and its subsidiaries in Kenya, Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand.
+**Mindspace Portal** demo: HR and payroll for Mindspace Artificial Intelligence Inc. and its legal employers across 15 countries: Kenya, Uganda, Tanzania, Egypt, France, India, China, Australia, the Netherlands, Japan, South Korea, South Africa, Nigeria, Mexico and New Zealand. Web portal now; Android and iOS apps in phase 7.
 
-This is milestone 1: secure sign-in, employee records, and the month-end payroll run with payslips. Kenya is the first country with payroll rules; the other countries come next.
+**Designed and developed by Bhim Dhami. © 2026 Bhim Dhami. All rights reserved.**
+
+This rebuild replaces the first Mindspace HR Portal (PR #2) on a new multi-country foundation. Every feature of the first build (staff profiles, leave, advances and loans, benefits, payroll, the policies and forms library, chat, the community page and the activity tracker) is being carried over before this is merged; see [docs/06-implementation-plan.md](docs/06-implementation-plan.md).
+
+## What works today (phase 1 and phase 2, slice 1)
+
+- Sign-in with password plus an emailed one-time code; rotating refresh tokens; device list and remote sign-out; lockout after five wrong passwords.
+- Roles scoped to the whole group, a country or a single company, with segregation of duties (payroll maker, checker and treasury are kept apart) and limits on who can grant what.
+- The demo group: 15 countries, 14 currencies, 18 legal entities, each with business units, branches, departments and cost centres. Admins add countries, currencies, companies and structure from the portal.
+- Modules switched on or off per company.
+- Append-only audit log.
+- Light theme in orange by default, with a dark theme and six colour presets to choose from; English, Kiswahili, French and Arabic (right to left) for the portal shell.
+- OpenAPI docs at `/api/docs`.
+
+See [docs/](docs/README.md) for requirements, architecture, data model, navigation map, plan, security model and known limitations.
 
 | Part | Stack |
 |---|---|
 | `apps/api` | NestJS 11, Prisma 6, PostgreSQL 16 |
 | `apps/web` | Next.js 15, React 19 |
-| Email in development | Mailpit (catches every email locally) |
-| CAPTCHA | Cloudflare Turnstile (free) |
+| `packages/shared` | Countries, currencies, languages, roles and permissions, theme tokens |
+| Local services | PostgreSQL, Redis, MinIO, Mailpit (Docker Compose) |
 
 ## Quick start
 
 You need Node 22 and Docker.
 
 ```bash
-docker compose up -d                 # Postgres on 5432, Mailpit on 8025/1025
+docker compose up -d                 # Postgres, Redis, MinIO and the Mailpit test inbox
 cp .env.example apps/api/.env
-cp apps/web/.env.example apps/web/.env.local
-npm install
+npm install                          # also builds packages/shared
 npm run db:migrate
-npm run db:seed                      # companies and the six test accounts
-npm run dev:api                      # http://localhost:4000/api
+npm run db:seed                      # 15 countries, 18 companies, 13 test accounts, ~11,000 fictional staff
+npm run db:report                    # optional: headcount by country, company and department
+npm run dev:api                      # http://localhost:4000/api  (docs at /api/docs)
 npm run dev:web                      # http://localhost:3000
 ```
 
-Open **http://localhost:8025** to see the test inboxes. Every email the portal sends (sign-in codes, welcome emails, payslip notices) lands there, so the test accounts need no real mailbox.
+Sign-in codes arrive in the test inbox at **http://localhost:8025**. For a presentation, set `DEMO_SHOW_CODES=true` in `apps/api/.env` and the code is shown on the sign-in screen instead (never in production mode).
 
 ## Test accounts
 
-All emails use the reserved `.test` domain, so nothing can ever reach a real person.
+Password for all: `Demo#Mindspace2026` (change `SEED_PASSWORD` before seeding anything but a laptop). Every address uses the reserved `.test` domain.
 
-| Email | Password | Role | What they can do |
-|---|---|---|---|
-| admin@mindspace-ai.test | `Admin#Mindspace2026` | Administrator | Everything: add and delete employees, give any role, approve and finalize payroll |
-| hr@mindspace-ai.test | `Test#Mindspace2026` | HR | Add and edit employees (employee or manager role only) |
-| payroll@mindspace-ai.test | `Test#Mindspace2026` | Payroll | Create and recalculate payroll drafts |
-| manager@mindspace-ai.test | `Test#Mindspace2026` | Manager | See their own team (no pay figures) |
-| developer@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips (fully remote) |
-| tester@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips |
+| Email | Role | Scope |
+|---|---|---|
+| admin@mindspace.test | Group administrator | Whole group |
+| hr.global@mindspace.test | HR administrator | Whole group |
+| hr.kenya@mindspace.test | HR administrator | Kenya |
+| hr.france@mindspace.test | HR officer | France |
+| hr.india@mindspace.test | HR officer | Mindspace Artificial Intelligence India Pvt Ltd only |
+| payroll.kenya@mindspace.test | Payroll operator (maker) | Kenya |
+| approver.kenya@mindspace.test | Payroll approver (checker) | Kenya |
+| finance@mindspace.test | Finance | Whole group |
+| treasury@mindspace.test | Treasury | Whole group |
+| auditor@mindspace.test | Auditor | Whole group |
+| ceo@mindspace.test | Executive | Whole group |
+| manager@mindspace.test | Line manager | Mindspace Artificial Intelligence Kenya Ltd |
+| employee@mindspace.test | Employee | Mindspace Artificial Intelligence Kenya Ltd |
 
-Change the passwords with `SEED_ADMIN_PASSWORD` and `SEED_USER_PASSWORD` before seeding anything other than a laptop. The seed refuses to run with `NODE_ENV=production` unless both are set.
+Sign in as `hr.kenya` and then `hr.france` to see the data boundaries: each sees only their own country's companies, staff and users.
 
-## How sign-in works
-
-1. Email, password and a Turnstile CAPTCHA.
-2. A 6-digit code is emailed. It expires in 5 minutes and allows 5 tries; at most 5 codes per 15 minutes.
-3. The browser keeps the session token for the tab only (8 hours).
-
-The CAPTCHA keys in `.env.example` are Cloudflare's published test keys, which always pass. Put real keys in production.
-
-## Month-end payroll
-
-1. **Draft.** Payroll staff create a run for a company and month, or it is created automatically on the 20th (`PAYROLL_AUTODRAFT=true`), and the admin gets an email.
-2. **Approve.** The admin checks totals and approves.
-3. **Finalize.** The admin finalizes. Payslips are published and every employee gets an email.
-
-Deleting an employee is a soft delete: their login stops at once, and their record and payslips are kept for the legal retention period.
-
-### Kenya rules (`KE-2026.1-draft`)
-
-PAYE bands with KES 2,400 personal relief; NSSF 6% up to KES 72,000 pensionable pay (employer matches); SHIF 2.75% (minimum KES 300); Affordable Housing Levy 1.5% each side; NITA KES 50 employer levy. NSSF, SHIF and the housing levy are deducted before PAYE.
-
-**These rules are marked unverified.** A Kenyan payroll adviser must sign them off before real pay. Until then the portal shows a warning on every run.
+`manager` (Amina Mwangi) and `employee` (Kevin Otieno) are also employees in Kenya, so My profile and My team have data; so are `hr.kenya`, `payroll.kenya` and `approver.kenya` in the shared service centre. The seed gives each country 500 to 1,000 fictional people from a fixed random seed: see [docs/demo-data-report.md](docs/demo-data-report.md).
 
 ## Tests
 
 ```bash
-npm run db:test:setup   # migrates the hrportal_test database (created by docker compose)
-npm test                # Kenya rule unit tests + full API flow
+npm run db:test:setup   # once: migrate the hrportal_test database
+npm test                # shared unit tests and API integration tests on a real Postgres
+npm run typecheck
 ```
 
-The API test signs in through the email code, checks every role boundary, adds and deletes an employee, and runs payroll from draft to finalized. It wipes its database, so it only runs against a database whose name ends in `_test`.
+## Licence
 
-## Screenshots
-
-| | |
-|---|---|
-| ![Sign in](docs/screenshots/01-sign-in.png) | ![Payroll draft](docs/screenshots/02-payroll-draft.png) |
-| ![Admin home](docs/screenshots/03-admin-home.png) | ![Payslip](docs/screenshots/05-payslip.png) |
+Proprietary. © 2026 Bhim Dhami. All rights reserved. No copying, distribution or reuse without written permission. All people, companies and figures in the demo data are fictional.
