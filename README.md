@@ -1,19 +1,19 @@
 # Global People & Payroll Enterprise Platform
 
-**Mindspace Portal** demo: HR and payroll for a multinational group with many legal employers across Kenya, Uganda, Tanzania, Egypt, France, India, China, Australia, the Netherlands, Japan and South Korea. Web portal now; Android and iOS apps in phase 7.
+**Mindspace Portal** demo: HR and payroll for Mindspace Artificial Intelligence Inc. and its legal employers across 15 countries: Kenya, Uganda, Tanzania, Egypt, France, India, China, Australia, the Netherlands, Japan, South Korea, South Africa, Nigeria, Mexico and New Zealand. Web portal now; Android and iOS apps in phase 7.
 
 **Designed and developed by Bhim Dhami. © 2026 Bhim Dhami. All rights reserved.**
 
-This is a clean rebuild. The earlier Mindspace HR Portal (PR #2) is kept as a reference and is not part of this code.
+This rebuild replaces the first Mindspace HR Portal (PR #2) on a new multi-country foundation. Every feature of the first build (staff profiles, leave, advances and loans, benefits, payroll, the policies and forms library, chat, the community page and the activity tracker) is being carried over before this is merged; see [docs/06-implementation-plan.md](docs/06-implementation-plan.md).
 
 ## What works today (phase 1 and phase 2, slice 1)
 
 - Sign-in with password plus an emailed one-time code; rotating refresh tokens; device list and remote sign-out; lockout after five wrong passwords.
 - Roles scoped to the whole group, a country or a single company, with segregation of duties (payroll maker, checker and treasury are kept apart) and limits on who can grant what.
-- The demo group: 11 countries, 10 currencies, 14 legal entities, each with business units, branches, departments and cost centres. Admins add countries, currencies, companies and structure from the portal.
+- The demo group: 15 countries, 14 currencies, 18 legal entities, each with business units, branches, departments and cost centres. Admins add countries, currencies, companies and structure from the portal.
 - Modules switched on or off per company.
 - Append-only audit log.
-- Light and dark themes in KTM orange; English, Kiswahili, French and Arabic (right to left) for the portal shell.
+- Light theme in KTM orange by default, with a dark theme and six colour presets to choose from; English, Kiswahili, French and Arabic (right to left) for the portal shell.
 - OpenAPI docs at `/api/docs`.
 
 See [docs/](docs/README.md) for requirements, architecture, data model, navigation map, plan, security model and known limitations.
@@ -34,7 +34,7 @@ docker compose up -d                 # Postgres, Redis, MinIO and the Mailpit te
 cp .env.example apps/api/.env
 npm install                          # also builds packages/shared
 npm run db:migrate
-npm run db:seed                      # 11 countries, 14 companies, 13 test accounts
+npm run db:seed                      # 15 countries, 18 companies, 13 test accounts
 npm run dev:api                      # http://localhost:4000/api  (docs at /api/docs)
 npm run dev:web                      # http://localhost:3000
 ```
@@ -51,15 +51,15 @@ Password for all: `Demo#Mindspace2026` (change `SEED_PASSWORD` before seeding an
 | hr.global@mindspace.test | HR administrator | Whole group |
 | hr.kenya@mindspace.test | HR administrator | Kenya |
 | hr.france@mindspace.test | HR officer | France |
-| hr.india@mindspace.test | HR officer | Mindspace AI India Pvt Ltd only |
+| hr.india@mindspace.test | HR officer | Mindspace Artificial Intelligence India Pvt Ltd only |
 | payroll.kenya@mindspace.test | Payroll operator (maker) | Kenya |
 | approver.kenya@mindspace.test | Payroll approver (checker) | Kenya |
 | finance@mindspace.test | Finance | Whole group |
 | treasury@mindspace.test | Treasury | Whole group |
 | auditor@mindspace.test | Auditor | Whole group |
 | ceo@mindspace.test | Executive | Whole group |
-| manager@mindspace.test | Line manager | Mindspace AI Kenya Ltd |
-| employee@mindspace.test | Employee | Mindspace AI Kenya Ltd |
+| manager@mindspace.test | Line manager | Mindspace Artificial Intelligence Kenya Ltd |
+| employee@mindspace.test | Employee | Mindspace Artificial Intelligence Kenya Ltd |
 
 Sign in as `hr.kenya` and then `hr.france` to see the data boundaries: each sees only their own country's companies and users.
 

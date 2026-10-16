@@ -12,7 +12,7 @@ It replaces the earlier Mindspace HR Portal build (PR #2), which was designed fo
 
 ## 2. Scope of the initial release
 
-### Countries and currencies
+### Countries and currencies (15)
 
 | # | Country | ISO | Currency | Decimals | Interface languages |
 |---|---|---|---|---|---|
@@ -27,6 +27,12 @@ It replaces the earlier Mindspace HR Portal build (PR #2), which was designed fo
 | 9 | Netherlands | NL | EUR | 2 | Dutch, English |
 | 10 | Japan | JP | JPY | 0 | Japanese, English |
 | 11 | South Korea | KR | KRW | 0 | Korean, English |
+| 12 | South Africa | ZA | ZAR | 2 | English, Afrikaans, Zulu |
+| 13 | Nigeria | NG | NGN | 2 | English, Yoruba, Hausa, Igbo |
+| 14 | Mexico | MX | MXN | 2 | Spanish, English |
+| 15 | New Zealand | NZ | NZD | 2 | English, Māori |
+
+Countries 12 to 15 come from the first Mindspace build and stay at Bhim's request. The group is **Mindspace Artificial Intelligence Inc.**, reporting in US dollars, and each company is named "Mindspace Artificial Intelligence <country> <local legal form>".
 
 Administrators add countries, currencies, companies, branches and languages through the admin console without code changes.
 
@@ -73,13 +79,13 @@ The full list, with IDs used in the traceability matrix, is in [03-requirements-
 
 ## 4. Demonstration data
 
-Synthetic data only. Each of the 11 countries gets an independently drawn employee count between 4,000 and 5,000 from a fixed random seed, so the group totals 44,000 to 55,000 people, with at least 12 months of payroll history and the related leave, attendance, recruitment, performance, expense and workflow records. Contact details use reserved test domains, bank details are test-only, and identifiers are marked as specimens. A verification report lists the actual counts by country, company and department.
+Synthetic data only. Each country gets an independently drawn employee count between 500 and 1,000 from a fixed random seed (changed from 4,000 to 5,000 at Bhim's request on 16 October 2026), so the 15 countries total 7,500 to 15,000 people, with at least 12 months of payroll history and the related leave, attendance, recruitment, performance, expense and workflow records. Contact details use reserved test domains, bank details are test-only, and identifiers are marked as specimens. A verification report lists the actual counts by country, company and department.
 
 ## 5. Non-functional requirements
 
 | Area | Target |
 |---|---|
-| Scale | 55,000 employees, 11 countries, concurrent payroll teams per country |
+| Scale | Demo: up to 15,000 employees in 15 countries. Design target: 55,000 employees, concurrent payroll teams per country |
 | API latency | p95 under 300 ms for paged list and detail endpoints at 50,000 employees (to be proven by load tests in phase 9) |
 | Payroll run | A 5,000-employee monthly run calculated in under 2 minutes in a background job (to be proven in phase 4) |
 | Availability | 99.9% for self-service in production, with documented recovery point and recovery time objectives |

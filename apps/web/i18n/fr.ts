@@ -18,6 +18,7 @@ export const fr: Messages = {
   'top.allCompanies': 'Toutes mes sociétés',
   'top.company': 'Société',
   'top.language': 'Langue',
+  'top.colour': 'Couleur',
   'top.theme': 'Thème',
   'top.signOut': 'Se déconnecter',
   'theme.light': 'Clair',

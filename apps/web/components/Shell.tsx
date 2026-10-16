@@ -7,7 +7,7 @@ import { ReactNode, useEffect, useState } from 'react';
 import type { MessageKey } from '@/i18n';
 import { usePrefs } from '@/lib/prefs';
 import { useSession } from '@/lib/session';
-import { LanguageSelect, ThemeSelect } from './Prefs';
+import { AccentSelect, LanguageSelect, ThemeSelect } from './Prefs';
 import { Credit } from './ui';
 
 interface NavItem {
@@ -99,6 +99,7 @@ export function Shell({ children }: { children: ReactNode }) {
           <div className="spacer" />
           <LanguageSelect />
           <ThemeSelect />
+          <AccentSelect />
           <div>
             <div style={{ fontWeight: 600, fontSize: '.9rem' }}>{me.user.displayName}</div>
             <div className="muted" style={{ fontSize: '.78rem' }}>

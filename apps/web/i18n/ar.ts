@@ -18,6 +18,7 @@ export const ar: Messages = {
   'top.allCompanies': 'جميع شركاتي',
   'top.company': 'الشركة',
   'top.language': 'اللغة',
+  'top.colour': 'اللون',
   'top.theme': 'المظهر',
   'top.signOut': 'تسجيل الخروج',
   'theme.light': 'فاتح',

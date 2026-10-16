@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useState } from 'react';
+import { AppearancePicker } from '@/components/Prefs';
 import { ErrorAlert, fmtDate, Loading, PageHead, useLoad } from '@/components/ui';
 import { api } from '@/lib/api';
 import { usePrefs } from '@/lib/prefs';
@@ -38,6 +39,11 @@ export default function Account() {
   return (
     <>
       <PageHead title={t('nav.account')} sub={`${me.user.displayName} · ${me.user.email}`} />
+      <section className="card" style={{ marginBottom: '1rem' }}>
+        <h2>Appearance</h2>
+        <p className="muted">Light with KTM orange is the default. Your choice is kept on this device.</p>
+        <AppearancePicker />
+      </section>
       <div className="grid two">
         <section className="card">
           <h2>Signed-in devices</h2>

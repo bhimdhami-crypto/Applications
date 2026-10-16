@@ -1,4 +1,4 @@
-/** ISO 4217 currencies used by the initial countries. Admins can add more in the database. */
+/** ISO 4217 currencies used by the operating countries, plus the group's US dollar. Admins can add more in the database. */
 export interface CurrencyDef {
   code: string;
   name: string;
@@ -18,6 +18,10 @@ export const CURRENCIES: readonly CurrencyDef[] = [
   { code: 'AUD', name: 'Australian dollar', decimals: 2, symbol: 'A$' },
   { code: 'JPY', name: 'Japanese yen', decimals: 0, symbol: '¥' },
   { code: 'KRW', name: 'South Korean won', decimals: 0, symbol: '₩' },
+  { code: 'ZAR', name: 'South African rand', decimals: 2, symbol: 'R' },
+  { code: 'NGN', name: 'Nigerian naira', decimals: 2, symbol: '₦' },
+  { code: 'MXN', name: 'Mexican peso', decimals: 2, symbol: 'MX$' },
+  { code: 'NZD', name: 'New Zealand dollar', decimals: 2, symbol: 'NZ$' },
   { code: 'USD', name: 'US dollar', decimals: 2, symbol: '$' },
 ];
 

@@ -5,8 +5,8 @@ Section numbers refer to the project brief. **Status:** ✅ done and tested · �
 | ID | Brief § | Requirement | Phase | Status | Evidence |
 |---|---|---|---|---|---|
 | R-01 | 1, 30 | Modular architecture; features switchable per company | 1-2 | ✅ | `docs/02-solution-architecture.md`; `entity_feature`; test "switches modules per company" |
-| R-02 | 2 | Eleven initial countries | 2 | ✅ | `packages/shared/src/countries.ts`; test "covers the eleven initial countries"; seed |
-| R-03 | 2, 4 | Several legal entities, business units, branches, departments, cost centres per country | 2 | ✅ | 14 seeded companies (2 in Kenya, India, Netherlands); `OrgService`; organisation tests |
+| R-02 | 2 | Eleven brief countries plus the four from the first build (South Africa, Nigeria, Mexico, New Zealand) | 2 | ✅ | `packages/shared/src/countries.ts`; test "covers the fifteen countries"; seed |
+| R-03 | 2, 4 | Several legal entities, business units, branches, departments, cost centres per country | 2 | ✅ | 18 seeded companies (2 in Kenya, India, Netherlands); `OrgService`; organisation tests |
 | R-04 | 2, 25 | Admins add countries, companies, branches and currencies without code changes | 2 | ✅ | `/org/countries`, `/org/currencies`, `/org/entities` POST; test "keeps country and currency setup … to group admins" |
 | R-05 | 3 | Next.js + React + TypeScript web portal, responsive | 1-2 | ✅ | `apps/web`; phone layout checked |
 | R-06 | 3 | NestJS API with OpenAPI documentation | 2 | ✅ | `/api/docs` |
@@ -43,8 +43,9 @@ Section numbers refer to the project brief. **Status:** ✅ done and tested · �
 | R-37 | 22 | OIDC SSO | 9 | ⬜ | |
 | R-38 | 22 | Encryption of sensitive fields, malware scanning, backups | 2-9 | ⬜ | |
 | R-39 | 23 | Configurable workflow engine | 3 | ⬜ | |
-| R-40 | 24 | 44,000-55,000 synthetic employees, 4,000-5,000 per country, reproducible seed | 2 | ⬜ | Next slice |
-| R-41 | 26 | Light and dark themes, accessible, WCAG 2.2 AA colours | 1-2 | ✅ | `theme.ts`; contrast test |
+| R-40 | 24 | Synthetic employees, reproducible seed. Changed by Bhim on 16 Oct 2026: 500 to 1,000 per country (7,500 to 15,000 in all) | 2 | ⬜ | Next slice |
+| R-41 | 26 | Light (default) and dark themes, colour presets, WCAG 2.2 AA colours | 1-2 | ✅ | `theme.ts` `ACCENTS`; contrast tests for every preset |
+| R-47 | — | Keep every feature, form and policy of the first build (Bhim, 16 Oct 2026) | 2-4 | 🟡 | Port plan in `docs/06-implementation-plan.md` |
 | R-42 | 26 | Company switcher limited to access rights | 2 | ✅ | `Shell.tsx`, `/me` entities |
 | R-43 | 27 | Automated tests and CI | 1 | ✅ | 40 tests in CI |
 | R-44 | 28 | Paginated APIs, server-side filtering | 2 | ✅ | `/users`, `/audit` paginated |

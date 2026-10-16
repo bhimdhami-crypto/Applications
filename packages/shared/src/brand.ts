@@ -2,7 +2,7 @@
 export const BRAND = {
   productName: 'Global People & Payroll Enterprise Platform',
   shortName: 'Mindspace Portal',
-  demoGroupName: 'Mindspace Global Group',
+  demoGroupName: 'Mindspace Artificial Intelligence Inc.',
   developerCredit: 'Designed and developed by Bhim Dhami',
   copyright: (year = new Date().getFullYear()) => `© ${year} Bhim Dhami. All rights reserved.`,
   disclaimer:

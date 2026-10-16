@@ -26,6 +26,13 @@ export const LANGUAGES: readonly LanguageDef[] = [
   { code: 'te', englishName: 'Telugu', nativeName: 'తెలుగు', dir: 'ltr', status: 'catalogue' },
   { code: 'bn', englishName: 'Bengali', nativeName: 'বাংলা', dir: 'ltr', status: 'catalogue' },
   { code: 'mr', englishName: 'Marathi', nativeName: 'मराठी', dir: 'ltr', status: 'catalogue' },
+  { code: 'es', englishName: 'Spanish', nativeName: 'Español', dir: 'ltr', status: 'catalogue' },
+  { code: 'af', englishName: 'Afrikaans', nativeName: 'Afrikaans', dir: 'ltr', status: 'catalogue' },
+  { code: 'zu', englishName: 'Zulu', nativeName: 'isiZulu', dir: 'ltr', status: 'catalogue' },
+  { code: 'yo', englishName: 'Yoruba', nativeName: 'Yorùbá', dir: 'ltr', status: 'catalogue' },
+  { code: 'ha', englishName: 'Hausa', nativeName: 'Hausa', dir: 'ltr', status: 'catalogue' },
+  { code: 'ig', englishName: 'Igbo', nativeName: 'Igbo', dir: 'ltr', status: 'catalogue' },
+  { code: 'mi', englishName: 'Māori', nativeName: 'Te reo Māori', dir: 'ltr', status: 'catalogue' },
 ];
 
 export function languageDir(code: string): 'ltr' | 'rtl' {

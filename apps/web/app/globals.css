@@ -125,6 +125,13 @@ details.panel > div { padding: 0 .9rem .9rem; }
 .dialog { border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); padding: 1.2rem; width: min(560px, 92vw); }
 .dialog::backdrop { background: rgba(0,0,0,.55); }
 
+/* ───── Appearance picker ───── */
+.swatches { display: flex; flex-wrap: wrap; gap: .5rem; }
+.swatch { display: inline-flex; align-items: center; gap: .35rem; font: inherit; font-size: .88rem; padding: .4rem .7rem; border-radius: 99px; border: 2px solid var(--border); background: var(--surface); color: var(--text); cursor: pointer; }
+.swatch span { width: 16px; height: 16px; border-radius: 50%; display: inline-block; }
+.swatch span + span { margin-inline-start: -8px; box-shadow: 0 0 0 2px var(--surface); }
+.swatch[aria-pressed=true] { border-color: var(--accent); font-weight: 650; }
+
 /* ───── Sign-in ───── */
 .auth-page { min-height: 100vh; display: grid; grid-template-columns: 1.1fr 1fr; }
 .auth-hero { background: var(--sidebar); color: var(--sidebar-text); padding: 3rem; display: flex; flex-direction: column; justify-content: space-between; position: relative; overflow: hidden; }

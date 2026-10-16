@@ -16,6 +16,7 @@ export const en = {
   'top.allCompanies': 'All my companies',
   'top.company': 'Company',
   'top.language': 'Language',
+  'top.colour': 'Colour',
   'top.theme': 'Theme',
   'top.signOut': 'Sign out',
   'theme.light': 'Light',

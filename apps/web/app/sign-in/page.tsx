@@ -3,7 +3,7 @@
 import { BRAND } from '@gpp/shared';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useState } from 'react';
-import { LanguageSelect, ThemeSelect } from '@/components/Prefs';
+import { AccentSelect, LanguageSelect, ThemeSelect } from '@/components/Prefs';
 import { ErrorAlert } from '@/components/ui';
 import { login, verify } from '@/lib/api';
 import { usePrefs } from '@/lib/prefs';
@@ -73,7 +73,7 @@ export default function SignIn() {
             One platform for <span className="accent">people and payroll</span> in every country you operate.
           </h1>
           <ul>
-            <li>11 countries, 14 companies, 10 currencies</li>
+            <li>15 countries, 18 companies, 14 currencies</li>
             <li>Strict company and country data boundaries</li>
             <li>Maker-checker payroll with full audit trail</li>
           </ul>
@@ -90,6 +90,7 @@ export default function SignIn() {
           <div className="auth-tools">
             <LanguageSelect />
             <ThemeSelect />
+            <AccentSelect />
           </div>
           <div className="card">
             {!challenge ? (

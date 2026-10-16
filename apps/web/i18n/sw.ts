@@ -18,6 +18,7 @@ export const sw: Messages = {
   'top.allCompanies': 'Kampuni zangu zote',
   'top.company': 'Kampuni',
   'top.language': 'Lugha',
+  'top.colour': 'Rangi',
   'top.theme': 'Mandhari',
   'top.signOut': 'Ondoka',
   'theme.light': 'Mwanga',

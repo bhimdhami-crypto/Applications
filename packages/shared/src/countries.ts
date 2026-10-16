@@ -27,4 +27,9 @@ export const COUNTRIES: readonly CountryDef[] = [
   { code: 'NL', name: 'Netherlands', currency: 'EUR', languages: ['nl', 'en'], timeZone: 'Europe/Amsterdam', weekendDays: [0, 6], region: 'Europe' },
   { code: 'JP', name: 'Japan', currency: 'JPY', languages: ['ja', 'en'], timeZone: 'Asia/Tokyo', weekendDays: [0, 6], region: 'Asia' },
   { code: 'KR', name: 'South Korea', currency: 'KRW', languages: ['ko', 'en'], timeZone: 'Asia/Seoul', weekendDays: [0, 6], region: 'Asia' },
+  // Carried over from the first Mindspace build
+  { code: 'ZA', name: 'South Africa', currency: 'ZAR', languages: ['en', 'af', 'zu'], timeZone: 'Africa/Johannesburg', weekendDays: [0, 6], region: 'Africa' },
+  { code: 'NG', name: 'Nigeria', currency: 'NGN', languages: ['en', 'yo', 'ha', 'ig'], timeZone: 'Africa/Lagos', weekendDays: [0, 6], region: 'Africa' },
+  { code: 'MX', name: 'Mexico', currency: 'MXN', languages: ['es', 'en'], timeZone: 'America/Mexico_City', weekendDays: [0, 6], region: 'Americas' },
+  { code: 'NZ', name: 'New Zealand', currency: 'NZD', languages: ['en', 'mi'], timeZone: 'Pacific/Auckland', weekendDays: [0, 6], region: 'Oceania' },
 ];

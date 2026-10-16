@@ -1,6 +1,6 @@
 // Seeds reference data, the demo organisation and the test accounts. Safe to run more than once.
 import { PrismaClient, Role, ScopeType } from '@prisma/client';
-import { COUNTRIES, CURRENCIES, GROUP_REPORTING_CURRENCY, LANGUAGES } from '@gpp/shared';
+import { BRAND, COUNTRIES, CURRENCIES, GROUP_REPORTING_CURRENCY, LANGUAGES } from '@gpp/shared';
 import * as bcrypt from 'bcryptjs';
 import { DEMO_BUSINESS_UNITS, DEMO_DEPARTMENTS, DEMO_ENTITIES, DEMO_FEATURES, DEMO_USERS, NO_PAYROLL, SHARED_SERVICE_DEPARTMENTS } from './demo-org';
 
@@ -27,8 +27,8 @@ export async function seed(prisma: PrismaClient, opts: { password?: string; quie
 
   const group = await prisma.group.upsert({
     where: { code: DEMO_GROUP_CODE },
-    create: { code: DEMO_GROUP_CODE, name: 'Mindspace Global Group', reportingCurrency: GROUP_REPORTING_CURRENCY },
-    update: {},
+    create: { code: DEMO_GROUP_CODE, name: BRAND.demoGroupName, reportingCurrency: GROUP_REPORTING_CURRENCY },
+    update: { name: BRAND.demoGroupName },
   });
 
   const entityIds = new Map<string, string>();
@@ -45,11 +45,11 @@ export async function seed(prisma: PrismaClient, opts: { password?: string; quie
         timeZone: country.timeZone,
         weekendDays: country.weekendDays,
         defaultLanguage: country.languages[0],
-        // Demo fiscal years: July in Australia, April in India and Japan, January elsewhere
-        fiscalYearStartMonth: e.countryCode === 'AU' ? 7 : e.countryCode === 'IN' || e.countryCode === 'JP' ? 4 : 1,
+        // Demo fiscal years: July in Australia and New Zealand (April), April in India and Japan, March in South Africa, January elsewhere
+        fiscalYearStartMonth: ({ AU: 7, IN: 4, JP: 4, NZ: 4, ZA: 3 } as Record<string, number>)[e.countryCode] ?? 1,
         isSharedServiceCentre: e.isSharedServiceCentre ?? false,
       },
-      update: {},
+      update: { name: e.name },
     });
     entityIds.set(e.code, entity.id);
 

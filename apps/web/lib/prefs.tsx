@@ -1,6 +1,6 @@
 'use client';
 
-import { languageDir } from '@gpp/shared';
+import { ACCENTS, DEFAULT_ACCENT, DEFAULT_THEME, languageDir } from '@gpp/shared';
 import { createContext, ReactNode, useCallback, useContext, useEffect, useState } from 'react';
 import { MessageKey, translate, UI_LANGUAGES } from '@/i18n';
 
@@ -9,6 +9,8 @@ export type ThemeChoice = 'light' | 'dark' | 'system';
 interface Prefs {
   theme: ThemeChoice;
   setTheme: (t: ThemeChoice) => void;
+  accent: string;
+  setAccent: (a: string) => void;
   lang: string;
   setLang: (l: string) => void;
   t: (key: MessageKey, vars?: Record<string, string>) => string;
@@ -37,12 +39,15 @@ export function applyTheme(choice: ThemeChoice) {
 }
 
 export function PrefsProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeChoice>('system');
+  const [theme, setThemeState] = useState<ThemeChoice>(DEFAULT_THEME);
+  const [accent, setAccentState] = useState(DEFAULT_ACCENT);
   const [lang, setLangState] = useState('en');
 
   useEffect(() => {
     const t = read('gpp.theme') as ThemeChoice | null;
     if (t) setThemeState(t);
+    const a = read('gpp.accent');
+    if (a && ACCENTS[a]) setAccentState(a);
     const l = read('gpp.lang');
     if (l && UI_LANGUAGES.includes(l)) setLangState(l);
   }, []);
@@ -57,6 +62,10 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
   }, [theme]);
 
   useEffect(() => {
+    document.documentElement.dataset.accent = accent;
+  }, [accent]);
+
+  useEffect(() => {
     document.documentElement.lang = lang;
     document.documentElement.dir = languageDir(lang);
   }, [lang]);
@@ -65,13 +74,17 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
     setThemeState(t);
     write('gpp.theme', t);
   }, []);
+  const setAccent = useCallback((a: string) => {
+    setAccentState(a);
+    write('gpp.accent', a);
+  }, []);
   const setLang = useCallback((l: string) => {
     setLangState(l);
     write('gpp.lang', l);
   }, []);
   const t = useCallback((key: MessageKey, vars?: Record<string, string>) => translate(lang, key, vars), [lang]);
 
-  return <PrefsContext.Provider value={{ theme, setTheme, lang, setLang, t }}>{children}</PrefsContext.Provider>;
+  return <PrefsContext.Provider value={{ theme, setTheme, accent, setAccent, lang, setLang, t }}>{children}</PrefsContext.Provider>;
 }
 
 export function usePrefs() {

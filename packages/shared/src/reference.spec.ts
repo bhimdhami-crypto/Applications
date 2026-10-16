@@ -1,8 +1,8 @@
-import { COUNTRIES, CURRENCIES, currencyDecimals, formatMoney, LANGUAGES, languageDir, THEME } from './index';
+import { ACCENTS, COUNTRIES, CURRENCIES, currencyDecimals, formatMoney, LANGUAGES, languageDir, THEME } from './index';
 
 describe('reference data', () => {
-  it('covers the eleven initial countries with known currencies and languages', () => {
-    expect(COUNTRIES.map((c) => c.code)).toEqual(['KE', 'UG', 'TZ', 'EG', 'FR', 'IN', 'CN', 'AU', 'NL', 'JP', 'KR']);
+  it('covers the fifteen countries with known currencies and languages', () => {
+    expect(COUNTRIES.map((c) => c.code)).toEqual(['KE', 'UG', 'TZ', 'EG', 'FR', 'IN', 'CN', 'AU', 'NL', 'JP', 'KR', 'ZA', 'NG', 'MX', 'NZ']);
     for (const c of COUNTRIES) {
       expect(CURRENCIES.some((x) => x.code === c.currency)).toBe(true);
       for (const l of c.languages) expect(LANGUAGES.some((x) => x.code === l)).toBe(true);
@@ -45,5 +45,19 @@ describe('theme contrast (WCAG 2.2 AA)', () => {
       expect(contrast(t.success, t.surface)).toBeGreaterThanOrEqual(4.5);
       expect(contrast(t.sidebarText, t.sidebar)).toBeGreaterThanOrEqual(4.5);
     });
+  }
+});
+
+describe('accent presets (WCAG 2.2 AA)', () => {
+  for (const [key, preset] of Object.entries(ACCENTS)) {
+    for (const name of ['light', 'dark'] as const) {
+      it(`${key} in ${name}: links and button labels are readable`, () => {
+        const a = preset[name];
+        expect(contrast(a.accentText, THEME[name].surface)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(a.accentText, THEME[name].bg)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(a.onAccent, a.accent)).toBeGreaterThanOrEqual(4.5);
+        expect(contrast(a.onAccent, a.accentHover)).toBeGreaterThanOrEqual(4.5);
+      });
+    }
   }
 });

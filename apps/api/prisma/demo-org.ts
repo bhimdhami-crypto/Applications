@@ -1,5 +1,5 @@
 /**
- * The demo organisation: Mindspace Global Group across the eleven initial countries.
+ * The demo organisation: Mindspace Artificial Intelligence Inc. across fifteen countries.
  * All names are fictional. Registration and tax numbers are left blank on purpose.
  */
 export interface DemoEntity {
@@ -12,20 +12,25 @@ export interface DemoEntity {
 }
 
 export const DEMO_ENTITIES: DemoEntity[] = [
-  { code: 'KE01', name: 'Mindspace AI Kenya Ltd', countryCode: 'KE', cities: ['Nairobi', 'Mombasa', 'Kisumu'] },
-  { code: 'KE02', name: 'Mindspace Shared Services Africa Ltd', countryCode: 'KE', isSharedServiceCentre: true, cities: ['Nairobi'] },
-  { code: 'UG01', name: 'Mindspace AI Uganda Ltd', countryCode: 'UG', cities: ['Kampala', 'Entebbe'] },
-  { code: 'TZ01', name: 'Mindspace AI Tanzania Ltd', countryCode: 'TZ', cities: ['Dar es Salaam', 'Arusha'] },
-  { code: 'EG01', name: 'Mindspace AI Egypt S.A.E.', countryCode: 'EG', cities: ['Cairo', 'Alexandria'] },
-  { code: 'FR01', name: 'Mindspace IA France SAS', countryCode: 'FR', cities: ['Paris', 'Lyon'] },
-  { code: 'IN01', name: 'Mindspace AI India Pvt Ltd', countryCode: 'IN', cities: ['Bengaluru', 'Mumbai'] },
-  { code: 'IN02', name: 'Mindspace Global Delivery Centre India Pvt Ltd', countryCode: 'IN', isSharedServiceCentre: true, cities: ['Pune', 'Hyderabad'] },
-  { code: 'CN01', name: 'Mindspace (Shanghai) AI Technology Co., Ltd.', countryCode: 'CN', cities: ['Shanghai', 'Shenzhen'] },
-  { code: 'AU01', name: 'Mindspace AI Australia Pty Ltd', countryCode: 'AU', cities: ['Sydney', 'Melbourne'] },
-  { code: 'NL01', name: 'Mindspace AI Netherlands B.V.', countryCode: 'NL', cities: ['Amsterdam', 'Rotterdam'] },
-  { code: 'NL02', name: 'Mindspace Europe Holding B.V.', countryCode: 'NL', cities: ['Amsterdam'] },
-  { code: 'JP01', name: 'Mindspace AI Japan K.K.', countryCode: 'JP', cities: ['Tokyo', 'Osaka'] },
-  { code: 'KR01', name: 'Mindspace AI Korea Ltd.', countryCode: 'KR', cities: ['Seoul', 'Busan'] },
+  { code: 'KE01', name: 'Mindspace Artificial Intelligence Kenya Ltd', countryCode: 'KE', cities: ['Nairobi', 'Mombasa', 'Kisumu'] },
+  { code: 'KE02', name: 'Mindspace Artificial Intelligence Shared Services Africa Ltd', countryCode: 'KE', isSharedServiceCentre: true, cities: ['Nairobi'] },
+  { code: 'UG01', name: 'Mindspace Artificial Intelligence Uganda Ltd', countryCode: 'UG', cities: ['Kampala', 'Entebbe', 'Jinja'] },
+  { code: 'TZ01', name: 'Mindspace Artificial Intelligence Tanzania Ltd', countryCode: 'TZ', cities: ['Dar es Salaam', 'Arusha', 'Dodoma'] },
+  { code: 'EG01', name: 'Mindspace Artificial Intelligence Egypt S.A.E.', countryCode: 'EG', cities: ['Cairo', 'Alexandria', 'Giza'] },
+  { code: 'FR01', name: 'Mindspace Artificial Intelligence France SAS', countryCode: 'FR', cities: ['Paris', 'Lyon'] },
+  { code: 'IN01', name: 'Mindspace Artificial Intelligence India Pvt Ltd', countryCode: 'IN', cities: ['Bengaluru', 'Mumbai'] },
+  { code: 'IN02', name: 'Mindspace Artificial Intelligence Global Delivery Centre India Pvt Ltd', countryCode: 'IN', isSharedServiceCentre: true, cities: ['Pune', 'Hyderabad'] },
+  { code: 'CN01', name: 'Mindspace Artificial Intelligence China Co., Ltd.', countryCode: 'CN', cities: ['Shanghai', 'Shenzhen'] },
+  { code: 'AU01', name: 'Mindspace Artificial Intelligence Australia Pty Ltd', countryCode: 'AU', cities: ['Sydney', 'Melbourne'] },
+  { code: 'NL01', name: 'Mindspace Artificial Intelligence Netherlands B.V.', countryCode: 'NL', cities: ['Amsterdam', 'Rotterdam'] },
+  { code: 'NL02', name: 'Mindspace Artificial Intelligence Europe Holding B.V.', countryCode: 'NL', cities: ['Amsterdam'] },
+  { code: 'JP01', name: 'Mindspace Artificial Intelligence Japan K.K.', countryCode: 'JP', cities: ['Tokyo', 'Osaka'] },
+  { code: 'KR01', name: 'Mindspace Artificial Intelligence Korea Ltd.', countryCode: 'KR', cities: ['Seoul', 'Busan'] },
+  // Countries carried over from the first Mindspace build
+  { code: 'ZA01', name: 'Mindspace Artificial Intelligence South Africa (Pty) Ltd', countryCode: 'ZA', cities: ['Johannesburg', 'Cape Town', 'Durban'] },
+  { code: 'NG01', name: 'Mindspace Artificial Intelligence Nigeria Ltd', countryCode: 'NG', cities: ['Lagos', 'Abuja', 'Port Harcourt'] },
+  { code: 'MX01', name: 'Mindspace Artificial Intelligence Mexico S. de R.L. de C.V.', countryCode: 'MX', cities: ['Mexico City', 'Guadalajara', 'Monterrey'] },
+  { code: 'NZ01', name: 'Mindspace Artificial Intelligence New Zealand Limited', countryCode: 'NZ', cities: ['Auckland', 'Wellington', 'Christchurch'] },
 ];
 
 export const DEMO_BUSINESS_UNITS = [

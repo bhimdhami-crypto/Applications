@@ -28,10 +28,10 @@ describe('organisation and company isolation', () => {
     await prisma.$disconnect();
   });
 
-  it('shows a group admin all eleven countries and fourteen companies', async () => {
+  it('shows a group admin all fifteen countries and eighteen companies', async () => {
     const tree = await http().get('/api/org/tree').set(admin).expect(200);
-    expect(tree.body.countries).toHaveLength(11);
-    expect(tree.body.countries.flatMap((c: { entities: unknown[] }) => c.entities)).toHaveLength(14);
+    expect(tree.body.countries).toHaveLength(15);
+    expect(tree.body.countries.flatMap((c: { entities: unknown[] }) => c.entities)).toHaveLength(18);
   });
 
   it('shows country HR only their country, and company HR only their company', async () => {
@@ -66,13 +66,13 @@ describe('organisation and company isolation', () => {
   });
 
   it('keeps country and currency setup and new companies to group admins', async () => {
-    await http().post('/api/org/currencies').set(hrKenya).send({ code: 'ZAR', name: 'South African rand', decimals: 2, symbol: 'R' }).expect(403);
-    await http().post('/api/org/currencies').set(admin).send({ code: 'ZAR', name: 'South African rand', decimals: 2, symbol: 'R' }).expect(201);
-    await http().post('/api/org/countries').set(admin).send({ code: 'ZA', name: 'South Africa', currencyCode: 'ZAR', languages: ['en'], timeZone: 'Mars/Olympus', weekendDays: [0, 6], region: 'Africa' }).expect(400);
-    await http().post('/api/org/countries').set(admin).send({ code: 'ZA', name: 'South Africa', currencyCode: 'ZAR', languages: ['en'], timeZone: 'Africa/Johannesburg', weekendDays: [0, 6], region: 'Africa' }).expect(201);
-    await http().post('/api/org/entities').set(hrKenya).send({ code: 'ZA01', name: 'Mindspace AI South Africa (Pty) Ltd', countryCode: 'ZA' }).expect(403);
-    const za = await http().post('/api/org/entities').set(admin).send({ code: 'ZA01', name: 'Mindspace AI South Africa (Pty) Ltd', countryCode: 'ZA' }).expect(201);
-    expect(za.body).toMatchObject({ functionalCurrency: 'ZAR', timeZone: 'Africa/Johannesburg', defaultLanguage: 'en' });
+    await http().post('/api/org/currencies').set(hrKenya).send({ code: 'BRL', name: 'Brazilian real', decimals: 2, symbol: 'R$' }).expect(403);
+    await http().post('/api/org/currencies').set(admin).send({ code: 'BRL', name: 'Brazilian real', decimals: 2, symbol: 'R$' }).expect(201);
+    await http().post('/api/org/countries').set(admin).send({ code: 'BR', name: 'Brazil', currencyCode: 'BRL', languages: ['en'], timeZone: 'Mars/Olympus', weekendDays: [0, 6], region: 'Americas' }).expect(400);
+    await http().post('/api/org/countries').set(admin).send({ code: 'BR', name: 'Brazil', currencyCode: 'BRL', languages: ['en'], timeZone: 'America/Sao_Paulo', weekendDays: [0, 6], region: 'Americas' }).expect(201);
+    await http().post('/api/org/entities').set(hrKenya).send({ code: 'BR01', name: 'Mindspace Artificial Intelligence Brasil Ltda', countryCode: 'BR' }).expect(403);
+    const br = await http().post('/api/org/entities').set(admin).send({ code: 'BR01', name: 'Mindspace Artificial Intelligence Brasil Ltda', countryCode: 'BR' }).expect(201);
+    expect(br.body).toMatchObject({ functionalCurrency: 'BRL', timeZone: 'America/Sao_Paulo', defaultLanguage: 'en' });
   });
 
   it('switches modules per company without touching other companies', async () => {
