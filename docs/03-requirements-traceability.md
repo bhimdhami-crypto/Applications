@@ -29,9 +29,9 @@ Section numbers refer to the project brief. **Status:** ✅ done and tested · �
 | R-23 | 9 | Effective-dated exchange rates, no uncontrolled re-translation | 4 | ⬜ | |
 | R-24 | 10 | Localisation framework, RTL Arabic | 2, 6 | 🟡 | Language catalogue, 4 draft UI languages, RTL layout working; full catalogues in phase 6 |
 | R-25 | 10 | Language preference at user, company, group level | 2 | ✅ | `preferred_language`, `default_language` on company and group |
-| R-26 | 11-12 | Leave, attendance, scheduling | 3 | ⬜ | Weekend days per company ready |
+| R-26 | 11-12 | Leave, attendance, scheduling | 3 | 🟡 | Leave done: requests, two-step approvals, balances, adjustments, calendar, public holidays per country, using each company's weekend days. Rules are the first build's draft pack `LEAVE-2026.1-draft`, marked unverified. `leave-rules.spec.ts`, `leave.e2e.spec.ts`. Attendance and scheduling later in phase 3 |
 | R-27 | 13 | Recruitment, performance, talent | 3 | ⬜ | |
-| R-28 | 14-15 | Employee and manager self-service | 2-3 | 🟡 | My profile (contacts, next of kin, photo, documents, bank change with HR approval) and My team; leave and the rest in phase 3 |
+| R-28 | 14-15 | Employee and manager self-service | 2-3 | 🟡 | My profile (contacts, next of kin, photo, documents, bank change with HR approval), My team, My leave and Leave approvals; the rest in phase 3 |
 | R-29 | 16, 22 | RBAC with scopes, segregation of duties, delegation limits | 2 | ✅ | `access.spec.ts`; `users.e2e.spec.ts` |
 | R-30 | 17-18 | Dashboards and reports from live data | 6 | ⬜ | |
 | R-31 | 19 | AI HR assistant with RAG and permission-checked tools | 6 | ⬜ | |
@@ -47,7 +47,7 @@ Section numbers refer to the project brief. **Status:** ✅ done and tested · �
 | R-41 | 26 | Light (default) and dark themes, colour presets, WCAG 2.2 AA colours | 1-2 | ✅ | `theme.ts` `ACCENTS`; contrast tests for every preset |
 | R-47 | — | Keep every feature, form and policy of the first build (Bhim, 16 Oct 2026) | 2-4 | 🟡 | Port plan in `docs/06-implementation-plan.md` |
 | R-42 | 26 | Company switcher limited to access rights | 2 | ✅ | `Shell.tsx`, `/me` entities |
-| R-43 | 27 | Automated tests and CI | 1 | ✅ | 79 tests in CI |
+| R-43 | 27 | Automated tests and CI | 1 | ✅ | 104 tests in CI (79 API, 25 shared) |
 | R-44 | 28 | Paginated APIs, server-side filtering | 2 | ✅ | `/users`, `/audit`, `/employees` paginated and filtered on the server |
 | R-45 | 29 | Product requirements, architecture, ERD, plans | 1 | ✅ | `docs/01` to `docs/09` |
 | R-46 | — | Developer credit and copyright on the product | 1 | ✅ | `BRAND` in shared; footer, sidebar, sign-in, emails, API docs |

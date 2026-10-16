@@ -46,3 +46,7 @@ Each person has an employment, a job history (about a third were promoted), pay 
 | TZ01 Mindspace Artificial Intelligence Tanzania Ltd | 784 | CSU 91, DAI 87, ENG 163, FIN 55, HRM 41, ITS 54, LEG 12, MKT 50, OPS 86, PRD 60, SAL 85 |
 | UG01 Mindspace Artificial Intelligence Uganda Ltd | 569 | CSU 79, DAI 49, ENG 104, FIN 44, HRM 22, ITS 46, LEG 11, MKT 27, OPS 66, PRD 46, SAL 75 |
 | ZA01 Mindspace Artificial Intelligence South Africa (Pty) Ltd | 636 | CSU 69, DAI 70, ENG 142, FIN 41, HRM 34, ITS 41, LEG 24, MKT 37, OPS 67, PRD 33, SAL 78 |
+
+## Leave history
+
+`prisma/leave-generator.ts` adds fictional leave for 2026 to staff hired before 2026 who have no portal account: past annual leave in different months, some sick and family care days, some leave in October 2026, and some booked or waiting for HR in November and December. The demo employee (Kevin Otieno) has a holiday in July, a sick day in March, and a year-end request waiting for his manager, Amina Mwangi. About 18,600 requests in total, all counted under rule pack `LEAVE-2026.1-draft`. Draft public holidays are stored for 2026 and 2027 for Kenya, Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand only.

@@ -9,6 +9,6 @@ import { PeopleService } from './people.service';
 @Module({
   controllers: [PeopleController],
   providers: [PeopleService, PeopleAccess, DocumentsService, ChangeRequestsService, StorageService],
-  exports: [PeopleAccess, StorageService],
+  exports: [PeopleAccess, StorageService, DocumentsService],
 })
 export class PeopleModule {}

@@ -110,5 +110,7 @@ export function Credit({ compact = false }: { compact?: boolean }) {
 
 export function fmtDate(iso: string | null | undefined, lang = 'en', withTime = false) {
   if (!iso) return '—';
-  return new Intl.DateTimeFormat(lang, withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium' }).format(new Date(iso));
+  // A bare date is a calendar day, not an instant: show it as the same day in every time zone
+  const dayOnly = /^\d{4}-\d{2}-\d{2}$/.test(iso) || (!withTime && /T00:00:00(\.000)?Z$/.test(iso));
+  return new Intl.DateTimeFormat(lang, withTime ? { dateStyle: 'medium', timeStyle: 'short' } : { dateStyle: 'medium', ...(dayOnly ? { timeZone: 'UTC' } : {}) }).format(new Date(iso));
 }

@@ -3,6 +3,7 @@ import { PrismaClient, Role, ScopeType } from '@prisma/client';
 import { BRAND, COUNTRIES, CURRENCIES, GROUP_REPORTING_CURRENCY, LANGUAGES } from '@gpp/shared';
 import * as bcrypt from 'bcryptjs';
 import { DEMO_BUSINESS_UNITS, DEMO_DEPARTMENTS, DEMO_ENTITIES, DEMO_FEATURES, DEMO_USERS, NO_PAYROLL, SHARED_SERVICE_DEPARTMENTS } from './demo-org';
+import { generateLeave } from './leave-generator';
 import { DEFAULT_STAFF, generateStaff, StaffOptions } from './staff-generator';
 
 export const DEMO_GROUP_CODE = 'MINDSPACE';
@@ -130,6 +131,7 @@ export async function seed(prisma: PrismaClient, opts: SeedOptions = {}) {
   if (opts.staff !== false) {
     log('Generating synthetic staff (companies that already have staff are skipped):');
     await generateStaff(prisma, group.id, opts.staff ?? DEFAULT_STAFF, log);
+    await generateLeave(prisma, group.id, log);
   }
   return group;
 }

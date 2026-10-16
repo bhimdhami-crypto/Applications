@@ -233,3 +233,64 @@ export interface Headcount {
   countries: { countryCode: string; active: number; left: number }[];
   companies: { id: string; code: string; name: string; countryCode: string; active: number; left: number; departments: { id: string; code: string; name: string; active: number }[] }[];
 }
+
+export type LeaveType = import('@gpp/shared').LeaveTypeKey;
+export type LeaveStatus = import('@gpp/shared').LeaveStatusKey;
+
+export interface LeaveRulePack {
+  version: string;
+  status: 'UNVERIFIED';
+  summary: string;
+  draftHolidayCountries: string[];
+}
+
+export interface LeaveTypeInfo {
+  type: LeaveType;
+  label: string;
+  hrApproval: boolean;
+  backdated: boolean;
+  yearly: boolean;
+  note: string;
+}
+
+export interface LeaveBalance {
+  type: LeaveType;
+  label: string;
+  entitlement: number | null;
+  carriedOver: number;
+  adjustment: number;
+  approved: number;
+  pending: number;
+  left: number | null;
+}
+
+export interface LeaveRequest {
+  id: string;
+  type: LeaveType;
+  startDate: string;
+  endDate: string;
+  days: number;
+  reason: string | null;
+  handoverTo: string | null;
+  contactWhileAway: string | null;
+  documentId: string | null;
+  status: LeaveStatus;
+  managerNote: string | null;
+  hrNote: string | null;
+  rulesVersion: string;
+  createdAt: string;
+  canCancel: boolean;
+  employee: { id: string; employeeNumber: string; name: string; entity: { code: string; name: string } };
+  approver: { id: string; name: string } | null;
+  waitingDays?: number;
+  overdue?: boolean;
+  step?: 'manager' | 'hr';
+}
+
+export interface Holiday {
+  id: string;
+  countryCode: string;
+  date: string;
+  name: string;
+  source: 'DRAFT' | 'MANUAL';
+}

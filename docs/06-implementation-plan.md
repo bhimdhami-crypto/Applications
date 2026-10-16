@@ -35,7 +35,7 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 |---|---|---|
 | Staff profiles: job, contact, IDs, education, next of kin, photo, HR documents | Phase 2 employee master | Done |
 | Sample staff | Generator: 500 to 1,000 per country, reproducible seed ([report](demo-data-report.md)) | Done |
-| Leave: requests, approvals, balances, team calendar, public holidays | Phase 3 | Planned |
+| Leave: requests, approvals, balances, team calendar, public holidays | Phase 3, draft rule pack marked unverified | Done |
 | Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4 | Planned |
 | Meal, gym and gift-voucher benefits | Phase 3-4 | Planned |
 | Month-end payroll and payslips for the first build's eight countries | Phase 4, rule packs marked unverified | Planned |
@@ -51,4 +51,13 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 - Staff directory with search and filters, My profile, My team for managers, Hire someone, Headcount, Change requests.
 - 11,153 fictional people across the 15 countries, 500 to 1,000 per country, with the verification report in [demo-data-report.md](demo-data-report.md).
 
-Next: leave (requests, approvals, balances, team calendar, public holidays), then advances, loans and IOUs, benefits, the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.
+## Phase 3, first slice: leave from the first build (this pull request)
+
+- Nine leave types from the Leave and Holidays Policy and the Parental and Family Policy, with the first build's country overrides (Mexico, Egypt, South Africa, New Zealand), as rule pack `LEAVE-2026.1-draft`. Every balance screen says the pack is unverified, and each request records the pack version it was counted under.
+- Requests go to the line manager in force today (when they have a portal account), then to HR for study, maternity, paternity and unpaid leave. HR recording leave for someone approves it at once. Nobody decides their own leave, and two deciders at once cannot both win.
+- Working days use each company's weekend days and the country's public holidays. The portal drafts holidays only for the first build's eight countries; France, India, China, Australia, the Netherlands, Japan and Korea start empty for HR to enter from the gazette. HR confirms or removes drafts.
+- Who is away: HR sees a company, managers everyone below them, others their teammates without the reason.
+- Companies with leave switched off refuse new requests.
+- About 18,600 fictional leave requests for 2026 in the demo data.
+
+Next: advances, loans and IOUs, benefits, the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.

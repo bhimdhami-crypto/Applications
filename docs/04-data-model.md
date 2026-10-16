@@ -101,7 +101,7 @@ erDiagram
 | Phase | Tables |
 |---|---|
 | 2-3 | `salary_band`, `position`, `dependant` |
-| 3 | `workflow_definition`, `workflow_instance`, `workflow_task`, `delegation`, `notification`, `document`, `leave_type`, `leave_policy`, `leave_balance`, `leave_request`, `public_holiday`, `shift`, `attendance_record`, `timesheet`, `expense_claim` |
+| 3 | `workflow_definition`, `workflow_instance`, `workflow_task`, `delegation`, `notification`, `document`, `leave_request` ✓, `leave_adjustment` ✓, `public_holiday` ✓ (types and entitlements live in the versioned rule pack, balances are worked out from requests), `shift`, `attendance_record`, `timesheet`, `expense_claim` |
 | 4 | `pay_group`, `pay_period`, `salary_component`, `payroll_input`, `payroll_run`, `payroll_result`, `result_line`, `payslip`, `payment_file`, `journal`, `gl_mapping`, `fx_rate`, `loan` |
 | 5 | `rule_set`, `rule_set_version` (with source, jurisdiction, effective dates, verification and approval status) |
 | 6+ | `report_definition`, `report_subscription`, `knowledge_document`, `assistant_conversation`, `integration_connection`, `integration_job`, `dead_letter` |

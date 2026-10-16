@@ -9,7 +9,7 @@ flowchart TB
   subgraph Me[Me]
     Profile[My profile (2) ✓]
     Payslips[My payslips (4)]
-    Leave[My leave (3)]
+    Leave[My leave (3) ✓]
     Time[My time and attendance (3)]
     Expenses[My expenses (3)]
     Letters[Letters and documents (3)]
@@ -19,8 +19,9 @@ flowchart TB
 
   subgraph Team[My team]
     TeamList[My team (2) ✓]
-    Approvals[Approvals inbox (3)]
-    TeamCal[Team calendar (3)]
+    Approvals[Leave approvals (3) ✓]
+    TeamCal[Who is away (3) ✓]
+    Holidays[Public holidays (3) ✓]
     Reviews[Reviews and goals (3)]
   end
 

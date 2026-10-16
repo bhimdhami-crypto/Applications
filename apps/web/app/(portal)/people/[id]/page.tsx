@@ -100,6 +100,9 @@ export default function Profile() {
             {d.status === 'ACTIVE' ? <span className="badge ok">Active</span> : <span className="badge">Left {fmtDate(d.endDate, lang)}</span>}
             {d.status === 'ACTIVE' && d.endDate && <span className="badge warn">Leaving {fmtDate(d.endDate, lang)}</span>}
             {d.relation === 'SELF' && <span className="badge">This is you</span>}
+            <Link className="badge accent" href={d.relation === 'SELF' ? '/leave' : `/leave?employee=${d.id}`}>
+              Leave and balances
+            </Link>
           </div>
         </div>
       </div>

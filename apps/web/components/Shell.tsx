@@ -15,6 +15,8 @@ interface NavItem {
   label: MessageKey;
   /** Every one of these is needed somewhere in the user's scope */
   needs?: Permission[];
+  /** At least one of these is needed */
+  anyOf?: Permission[];
 }
 
 const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
@@ -36,6 +38,15 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
     ],
   },
   {
+    title: 'nav.leave',
+    items: [
+      { href: '/leave', label: 'nav.myLeave', needs: ['self.service'] },
+      { href: '/leave/approvals', label: 'nav.leaveApprovals', anyOf: ['team.read', 'people.manage'] },
+      { href: '/leave/calendar', label: 'nav.leaveCalendar', needs: ['self.service'] },
+      { href: '/leave/holidays', label: 'nav.holidays', needs: ['self.service'] },
+    ],
+  },
+  {
     title: 'nav.admin',
     items: [
       { href: '/organisation', label: 'nav.organisation', needs: ['org.read'] },
@@ -47,7 +58,6 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
 ];
 
 const COMING: { label: MessageKey; phase: number }[] = [
-  { label: 'nav.leave', phase: 3 },
   { label: 'nav.payroll', phase: 4 },
   { label: 'nav.insight', phase: 6 },
 ];
@@ -78,7 +88,7 @@ export function Shell({ children }: { children: ReactNode }) {
         </Link>
         <nav className="nav">
           {SECTIONS.map((s) => {
-            const items = s.items.filter((i) => !i.needs || i.needs.every((p) => can(p)));
+            const items = s.items.filter((i) => (!i.needs || i.needs.every((p) => can(p))) && (!i.anyOf || i.anyOf.some((p) => can(p))));
             if (!items.length) return null;
             return (
               <div key={s.title}>

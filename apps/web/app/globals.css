@@ -176,3 +176,22 @@ dl.facts dd { margin: 0; overflow-wrap: anywhere; }
 .filters { display: flex; flex-wrap: wrap; gap: .5rem; align-items: end; margin-bottom: 1rem; }
 .filters input, .filters select { min-width: 0; }
 @media (max-width: 600px) { dl.facts { grid-template-columns: 1fr; gap: .1rem; } dl.facts dd { margin-bottom: .5rem; } }
+
+/* Leave calendar */
+.leave-cal { table-layout: fixed; min-width: 900px; }
+.leave-cal th, .leave-cal td { padding: 0; text-align: center; font-size: .72rem; height: 28px; border-left: 1px solid var(--border); text-transform: none; letter-spacing: 0; }
+.leave-cal th { padding: .2rem 0; font-weight: 600; }
+.leave-cal th div { color: var(--text-muted); font-weight: 400; }
+.leave-cal .who { width: 180px; text-align: start; padding: 0 .5rem; font-size: .85rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border-left: 0; }
+.leave-cal .off, .legend .off { background: color-mix(in srgb, var(--text-muted) 16%, var(--surface)); }
+.lt { background: #0b6e99; }
+.lt-ANNUAL { background: #0b6e99; }
+.lt-SICK { background: #c0392b; }
+.lt-FLOATING, .lt-FAMILY_CARE, .lt-COMPASSIONATE { background: #8e44ad; }
+.lt-STUDY { background: #b7791f; }
+.lt-MATERNITY, .lt-PATERNITY { background: #19a974; }
+.lt-UNPAID { background: #5c6782; }
+.lt-AWAY { background: #7f9bb8; }
+.lt.pending { opacity: .5; background-image: repeating-linear-gradient(45deg, transparent 0 4px, rgba(255, 255, 255, .6) 4px 7px); }
+.legend { display: flex; flex-wrap: wrap; gap: 1rem; margin-top: .75rem; font-size: .8rem; color: var(--text-muted); }
+.legend i { display: inline-block; width: 14px; height: 14px; border-radius: 3px; vertical-align: -2px; border: 1px solid var(--border); }
