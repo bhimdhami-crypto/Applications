@@ -474,3 +474,149 @@ export interface LibraryList {
   canReport: boolean;
   items: LibraryItem[];
 }
+
+// ───── Workplace: chat, community page, activity tracker ─────
+
+export interface PersonCard {
+  id: string;
+  name: string;
+  jobTitle: string;
+  country: string | null;
+  company: string | null;
+}
+
+export interface Conversation {
+  id: string;
+  kind: 'DIRECT' | 'GROUP';
+  name: string;
+  members: PersonCard[];
+  left: boolean;
+  lastMessageAt: string;
+  preview: { from: string; text: string } | null;
+  unread: number;
+}
+
+export interface ChatMessage {
+  id: string;
+  sender: PersonCard;
+  mine: boolean;
+  body: string | null;
+  removed: string | null;
+  createdAt: string;
+}
+
+export interface PostComment {
+  id: string;
+  author: PersonCard;
+  mine: boolean;
+  canRemove: boolean;
+  body: string | null;
+  removed: string | null;
+  createdAt: string;
+}
+
+export interface Post {
+  id: string;
+  author: PersonCard;
+  mine: boolean;
+  canRemove: boolean;
+  body: string | null;
+  removed: string | null;
+  attachments: { index: number; mime: string; name: string; size: number }[];
+  likes: number;
+  liked: boolean;
+  createdAt: string;
+  comments: PostComment[];
+}
+
+export interface ContentReport {
+  id: string;
+  target: 'MESSAGE' | 'POST' | 'COMMENT';
+  status: 'OPEN' | 'REMOVED' | 'DISMISSED';
+  reason: string;
+  note: string | null;
+  createdAt: string;
+  reviewedAt: string | null;
+  reporter: PersonCard;
+  where: string;
+  author: PersonCard | null;
+  body: string | null;
+  removed: boolean;
+}
+
+export type WorkMode = 'OFFICE' | 'REMOTE' | 'FIELD';
+
+export interface WorkSession {
+  id: string;
+  date: string;
+  clockIn: string;
+  clockOut: string | null;
+  mode: WorkMode;
+  minutes: number;
+  autoClosed: boolean;
+  edited: boolean;
+  editReason: string | null;
+}
+
+export interface WorkLog {
+  id: string;
+  date: string;
+  hours: number;
+  project: string;
+  description: string;
+}
+
+export interface ActivityWeek {
+  enabled: boolean;
+  company: string;
+  today: string;
+  timeZone: string;
+  editableFrom: string;
+  limits: { editDays: number; autoCloseAfterHours: number; dayHours: number };
+  week: { start: string; end: string };
+  open: WorkSession | null;
+  days: {
+    date: string;
+    working: boolean;
+    holiday: string | null;
+    onLeave: boolean;
+    sessions: WorkSession[];
+    logs: WorkLog[];
+    workedMinutes: number;
+    loggedHours: number;
+  }[];
+  totals: { workedMinutes: number; loggedHours: number; expectedHours: number };
+}
+
+export type PresenceStatus = 'IN' | 'OUT' | 'ON_LEAVE' | 'NOT_STARTED';
+
+export interface TeamActivity {
+  date: string;
+  wholeCompany: boolean;
+  entity: { id: string; code: string; name: string };
+  timeZone: string;
+  summary: { people: number; in: number; out: number; onLeave: number };
+  rows: {
+    id: string;
+    name: string;
+    employeeNumber: string;
+    jobTitle: string | null;
+    hasLogin: boolean;
+    status: PresenceStatus;
+    mode: WorkMode | null;
+    firstIn: string | null;
+    lastOut: string | null;
+    workedMinutes: number;
+    weekMinutes: number;
+    flags: string[];
+    logs: WorkLog[];
+  }[];
+  truncated: boolean;
+}
+
+export interface ActivityReport {
+  month: string;
+  entity: { id: string; code: string; name: string };
+  expectedHours: number;
+  rows: { employeeNumber: string; name: string; daysPresent: number; hoursWorked: number; hoursLogged: number; overExpected: number; forgotClockOut: number; edited: number }[];
+}

@@ -15,6 +15,8 @@ Updated at the end of each phase.
 - **Advances and loans only in the eight countries with a draft payroll pack.** France, India, China, Australia, the Netherlands, Japan and Korea can request IOUs only.
 - **Benefit prices are drafts.** Kenya's six meal and gym options come from the first build and await HR's confirmation; the other fourteen companies have no options until HR adds them. Payslip lines for benefits in kind, cash meal allowances and employee shares arrive with month-end payroll.
 - **The policy pack is a draft** (version 0.1) carried over from the first build. It has not been reviewed against each country's law.
+- **Chat refreshes by polling** every few seconds rather than over a live connection, and there are no push notifications yet.
+- **The activity tracker's 8-hour day** is a planning figure for its totals, not a contractual or legal working-time rule; overtime is not calculated from it.
 - **Half days** are not supported yet; leave counts whole working days.
 - **Docker image tags** in `docker-compose.yml` were pinned without pulling them in this environment; check `docker compose up -d` on first use.
 - The earlier build (PR #2) is left untouched. Its features are being carried over one by one (see the implementation plan); its four extra countries are already part of the fifteen.

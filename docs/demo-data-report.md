@@ -62,3 +62,7 @@ Each person has an employment, a job history (about a third were promoted), pay 
 ## Policies and forms
 
 `prisma/library-generator.ts` loads the first build's 22 policies and 20 forms from `sample-data/library/catalogue.json` and copies the PDFs into storage. About 80% of staff without a portal account have confirmed POL-01 (Code of Conduct) and about 55% POL-08 and POL-09, about 19,000 fictional confirmations in total. Test accounts start with everything still to read.
+
+## Chat, community and activity
+
+`prisma/workplace-generator.ts` adds two chats (Amina Mwangi and Kevin Otieno, and a "Kenya engineering" group with Wanjiru Kamau), two community posts with likes and comments, and one open report on an off-topic comment for Kenyan HR to review. It also records the last 10 working days of clock-ins and work notes for the Kenyan companies: about 86% attendance per day, about 1% forgotten clock-outs and 1.5% corrected sessions, and work notes on about 40% of days, skipping approved leave and public holidays. Staff who have started by the time the seed runs are shown clocked in today. Every name and note is fictional.

@@ -61,6 +61,11 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
     items: [
       { href: '/policies', label: 'nav.policies', needs: ['self.service'] },
       { href: '/policies/manage', label: 'nav.policiesManage', anyOf: ['policies.manage', 'people.read'] },
+      { href: '/chat', label: 'nav.chat', needs: ['self.service'] },
+      { href: '/community', label: 'nav.community', needs: ['self.service'] },
+      { href: '/community/moderation', label: 'nav.moderation', needs: ['people.manage'] },
+      { href: '/activity', label: 'nav.myDay', needs: ['self.service'] },
+      { href: '/activity/team', label: 'nav.teamActivity', anyOf: ['team.read', 'people.read', 'payroll.read'] },
     ],
   },
   {

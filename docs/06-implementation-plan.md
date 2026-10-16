@@ -40,7 +40,7 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 | Meal, gym and gift-voucher benefits | Phase 3-4 | Done, except the payslip lines, which come with payroll |
 | Month-end payroll and payslips for the first build's eight countries | Phase 4, rule packs marked unverified | Planned |
 | Policies and forms library (22 policies, 20 fillable forms) with read confirmations | Phase 3 | Done |
-| Staff chat, community page with moderation, daily activity tracker | Phase 3 | Planned |
+| Staff chat, community page with moderation, daily activity tracker | Phase 3 | Done |
 
 ## Phase 2, slice 2: employee master (this pull request)
 
@@ -85,4 +85,13 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 - Only group HR administrators publish, change or hide policies and forms (new group-only permission `policies.manage`). HR in each country sees, for their own companies, who has read the current version and emails a reminder to those with a portal account.
 - About 19,000 fictional read confirmations for three widely read policies in the demo data.
 
-Next: the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.
+## Phase 3, fifth slice: chat, community page and activity tracker from the first build (this pull request)
+
+- Direct and group chats between colleagues anywhere in the group, with unread counts. Leaving a group keeps what was said before; deleting a message hides it but keeps the record (POL-20 3.10).
+- The community page: posts with up to four photos, MP4 videos or PDFs (the author confirms they may share them), likes and comments.
+- Anyone can report a message, post or comment. The report goes to HR for the author's company, who remove it (the author is emailed) or keep it. HR in another country cannot see it.
+- My day: clock in and out with where you work (office, remote, on site), work notes, corrections for the last 7 days marked as edited, and forgotten clock-outs closed after 16 hours. No location, screen or keystrokes are recorded (POL-21).
+- Team activity: managers see everyone below them; HR and Payroll see a whole company, with a monthly report and CSV export. Switched off with the company's time and attendance module.
+- Sample chats, two posts with one open report, and two weeks of fictional clock-ins and work notes for the Kenyan companies.
+
+Next: month-end payroll and payslips for the first build's eight countries, with loan and benefit deductions.

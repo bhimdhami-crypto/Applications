@@ -228,27 +228,33 @@ enum ScopeType {
 }
 
 model User {
-  id                String           @id @default(cuid())
-  groupId           String           @map("group_id")
-  group             Group            @relation(fields: [groupId], references: [id])
+  id                String               @id @default(cuid())
+  groupId           String               @map("group_id")
+  group             Group                @relation(fields: [groupId], references: [id])
   /// Stored lower-case
-  email             String           @unique
-  displayName       String           @map("display_name")
+  email             String               @unique
+  displayName       String               @map("display_name")
   /// Null until the user accepts their invitation
-  passwordHash      String?          @map("password_hash")
-  preferredLanguage String?          @map("preferred_language")
-  isActive          Boolean          @default(true) @map("is_active")
-  failedLoginCount  Int              @default(0) @map("failed_login_count")
-  lockedUntil       DateTime?        @map("locked_until")
-  lastLoginAt       DateTime?        @map("last_login_at")
-  createdAt         DateTime         @default(now()) @map("created_at")
-  updatedAt         DateTime         @updatedAt @map("updated_at")
-  roles             RoleAssignment[] @relation("RoleHolder")
-  grantedRoles      RoleAssignment[] @relation("RoleGranter")
+  passwordHash      String?              @map("password_hash")
+  preferredLanguage String?              @map("preferred_language")
+  isActive          Boolean              @default(true) @map("is_active")
+  failedLoginCount  Int                  @default(0) @map("failed_login_count")
+  lockedUntil       DateTime?            @map("locked_until")
+  lastLoginAt       DateTime?            @map("last_login_at")
+  createdAt         DateTime             @default(now()) @map("created_at")
+  updatedAt         DateTime             @updatedAt @map("updated_at")
+  roles             RoleAssignment[]     @relation("RoleHolder")
+  grantedRoles      RoleAssignment[]     @relation("RoleGranter")
   challenges        LoginChallenge[]
   sessions          Session[]
   invites           UserInvite[]
   employment        Employment[]
+  chatMemberships   ConversationMember[]
+  chatMessages      ChatMessage[]        @relation("MessageSender")
+  communityPosts    CommunityPost[]      @relation("PostAuthor")
+  postLikes         PostLike[]
+  postComments      PostComment[]        @relation("CommentAuthor")
+  contentReports    ContentReport[]      @relation("ContentReporter")
 
   @@index([groupId])
   @@map("app_user")
@@ -515,6 +521,8 @@ model Employment {
   giftVouchers           GiftVoucher[]           @relation("VoucherFor")
   vouchersToApprove      GiftVoucher[]           @relation("VoucherApprover")
   policyAcknowledgements PolicyAcknowledgement[]
+  attendanceSessions     AttendanceSession[]
+  workLogs               WorkLog[]
 
   @@index([legalEntityId, status])
   @@index([personId])
@@ -1008,4 +1016,181 @@ model PolicyAcknowledgement {
   @@unique([itemId, version, employmentId])
   @@index([employmentId])
   @@map("policy_acknowledgement")
+}
+
+// ───────────────────────── Workplace: chat, community page, activity ─────────────────────────
+
+enum ConversationKind {
+  DIRECT
+  GROUP
+}
+
+/// A direct chat between two people or a named group, inside one group of companies
+model Conversation {
+  id            String               @id @default(cuid())
+  groupId       String               @map("group_id")
+  kind          ConversationKind
+  name          String?
+  /// For direct chats: the two user ids, sorted and joined, so a pair has one chat
+  directKey     String?              @unique @map("direct_key")
+  createdById   String               @map("created_by_id")
+  lastMessageAt DateTime             @default(now()) @map("last_message_at")
+  createdAt     DateTime             @default(now()) @map("created_at")
+  members       ConversationMember[]
+  messages      ChatMessage[]
+
+  @@index([groupId])
+  @@map("conversation")
+}
+
+model ConversationMember {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  userId         String       @map("user_id")
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lastReadAt     DateTime     @default(now()) @map("last_read_at")
+  /// Set when the member leaves a group; they keep read access to what was said before
+  leftAt         DateTime?    @map("left_at")
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+
+  @@unique([conversationId, userId])
+  @@index([userId])
+  @@map("conversation_member")
+}
+
+model ChatMessage {
+  id             String       @id @default(cuid())
+  conversationId String       @map("conversation_id")
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String       @map("sender_id")
+  sender         User         @relation("MessageSender", fields: [senderId], references: [id])
+  body           String
+  /// Hidden by the sender or a moderator; kept as a company record (POL-20 3.10)
+  removedAt      DateTime?    @map("removed_at")
+  removedById    String?      @map("removed_by_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  @@index([conversationId, createdAt])
+  @@map("chat_message")
+}
+
+model CommunityPost {
+  id          String        @id @default(cuid())
+  groupId     String        @map("group_id")
+  authorId    String        @map("author_id")
+  author      User          @relation("PostAuthor", fields: [authorId], references: [id])
+  body        String
+  /// [{ mime, ext, name, size }] in upload order; files are stored as community/<postId>/<index>.<ext>
+  attachments Json          @default("[]")
+  removedAt   DateTime?     @map("removed_at")
+  removedById String?       @map("removed_by_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+  likes       PostLike[]
+  comments    PostComment[]
+
+  @@index([groupId, createdAt])
+  @@map("community_post")
+}
+
+model PostLike {
+  postId    String        @map("post_id")
+  post      CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  userId    String        @map("user_id")
+  user      User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime      @default(now()) @map("created_at")
+
+  @@id([postId, userId])
+  @@map("post_like")
+}
+
+model PostComment {
+  id          String        @id @default(cuid())
+  postId      String        @map("post_id")
+  post        CommunityPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+  authorId    String        @map("author_id")
+  author      User          @relation("CommentAuthor", fields: [authorId], references: [id])
+  body        String
+  removedAt   DateTime?     @map("removed_at")
+  removedById String?       @map("removed_by_id")
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  @@index([postId, createdAt])
+  @@map("post_comment")
+}
+
+enum ReportTarget {
+  MESSAGE
+  POST
+  COMMENT
+}
+
+enum ReportStatus {
+  OPEN
+  REMOVED
+  DISMISSED
+}
+
+/// A colleague's report of a chat message, post or comment, reviewed by HR (POL-20 3.7)
+model ContentReport {
+  id            String       @id @default(cuid())
+  groupId       String       @map("group_id")
+  target        ReportTarget
+  targetId      String       @map("target_id")
+  /// The author's company when reported, so HR for that company reviews it; null for authors with no employee record
+  legalEntityId String?      @map("legal_entity_id")
+  reporterId    String       @map("reporter_id")
+  reporter      User         @relation("ContentReporter", fields: [reporterId], references: [id])
+  reason        String
+  status        ReportStatus @default(OPEN)
+  reviewedById  String?      @map("reviewed_by_id")
+  reviewedAt    DateTime?    @map("reviewed_at")
+  note          String?
+  createdAt     DateTime     @default(now()) @map("created_at")
+
+  @@unique([target, targetId, reporterId])
+  @@index([groupId, status, createdAt])
+  @@map("content_report")
+}
+
+enum WorkMode {
+  OFFICE
+  REMOTE
+  FIELD
+}
+
+/// One clock-in to clock-out on the activity tracker (POL-21). No location is recorded.
+model AttendanceSession {
+  id           String     @id @default(cuid())
+  employmentId String     @map("employment_id")
+  employment   Employment @relation(fields: [employmentId], references: [id], onDelete: Cascade)
+  /// The employee's local date at clock-in, in the company's time zone
+  date         DateTime   @db.Date
+  clockIn      DateTime   @map("clock_in")
+  clockOut     DateTime?  @map("clock_out")
+  mode         WorkMode
+  /// Closed by the portal because the employee forgot to clock out
+  autoClosed   Boolean    @default(false) @map("auto_closed")
+  editedAt     DateTime?  @map("edited_at")
+  editReason   String?    @map("edit_reason")
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  @@index([employmentId, date])
+  @@map("attendance_session")
+}
+
+/// What an employee worked on, in hours against a project
+model WorkLog {
+  id           String     @id @default(cuid())
+  employmentId String     @map("employment_id")
+  employment   Employment @relation(fields: [employmentId], references: [id], onDelete: Cascade)
+  date         DateTime   @db.Date
+  hours        Decimal    @db.Decimal(4, 2)
+  project      String
+  description  String
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  @@index([employmentId, date])
+  @@map("work_log")
 }

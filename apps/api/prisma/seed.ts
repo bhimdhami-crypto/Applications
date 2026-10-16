@@ -6,6 +6,7 @@ import { DEMO_BUSINESS_UNITS, DEMO_DEPARTMENTS, DEMO_ENTITIES, DEMO_FEATURES, DE
 import { generateLeave } from './leave-generator';
 import { generateLibrary } from './library-generator';
 import { generateBenefits } from './benefits-generator';
+import { generateWorkplace } from './workplace-generator';
 import { generateMoney } from './money-generator';
 import { DEFAULT_STAFF, generateStaff, StaffOptions } from './staff-generator';
 
@@ -139,6 +140,7 @@ export async function seed(prisma: PrismaClient, opts: SeedOptions = {}) {
     await generateBenefits(prisma, group.id, log);
   }
   await generateLibrary(prisma, group.id, log);
+  if (opts.staff !== false) await generateWorkplace(prisma, group.id, log);
   return group;
 }
 

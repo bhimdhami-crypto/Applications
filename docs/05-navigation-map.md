@@ -47,6 +47,11 @@ flowchart TB
   subgraph Workplace[Workplace]
     Policies[Policies and forms (3) ✓]
     PoliciesManage[Manage policies and forms (3) ✓]
+    Chat[Chat (3) ✓]
+    Community[Community (3) ✓]
+    Moderation[Moderation (3) ✓]
+    MyDay[My day (3) ✓]
+    TeamActivity[Team activity (3) ✓]
   end
 
   subgraph Payroll[Payroll]
@@ -104,6 +109,9 @@ flowchart TB
 | Money: benefit options | | | ✓ | read | read | | |
 | Workplace: policies and forms | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Workplace: manage policies | | | read report (group HR admins publish) | read report | | read report | ✓ |
+| Workplace: chat, community, my day | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Workplace: moderation | | | own companies | | | | ✓ |
+| Workplace: team activity | | team | own companies | own companies | | read | ✓ |
 | People | | | ✓ | read | | read | ✓ |
 | Payroll | | | | ✓ | read | read | ✓ |
 | Finance | | | | | ✓ | read | ✓ |
