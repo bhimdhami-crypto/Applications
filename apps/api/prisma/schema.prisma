@@ -480,37 +480,40 @@ model PersonIdentifier {
 
 /// One period of employment with one company
 model Employment {
-  id               String             @id @default(cuid())
-  personId         String             @map("person_id")
-  person           Person             @relation(fields: [personId], references: [id])
-  legalEntityId    String             @map("legal_entity_id")
-  legalEntity      LegalEntity        @relation(fields: [legalEntityId], references: [id])
+  id                String             @id @default(cuid())
+  personId          String             @map("person_id")
+  person            Person             @relation(fields: [personId], references: [id])
+  legalEntityId     String             @map("legal_entity_id")
+  legalEntity       LegalEntity        @relation(fields: [legalEntityId], references: [id])
   /// Employee number, unique across the group
-  employeeNumber   String             @unique @map("employee_number")
+  employeeNumber    String             @unique @map("employee_number")
   /// The portal account of this employee, if they have one
-  userId           String?            @unique @map("user_id")
-  user             User?              @relation(fields: [userId], references: [id])
-  workEmail        String?            @unique @map("work_email")
-  employmentType   EmploymentType     @default(PERMANENT) @map("employment_type")
-  workLocation     WorkLocation       @default(ON_SITE) @map("work_location")
-  hireDate         DateTime           @map("hire_date") @db.Date
-  probationEndDate DateTime?          @map("probation_end_date") @db.Date
-  endDate          DateTime?          @map("end_date") @db.Date
-  exitReason       String?            @map("exit_reason")
-  status           EmploymentStatus   @default(ACTIVE)
-  createdAt        DateTime           @default(now()) @map("created_at")
-  updatedAt        DateTime           @updatedAt @map("updated_at")
-  assignments      Assignment[]       @relation("AssignmentOf")
-  reports          Assignment[]       @relation("ManagerOf")
-  compensation     Compensation[]
-  bankAccounts     BankAccount[]
-  documents        EmployeeDocument[]
-  changeRequests   ChangeRequest[]
-  leaveRequests    LeaveRequest[]     @relation("LeaveOf")
-  leaveToApprove   LeaveRequest[]     @relation("LeaveApprover")
-  leaveAdjustments LeaveAdjustment[]
-  loans            Loan[]             @relation("LoanOf")
-  loansToApprove   Loan[]             @relation("LoanApprover")
+  userId            String?            @unique @map("user_id")
+  user              User?              @relation(fields: [userId], references: [id])
+  workEmail         String?            @unique @map("work_email")
+  employmentType    EmploymentType     @default(PERMANENT) @map("employment_type")
+  workLocation      WorkLocation       @default(ON_SITE) @map("work_location")
+  hireDate          DateTime           @map("hire_date") @db.Date
+  probationEndDate  DateTime?          @map("probation_end_date") @db.Date
+  endDate           DateTime?          @map("end_date") @db.Date
+  exitReason        String?            @map("exit_reason")
+  status            EmploymentStatus   @default(ACTIVE)
+  createdAt         DateTime           @default(now()) @map("created_at")
+  updatedAt         DateTime           @updatedAt @map("updated_at")
+  assignments       Assignment[]       @relation("AssignmentOf")
+  reports           Assignment[]       @relation("ManagerOf")
+  compensation      Compensation[]
+  bankAccounts      BankAccount[]
+  documents         EmployeeDocument[]
+  changeRequests    ChangeRequest[]
+  leaveRequests     LeaveRequest[]     @relation("LeaveOf")
+  leaveToApprove    LeaveRequest[]     @relation("LeaveApprover")
+  leaveAdjustments  LeaveAdjustment[]
+  loans             Loan[]             @relation("LoanOf")
+  loansToApprove    Loan[]             @relation("LoanApprover")
+  benefits          BenefitEnrolment[] @relation("BenefitOf")
+  giftVouchers      GiftVoucher[]      @relation("VoucherFor")
+  vouchersToApprove GiftVoucher[]      @relation("VoucherApprover")
 
   @@index([legalEntityId, status])
   @@index([personId])
@@ -853,4 +856,107 @@ model LoanRepayment {
 
   @@index([loanId])
   @@map("loan_repayment")
+}
+
+enum BenefitKind {
+  MEAL
+  GYM
+}
+
+enum VoucherOccasion {
+  BIRTHDAY
+  LONG_SERVICE
+  FESTIVE
+  RECOGNITION
+  WEDDING
+  NEW_BABY
+  OTHER
+}
+
+/// A meal or gym option a company offers (POL-17 3.7, 3.8), with what the company and the employee pay each month
+model BenefitPlan {
+  id            String             @id @default(cuid())
+  legalEntityId String             @map("legal_entity_id")
+  kind          BenefitKind
+  name          String
+  provider      String?
+  description   String?
+  /// Paid by the company each month: a taxable benefit in kind, or cash with salary when paidAsCash
+  companyShare  Decimal            @map("company_share") @db.Decimal(18, 4)
+  /// Deducted from the employee's net pay each month
+  employeeShare Decimal            @default(0) @map("employee_share") @db.Decimal(18, 4)
+  paidAsCash    Boolean            @default(false) @map("paid_as_cash")
+  /// Who may join; empty means everyone
+  workLocations WorkLocation[]     @map("work_locations")
+  active        Boolean            @default(true)
+  enrolments    BenefitEnrolment[]
+  createdAt     DateTime           @default(now()) @map("created_at")
+  updatedAt     DateTime           @updatedAt @map("updated_at")
+
+  @@unique([legalEntityId, kind, name])
+  @@map("benefit_plan")
+}
+
+/// Meal voucher (HR-F06) or gym membership (HR-F07). Runs whole calendar months.
+model BenefitEnrolment {
+  id               String          @id @default(cuid())
+  employmentId     String          @map("employment_id")
+  employment       Employment      @relation("BenefitOf", fields: [employmentId], references: [id], onDelete: Cascade)
+  legalEntityId    String          @map("legal_entity_id")
+  planId           String          @map("plan_id")
+  plan             BenefitPlan     @relation(fields: [planId], references: [id])
+  kind             BenefitKind
+  /// First day of the first month
+  startDate        DateTime        @map("start_date") @db.Date
+  /// Last day of the last month, once ended
+  endDate          DateTime?       @map("end_date") @db.Date
+  /// Meal: dietary needs. Gym: branch and emergency contact.
+  dietaryNeeds     String?         @map("dietary_needs")
+  branch           String?
+  emergencyContact String?         @map("emergency_contact")
+  status           RequestStatus
+  stages           ApprovalStage[]
+  stage            ApprovalStage?
+  approverId       String?         @map("approver_id")
+  decisions        Json            @default("[]")
+  createdById      String?         @map("created_by_id")
+  cancelledById    String?         @map("cancelled_by_id")
+  cancelledAt      DateTime?       @map("cancelled_at")
+  createdAt        DateTime        @default(now()) @map("created_at")
+  updatedAt        DateTime        @updatedAt @map("updated_at")
+
+  @@index([employmentId, status])
+  @@index([legalEntityId, status, stage])
+  @@map("benefit_enrolment")
+}
+
+/// Gift voucher nomination (HR-F05). Taxed as a benefit in kind in the payroll month it is issued.
+model GiftVoucher {
+  id            String          @id @default(cuid())
+  employmentId  String          @map("employment_id")
+  employment    Employment      @relation("VoucherFor", fields: [employmentId], references: [id], onDelete: Cascade)
+  legalEntityId String          @map("legal_entity_id")
+  occasion      VoucherOccasion
+  value         Decimal         @db.Decimal(18, 4)
+  currency      String          @db.Char(3)
+  partner       String?
+  reason        String?
+  /// Payroll month the voucher is taxed in, as year * 100 + month
+  taxMonth      Int?            @map("tax_month")
+  status        RequestStatus
+  stages        ApprovalStage[]
+  stage         ApprovalStage?
+  approverId    String?         @map("approver_id")
+  approver      Employment?     @relation("VoucherApprover", fields: [approverId], references: [id])
+  decisions     Json            @default("[]")
+  createdById   String?         @map("created_by_id")
+  cancelledById String?         @map("cancelled_by_id")
+  cancelledAt   DateTime?       @map("cancelled_at")
+  createdAt     DateTime        @default(now()) @map("created_at")
+  updatedAt     DateTime        @updatedAt @map("updated_at")
+
+  @@index([employmentId, status])
+  @@index([legalEntityId, status, stage])
+  @@index([approverId, status])
+  @@map("gift_voucher")
 }

@@ -57,7 +57,7 @@ export default function ApprovalsPage() {
 
   return (
     <>
-      <PageHead title={t('nav.approvals')} sub="Salary advances, staff loans and IOUs waiting for you. Each step is approved by a different person, and nobody approves their own request." />
+      <PageHead title={t('nav.approvals')} sub="Salary advances, staff loans, IOUs, meal and gym enrolments and gift vouchers waiting for you. Each step is approved by a different person, and nobody approves their own request." />
       {notice && (
         <div className="alert success" role="status">
           {notice}
@@ -113,7 +113,7 @@ export default function ApprovalsPage() {
                         ))}
                       </ul>
                     )}
-                    <div className="muted">Rules {r.rulesVersion} (draft)</div>
+                    {r.rulesVersion && <div className="muted">Rules {r.rulesVersion} (draft)</div>}
                   </td>
                   <td style={{ minWidth: 200 }}>
                     <input

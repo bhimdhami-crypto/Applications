@@ -102,3 +102,26 @@ export function LoanDetails({ loan: l, lang = 'en' }: { loan: Loan; lang?: strin
     </div>
   );
 }
+
+export const LOCATION_LABEL: Record<string, string> = { ON_SITE: 'On site', HYBRID: 'Hybrid', FULLY_REMOTE: 'Fully remote' };
+export const OCCASION_LABEL: Record<string, string> = {
+  BIRTHDAY: 'Birthday',
+  LONG_SERVICE: 'Long service',
+  FESTIVE: 'Festive season',
+  RECOGNITION: 'Recognition',
+  WEDDING: 'Wedding',
+  NEW_BABY: 'New baby',
+  OTHER: 'Other',
+};
+
+/** Status of a meal or gym enrolment, or a gift voucher, in words */
+export function benefitStatus(r: { status: string; stageLabel: string | null; endLabel?: string | null }, issued = 'Active') {
+  if (r.status === 'PENDING') return `Waiting for ${r.stageLabel}`;
+  if (r.status === 'APPROVED') return r.endLabel ? `Ends ${r.endLabel}` : issued;
+  if (r.status === 'CLOSED') return r.endLabel ? `Ended ${r.endLabel}` : 'Ended';
+  return r.status === 'DECLINED' ? 'Declined' : 'Cancelled';
+}
+
+export function BenefitBadge({ r, issued }: { r: Parameters<typeof benefitStatus>[0]; issued?: string }) {
+  return <span className={`badge ${TONE[r.status] ?? ''}`}>{benefitStatus(r, issued)}</span>;
+}

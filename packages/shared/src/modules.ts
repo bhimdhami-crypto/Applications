@@ -6,6 +6,7 @@ export const FEATURE_MODULES = [
   { key: 'payroll', label: 'Payroll', alwaysOn: false },
   { key: 'expenses', label: 'Expenses', alwaysOn: false },
   { key: 'loans', label: 'Salary advances and loans', alwaysOn: false },
+  { key: 'benefits', label: 'Meal, gym and gift-voucher benefits', alwaysOn: false },
   { key: 'recruitment', label: 'Recruitment', alwaysOn: false },
   { key: 'performance', label: 'Performance and goals', alwaysOn: false },
   { key: 'learning', label: 'Learning', alwaysOn: false },

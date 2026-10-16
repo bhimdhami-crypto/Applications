@@ -52,6 +52,8 @@ const SECTIONS: { title: MessageKey; items: NavItem[] }[] = [
       { href: '/money', label: 'nav.myMoney', needs: ['self.service'] },
       { href: '/approvals', label: 'nav.approvals', anyOf: ['team.read', 'people.manage', 'payroll.prepare', 'finance.manage', 'requests.executive'] },
       { href: '/money/book', label: 'nav.loanBook', anyOf: ['payroll.read', 'finance.read'] },
+      { href: '/benefits', label: 'nav.benefits', needs: ['self.service'] },
+      { href: '/benefits/manage', label: 'nav.benefitOptions', anyOf: ['people.manage', 'payroll.read', 'finance.read'] },
     ],
   },
   {

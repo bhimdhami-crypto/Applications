@@ -27,6 +27,8 @@ export const sw: Messages = {
   'nav.myMoney': 'Malipo ya awali na mikopo',
   'nav.approvals': 'Maidhinisho',
   'nav.loanBook': 'Daftari la mikopo',
+  'nav.benefits': 'Marupurupu',
+  'nav.benefitOptions': 'Chaguo za marupurupu',
   'nav.insight': 'Dashibodi na ripoti',
   'top.allCompanies': 'Kampuni zangu zote',
   'top.company': 'Kampuni',

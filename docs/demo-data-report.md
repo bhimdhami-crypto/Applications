@@ -54,3 +54,7 @@ Each person has an employment, a job history (about a third were promoted), pay 
 ## Advances, loans and IOUs
 
 `prisma/money-generator.ts` adds fictional requests for staff hired before October 2025 who have no portal account. In the eight countries with a draft payroll pack, about 6% of permanent staff have a staff loan (repaid through September 2026 payroll) and about 3% a past salary advance; settled IOUs go to about 1% of staff in those countries and about 10% in the other seven, where IOUs are the only option. The demo employee (Kevin Otieno) has a personal loan being repaid since May 2026 and a salary advance waiting for his manager, Amina Mwangi. About 970 requests in total, all under rule pack `LOANS-2026.1-draft`.
+
+## Meal, gym and gift-voucher benefits
+
+`prisma/benefits-generator.ts` gives each Kenyan company the first build's six meal and gym options (draft prices in KES), then memberships for about 18% (meal) and 8% (gym) of staff hired before 2026 who have no portal account, and gift vouchers for about 3%. The demo employee (Kevin Otieno) has a Standard gym membership and a recognition voucher his manager nominated that waits for HR; a teammate's canteen wallet also waits for HR. About 220 memberships and 26 vouchers in total.

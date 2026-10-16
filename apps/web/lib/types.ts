@@ -379,7 +379,7 @@ export interface LoanQuote {
 }
 
 export interface ApprovalItem {
-  entity: 'loan';
+  entity: 'loan' | 'enrolment' | 'voucher';
   id: string;
   title: string;
   employee: { id: string; name: string; employeeNumber: string; entity: { code: string; name: string } };
@@ -391,6 +391,64 @@ export interface ApprovalItem {
   stages: string[];
   decisions: Decision[];
   receipt: boolean;
-  rulesVersion: string;
+  rulesVersion: string | null;
   createdAt: string;
+}
+
+export type BenefitKind = 'MEAL' | 'GYM';
+export type VoucherOccasion = 'BIRTHDAY' | 'LONG_SERVICE' | 'FESTIVE' | 'RECOGNITION' | 'WEDDING' | 'NEW_BABY' | 'OTHER';
+export type WorkLocation = 'ON_SITE' | 'HYBRID' | 'FULLY_REMOTE';
+
+export interface BenefitPlan {
+  id: string;
+  entityId: string;
+  kind: BenefitKind;
+  kindLabel: string;
+  name: string;
+  provider: string | null;
+  description: string | null;
+  companyShare: string;
+  employeeShare: string;
+  paidAsCash: boolean;
+  workLocations: WorkLocation[];
+  active: boolean;
+  currency: string;
+  eligible?: boolean;
+}
+
+export interface Enrolment {
+  id: string;
+  kind: BenefitKind;
+  kindLabel: string;
+  plan: { id: string; name: string; provider: string | null; companyShare: string; employeeShare: string; paidAsCash: boolean };
+  startLabel: string;
+  endLabel: string | null;
+  dietaryNeeds: string | null;
+  branch: string | null;
+  emergencyContact: string | null;
+  status: RequestStatusKey;
+  stageLabel: string | null;
+  stages: string[];
+  decisions: Decision[];
+  canEnd: boolean;
+  endsAtLabel: string | null;
+  employee?: { id: string; name: string; employeeNumber: string };
+}
+
+export interface Voucher {
+  id: string;
+  occasion: VoucherOccasion;
+  occasionLabel: string;
+  value: string;
+  currency: string;
+  partner: string | null;
+  reason: string | null;
+  status: RequestStatusKey;
+  stageLabel: string | null;
+  taxMonthLabel: string | null;
+  decisions: Decision[];
+  createdAt: string;
+  nominee?: string;
+  canCancel?: boolean;
+  employee?: { id: string; name: string; employeeNumber: string };
 }

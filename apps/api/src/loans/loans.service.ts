@@ -92,12 +92,16 @@ export class LoansService {
   /** Estimated monthly pay from the country's draft payroll rules, and what is already deducted each month */
   private async payPicture(e: MoneyPerson) {
     const pack = rulesFor(e.legalEntity.countryCode);
-    const [loans, pay] = await Promise.all([
+    const [loans, benefits, pay] = await Promise.all([
       // Advances and IOUs are one-off; only loan instalments recur every month
       this.prisma.loan.findMany({ where: { employmentId: e.id, status: { in: LIVE }, kind: LoanKind.LOAN }, include: { repayments: true } }),
+      // The employee's own share of running meal and gym benefits
+      this.prisma.benefitEnrolment.findMany({ where: { employmentId: e.id, status: { in: LIVE }, endDate: null }, select: { plan: { select: { employeeShare: true } } } }),
       currentPay(this.prisma, e.id),
     ]);
-    const commitments = loans.filter((l) => l.status === RequestStatus.PENDING || outstandingOf(l) > 0).reduce((s, l) => s + toMinor(l.instalment), 0);
+    const commitments =
+      loans.filter((l) => l.status === RequestStatus.PENDING || outstandingOf(l) > 0).reduce((s, l) => s + toMinor(l.instalment), 0) +
+      benefits.reduce((s, b) => s + toMinor(b.plan.employeeShare), 0);
     if (!pack || !pay) return { pack: pack ?? null, pay, gross: null, net: null, commitments };
     const r = pack.calculate({ basic: pay.basic, allowances: pay.allowances });
     return { pack, pay, gross: r.gross, net: r.net, commitments };

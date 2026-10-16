@@ -37,7 +37,7 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 | Sample staff | Generator: 500 to 1,000 per country, reproducible seed ([report](demo-data-report.md)) | Done |
 | Leave: requests, approvals, balances, team calendar, public holidays | Phase 3, draft rule pack marked unverified | Done |
 | Salary advances, staff loans and IOUs with approvals and payroll recovery | Phase 3-4, draft rules marked unverified | Done, except deduction in month-end payroll, which comes with payroll |
-| Meal, gym and gift-voucher benefits | Phase 3-4 | Planned |
+| Meal, gym and gift-voucher benefits | Phase 3-4 | Done, except the payslip lines, which come with payroll |
 | Month-end payroll and payslips for the first build's eight countries | Phase 4, rule packs marked unverified | Planned |
 | Policies and forms library (22 policies, 20 fillable forms) with read confirmations | Phase 3 | Planned |
 | Staff chat, community page with moderation, daily activity tracker | Phase 3 | Planned |
@@ -69,4 +69,13 @@ Bhim asked that nothing from the first build is lost: every feature, form and po
 - The loan book for Payroll and Finance, limited to their companies. Loan details are visible only to the employee, their approvers, Payroll and Finance.
 - Companies with loans switched off refuse new requests. About 970 fictional requests in the demo data.
 
-Next: benefits, the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.
+## Phase 3, third slice: meal, gym and gift-voucher benefits from the first build (this pull request)
+
+- Each company's meal and gym options with the company and employee share and who may join by work location. The first build's six Kenyan options are carried over as draft prices for HR to confirm; other companies start empty and HR adds their own.
+- Employees join from a month that payroll has not closed (HR, then Payroll approve), one meal option at a time, and end a membership at the end of the open payroll month.
+- Managers nominate their direct reports and HR anyone in their companies for gift vouchers; the nominator's own step counts, someone else approves the rest, and the voucher is taxed in the month it is issued.
+- The approvals inbox now carries enrolments and nominations next to loans. The employee's share of gym and meal plans counts against what an advance or loan may take.
+- HR, Payroll and Finance see each company's options, members, monthly cost and the year's vouchers; only HR changes options.
+- About 220 memberships and 26 vouchers for the Kenyan companies in the demo data.
+
+Next: the policies and forms library, chat, community and the activity tracker, then payroll for the first build's eight countries.

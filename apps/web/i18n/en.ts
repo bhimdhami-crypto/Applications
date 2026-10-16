@@ -25,6 +25,8 @@ export const en = {
   'nav.myMoney': 'Advances and loans',
   'nav.approvals': 'Approvals',
   'nav.loanBook': 'Loan book',
+  'nav.benefits': 'Benefits',
+  'nav.benefitOptions': 'Benefit options',
   'nav.insight': 'Dashboards and reports',
   'top.allCompanies': 'All my companies',
   'top.company': 'Company',

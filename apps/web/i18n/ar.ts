@@ -27,6 +27,8 @@ export const ar: Messages = {
   'nav.myMoney': 'السلف والقروض',
   'nav.approvals': 'الموافقات',
   'nav.loanBook': 'سجل القروض',
+  'nav.benefits': 'المزايا',
+  'nav.benefitOptions': 'خيارات المزايا',
   'nav.insight': 'لوحات المعلومات والتقارير',
   'top.allCompanies': 'جميع شركاتي',
   'top.company': 'الشركة',

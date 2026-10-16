@@ -40,6 +40,8 @@ flowchart TB
     MyMoney[Advances and loans (3) ✓]
     MoneyApprovals[Approvals (3) ✓]
     LoanBook[Loan book (3) ✓]
+    Benefits[Benefits (3) ✓]
+    BenefitOptions[Benefit options (3) ✓]
   end
 
   subgraph Payroll[Payroll]
@@ -92,6 +94,8 @@ flowchart TB
 | Money: advances and loans | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
 | Money: approvals | | ✓ | ✓ | ✓ | ✓ | | |
 | Money: loan book | | | | ✓ | ✓ | | |
+| Money: benefits | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| Money: benefit options | | | ✓ | read | read | | |
 | People | | | ✓ | read | | read | ✓ |
 | Payroll | | | | ✓ | read | read | ✓ |
 | Finance | | | | | ✓ | read | ✓ |

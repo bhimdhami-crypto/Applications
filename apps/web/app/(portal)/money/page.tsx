@@ -159,7 +159,7 @@ function MoneyPage() {
             <div className="card stat">
               <div className="label">Net pay (estimate)</div>
               <div className="value money">{m(opts.net)}</div>
-              <div className="muted small">{Number(opts.commitments) > 0 ? `${m(opts.commitments)} a month already goes to loans` : 'Before any loan deductions'}</div>
+              <div className="muted small">{Number(opts.commitments) > 0 ? `${m(opts.commitments)} a month already goes to loans and benefits` : 'Before any loan or benefit deductions'}</div>
             </div>
           )}
           {opts.maxAdvance && (

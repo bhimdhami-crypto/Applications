@@ -27,6 +27,8 @@ export const fr: Messages = {
   'nav.myMoney': 'Avances et prêts',
   'nav.approvals': 'Approbations',
   'nav.loanBook': 'Registre des prêts',
+  'nav.benefits': 'Avantages',
+  'nav.benefitOptions': 'Options d’avantages',
   'nav.insight': 'Tableaux de bord et rapports',
   'top.allCompanies': 'Toutes mes sociétés',
   'top.company': 'Société',
