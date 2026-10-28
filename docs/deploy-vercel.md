@@ -13,7 +13,8 @@ The demo build turns on **demo mode**: the sign-in page lists the test accounts 
 ## 1. API project
 
 1. On Vercel choose **Add New → Project**, import `bhimdhami-crypto/Applications`, name it `mindspace-hr-api`
-   and set **Root Directory** to `apps/api`. Leave the build settings as they are (`apps/api/vercel.json` sets them).
+   and set **Root Directory** to `apps/api`. Leave the build settings as they are (`apps/api/vercel.json` sets them;
+   it installs from the repository root, since Vercel's own install fails on npm workspaces with "Tracker idealTree already exists").
 2. Add these **Environment Variables**:
 
    | Name | Value |
