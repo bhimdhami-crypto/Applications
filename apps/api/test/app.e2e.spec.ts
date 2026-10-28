@@ -86,7 +86,31 @@ describe('Mindspace HR API', () => {
         .post('/api/auth/login')
         .send({ email: 'tester@mindspace-ai.test', password: USER_PASSWORD })
         .expect(200);
+      expect(login.body.demoCode).toBeUndefined();
       await request(app.getHttpServer()).post('/api/auth/verify').send({ challengeId: login.body.challengeId, code: '000000' }).expect(401);
+    });
+
+    it('lists the test accounts and returns the code only in demo mode', async () => {
+      const off = await request(app.getHttpServer()).get('/api/auth/demo').expect(200);
+      expect(off.body).toEqual({ demo: false });
+      process.env.DEMO_MODE = 'true';
+      try {
+        const on = await request(app.getHttpServer()).get('/api/auth/demo').expect(200);
+        expect(on.body.accounts).toContainEqual(expect.objectContaining({ email: 'admin@mindspace-ai.test', password: ADMIN_PASSWORD }));
+        expect(on.body.accounts).toContainEqual(expect.objectContaining({ email: 'tester@mindspace-ai.test', password: USER_PASSWORD }));
+        const login = await request(app.getHttpServer())
+          .post('/api/auth/login')
+          .send({ email: 'manager@mindspace-ai.test', password: USER_PASSWORD })
+          .expect(200);
+        expect(login.body.demoCode).toMatch(/^\d{6}$/);
+        const verify = await request(app.getHttpServer())
+          .post('/api/auth/verify')
+          .send({ challengeId: login.body.challengeId, code: login.body.demoCode })
+          .expect(200);
+        expect(verify.body.user.email).toBe('manager@mindspace-ai.test');
+      } finally {
+        delete process.env.DEMO_MODE;
+      }
     });
 
     it('refuses requests without a token', async () => {

@@ -284,6 +284,12 @@ DATABASE_URL=postgresql://hr:<password>@localhost:5432/hrportal npm run db:seed 
 - Uploaded files live in the `storage` volume; back it up with the database, or move to object storage.
 - Set `PAYROLL_AUTODRAFT=false` on all but one API instance if you run several.
 
+### Public demo on Vercel
+
+The API and website can also run as two Vercel projects with a free Neon Postgres database, in **demo mode**
+(`DEMO_MODE=true`: the sign-in page lists the test accounts and the sign-in code is filled in for you) and with
+uploaded files kept in the database (`STORAGE_DRIVER=database`). Step-by-step setup: [docs/deploy-vercel.md](docs/deploy-vercel.md).
+
 ## Security
 
 - Two-step sign-in (password, CAPTCHA and an emailed code), sessions that end with the browser tab, accounts and roles re-checked on every request.

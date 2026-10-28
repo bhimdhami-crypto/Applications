@@ -905,3 +905,10 @@ model Goal {
 
   @@index([employeeId, status])
 }
+
+/// Uploaded files when STORAGE_DRIVER=database (hosts with no lasting disk, such as Vercel)
+model StoredFile {
+  key       String   @id
+  data      Bytes
+  createdAt DateTime @default(now())
+}

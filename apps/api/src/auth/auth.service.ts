@@ -10,8 +10,21 @@ import { CaptchaService } from './captcha.service';
 
 const MAX_CHALLENGES_PER_15_MIN = 5;
 
+/** The seeded test accounts, listed on the sign-in page when DEMO_MODE=true */
+const DEMO_ACCOUNTS = [
+  { email: 'admin@mindspace-ai.test', name: 'Administrator', role: 'Administrator', admin: true },
+  { email: 'hr@mindspace-ai.test', name: 'Wanjiru Kamau', role: 'HR' },
+  { email: 'payroll@mindspace-ai.test', name: 'Brian Otieno', role: 'Payroll' },
+  { email: 'finance@mindspace-ai.test', name: 'Lucy Achieng', role: 'Finance' },
+  { email: 'manager@mindspace-ai.test', name: 'Amina Hassan', role: 'Manager' },
+  { email: 'developer@mindspace-ai.test', name: 'Kevin Mwangi', role: 'Employee' },
+  { email: 'tester@mindspace-ai.test', name: 'Faith Njeri', role: 'Employee' },
+];
+
 /**
  * Two-step sign-in: password plus CAPTCHA, then a 6-digit code sent by email.
+ * DEMO_MODE=true (public demos only, never with real data) returns the code to the sign-in page
+ * instead of relying on email, and lifts the per-account attempt limit so visitors can share accounts.
  */
 @Injectable()
 export class AuthService {
@@ -37,7 +50,7 @@ export class AuthService {
 
     const since = new Date(Date.now() - 15 * 60_000);
     const recent = await this.prisma.loginChallenge.count({ where: { userId: user.id, createdAt: { gte: since } } });
-    if (recent >= MAX_CHALLENGES_PER_15_MIN) {
+    if (recent >= MAX_CHALLENGES_PER_15_MIN && !this.demoMode) {
       throw new HttpException('Too many sign-in attempts, wait 15 minutes', HttpStatus.TOO_MANY_REQUESTS);
     }
 
@@ -55,7 +68,23 @@ export class AuthService {
       subject: 'Your Mindspace sign-in code',
       text: `Your sign-in code is ${code}. It expires in ${ttl} minutes.\n\nIf you did not try to sign in, tell IT Security at once.`,
     });
+    if (this.demoMode) return { challengeId: challenge.id, message: 'Demo mode: your code has been filled in for you', demoCode: code };
     return { challengeId: challenge.id, message: `We sent a 6-digit code to ${user.email}` };
+  }
+
+  /** What the sign-in page shows: nothing normally, the test accounts and passwords in demo mode. */
+  demo() {
+    if (!this.demoMode) return { demo: false as const };
+    const adminPassword = this.config.get('SEED_ADMIN_PASSWORD', 'Admin#Mindspace2026');
+    const userPassword = this.config.get('SEED_USER_PASSWORD', 'Test#Mindspace2026');
+    return {
+      demo: true as const,
+      accounts: DEMO_ACCOUNTS.map(({ admin, ...a }) => ({ ...a, password: admin ? adminPassword : userPassword })),
+    };
+  }
+
+  private get demoMode() {
+    return this.config.get('DEMO_MODE') === 'true';
   }
 
   async verify(challengeId: string, code: string) {

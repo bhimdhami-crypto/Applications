@@ -16,6 +16,13 @@ const ENTITIES = [
 const SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? '1x00000000000000000000AA';
 const CAPTCHA_ON = SITE_KEY !== 'disabled';
 
+interface DemoAccount {
+  email: string;
+  name: string;
+  role: string;
+  password: string;
+}
+
 declare global {
   interface Window {
     turnstile?: {
@@ -38,8 +45,16 @@ export default function SignInPage() {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [scriptReady, setScriptReady] = useState(false);
+  const [demoAccounts, setDemoAccounts] = useState<DemoAccount[]>([]);
   const widgetRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<string | null>(null);
+
+  // In demo mode the API lists the test accounts so visitors can sign in
+  useEffect(() => {
+    api<{ demo: boolean; accounts?: DemoAccount[] }>('/auth/demo')
+      .then((res) => setDemoAccounts(res.accounts ?? []))
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!CAPTCHA_ON || step !== 'password' || !scriptReady || !widgetRef.current || !window.turnstile) return;
@@ -56,14 +71,20 @@ export default function SignInPage() {
     setBusy(true);
     setError('');
     try {
-      const res = await api<{ challengeId: string; message: string }>('/auth/login', {
+      const res = await api<{ challengeId: string; message: string; demoCode?: string }>('/auth/login', {
         method: 'POST',
         body: { email, password, captchaToken: captchaToken || undefined },
       });
+      widgetId.current = null;
+      if (res.demoCode) {
+        // Demo mode: the API hands back the code, so finish signing in straight away
+        setCode(res.demoCode);
+        await finishSignIn(res.challengeId, res.demoCode);
+        return;
+      }
       setChallengeId(res.challengeId);
       setMessage(res.message);
       setStep('code');
-      widgetId.current = null;
     } catch (err) {
       setError((err as Error).message);
       setCaptchaToken('');
@@ -78,14 +99,18 @@ export default function SignInPage() {
     setBusy(true);
     setError('');
     try {
-      const res = await api<{ accessToken: string; user: Me }>('/auth/verify', { method: 'POST', body: { challengeId, code } });
-      setToken(res.accessToken);
-      router.replace('/dashboard');
+      await finishSignIn(challengeId, code);
     } catch (err) {
       setError((err as Error).message);
     } finally {
       setBusy(false);
     }
+  }
+
+  async function finishSignIn(id: string, otp: string) {
+    const res = await api<{ accessToken: string; user: Me }>('/auth/verify', { method: 'POST', body: { challengeId: id, code: otp } });
+    setToken(res.accessToken);
+    router.replace('/dashboard');
   }
 
   return (
@@ -146,7 +171,7 @@ export default function SignInPage() {
               </label>
               {CAPTCHA_ON && <div ref={widgetRef} style={{ marginBottom: '1rem', minHeight: 65 }} />}
               <button type="submit" disabled={busy || (CAPTCHA_ON && !captchaToken)} style={{ width: '100%', minHeight: 42 }}>
-                {busy ? 'Checking…' : 'Continue'}
+                {busy ? 'Checking…' : demoAccounts.length ? 'Sign in' : 'Continue'}
               </button>
               <p className="auth-agree">
                 By signing in you agree to the <Link href="/legal#terms">Terms of use</Link> and acknowledge the{' '}
@@ -178,9 +203,41 @@ export default function SignInPage() {
               </button>
             </form>
           )}
+          {step === 'password' && demoAccounts.length > 0 && (
+            <div className="notice info" style={{ marginTop: '1.25rem', display: 'block' }}>
+              <strong>Demo accounts</strong>
+              <p style={{ margin: '0.25rem 0 0.6rem', fontSize: '0.8rem' }}>
+                All data is fictional. Pick an account to fill in the form; the sign-in code is entered for you.
+              </p>
+              <table style={{ width: '100%', fontSize: '0.78rem', borderCollapse: 'collapse' }}>
+                <tbody>
+                  {demoAccounts.map((a) => (
+                    <tr key={a.email} style={{ borderTop: '1px solid color-mix(in srgb, currentColor 15%, transparent)' }}>
+                      <td style={{ padding: '0.35rem 0.25rem 0.35rem 0' }}>
+                        <b>{a.role}</b> · {a.name}
+                        <br />
+                        <code>{a.email}</code>
+                        <br />
+                        <code>{a.password}</code>
+                      </td>
+                      <td style={{ textAlign: 'right', padding: '0.35rem 0' }}>
+                        <button type="button" className="ghost" style={{ minHeight: 30 }} onClick={() => { setEmail(a.email); setPassword(a.password); setError(''); }}>
+                          Use
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
           <div className="auth-secure">
             <ShieldCheck size={16} />
-            <span>Two-step sign-in: a 6-digit code is emailed to you each time. It expires after 5 minutes. Your session ends when you close this tab.</span>
+            <span>
+              {demoAccounts.length
+                ? 'Demo site: the 6-digit sign-in code is filled in for you instead of being emailed. Your session ends when you close this tab.'
+                : 'Two-step sign-in: a 6-digit code is emailed to you each time. It expires after 5 minutes. Your session ends when you close this tab.'}
+            </span>
           </div>
         </div>
         <AppFooter compact />
