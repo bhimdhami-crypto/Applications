@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api, BenefitKind, BenefitPlan, benefitStatus, Company, Employee, Enrolment, LOCATION_LABEL, money, Voucher } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { PageHeader } from '@/components/ui';
 
 interface Overview {
   company: { id: string; name: string; currency: string };
@@ -89,7 +90,7 @@ export default function ManageBenefitsPage() {
 
   return (
     <>
-      <h1>Benefit options</h1>
+      <PageHeader back={{ href: '/benefits', label: 'Benefits' }} title="Benefit options" sub="Meal and gym options and prices for each company, with members, monthly cost and vouchers issued." />
       <div className="toolbar">
         <label>
           Company
@@ -142,7 +143,7 @@ export default function ManageBenefitsPage() {
                   </tr>
                 );
               })}
-              {plans.length === 0 && <tr><td colSpan={isHr ? 6 : 5} className="muted">No options for this company yet.</td></tr>}
+              {plans.length === 0 && <tr><td colSpan={isHr ? 6 : 5} className="empty">No options for this company yet.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -197,7 +198,7 @@ export default function ManageBenefitsPage() {
                   {isHr && <td className="actions">{e.status === 'APPROVED' && !e.endLabel && <button className="secondary small" onClick={() => end(e)}>End</button>}</td>}
                 </tr>
               ))}
-              {overview && overview.enrolments.length === 0 && <tr><td colSpan={isHr ? 5 : 4} className="muted">Nobody has joined yet.</td></tr>}
+              {overview && overview.enrolments.length === 0 && <tr><td colSpan={isHr ? 5 : 4} className="empty">Nobody has joined yet.</td></tr>}
             </tbody>
           </table>
         </div>
@@ -218,7 +219,7 @@ export default function ManageBenefitsPage() {
                   <td><span className={`badge ${v.status}`}>{benefitStatus(v, 'Issued')}</span></td>
                 </tr>
               ))}
-              {overview && overview.vouchers.length === 0 && <tr><td colSpan={5} className="muted">No vouchers this year.</td></tr>}
+              {overview && overview.vouchers.length === 0 && <tr><td colSpan={5} className="empty">No vouchers this year.</td></tr>}
             </tbody>
           </table>
         </div>

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityReport, api, Company, downloadFile, hoursAndMinutes, MODE_LABEL, TeamActivity, timeIn } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { PageHeader } from '@/components/ui';
 
 const STATUS = { IN: 'Working now', OUT: 'Finished', ON_LEAVE: 'On leave', NOT_STARTED: 'Not clocked in' } as const;
 const STATUS_BADGE = { IN: 'APPROVED', OUT: 'FINALIZED', ON_LEAVE: 'PENDING', NOT_STARTED: 'CANCELLED' } as const;
@@ -57,10 +58,7 @@ export default function TeamActivityPage() {
   const rows = (data?.rows ?? []).filter((r) => !wholeCompany || everyone || search.trim() || r.status !== 'NOT_STARTED');
   return (
     <>
-      <h1>Team activity</h1>
-      <p className="muted">
-        {wholeCompany ? 'Who is working today across the company, and what they noted.' : 'Who in your team is working today, and what they noted.'} Times are local to the company.
-      </p>
+      <PageHeader title="Team activity" sub={<> {wholeCompany ? 'Who is working today across the company, and what they noted.' : 'Who in your team is working today, and what they noted.'} Times are local to the company. </>} />
       {error && <div className="notice error">{error}</div>}
 
       <div className="toolbar">
@@ -128,7 +126,7 @@ export default function TeamActivityPage() {
                     </td>
                   </tr>
                 ))}
-                {rows.length === 0 && <tr><td colSpan={6} className="muted">Nobody matches.</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={6} className="empty">Nobody matches.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -172,7 +170,7 @@ export default function TeamActivityPage() {
                       <td className="num">{r.edited || ''}</td>
                     </tr>
                   ))}
-                  {report.rows.length === 0 && <tr><td colSpan={7} className="muted">No time recorded this month.</td></tr>}
+                  {report.rows.length === 0 && <tr><td colSpan={7} className="empty">No time recorded this month.</td></tr>}
                 </tbody>
               </table>
             </div>

@@ -6,6 +6,7 @@ import { workingDays } from '../src/leave/calendar';
 import { instalmentFor } from '../src/loans/loan-rules';
 import { publicHolidays } from '../src/leave/public-holidays';
 import { seedLibrary, seedWorkplace } from './seed-workplace';
+import { seedTalent } from './seed-talent';
 
 const COMPANIES = [
   { code: 'MSA-INC', name: 'Mindspace Artificial Intelligence Inc.', country: 'United States', countryCode: 'US', currency: 'USD' },
@@ -122,6 +123,7 @@ export async function seed(prisma: PrismaClient) {
   await seedMoney(prisma, employeeIdByEmail);
   await seedLibrary(prisma);
   await seedWorkplace(prisma, employeeIdByEmail);
+  await seedTalent(prisma, employeeIdByEmail);
   return PEOPLE.map((p) => ({ email: p.email, role: p.role }));
 }
 

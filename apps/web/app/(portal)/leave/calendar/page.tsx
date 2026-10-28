@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { api, Company, COUNTRY_NAME, Holiday, LeaveStatus, LeaveType, LeaveTypeInfo } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Empty, PageHeader } from '@/components/ui';
 
 interface CalendarData {
   month: string;
@@ -59,11 +61,17 @@ export default function LeaveCalendarPage() {
 
   return (
     <>
-      <h1>Leave calendar</h1>
+      <PageHeader
+        title="Leave calendar"
+        sub={seesCompanies ? 'Who is away across a company, by day.' : 'When your colleagues are away. Only HR and managers see the type of leave.'}
+        actions={<Link className="button secondary" href="/leave/holidays"><CalendarDays size={16} /> Public holidays</Link>}
+      />
       <div className="toolbar">
-        <button className="secondary" onClick={() => setMonth(shift(month, -1))}>Previous</button>
-        <strong style={{ alignSelf: 'center', minWidth: '9rem', textAlign: 'center' }}>{monthName(month)}</strong>
-        <button className="secondary" onClick={() => setMonth(shift(month, 1))}>Next</button>
+        <div className="actions" style={{ marginBottom: 1 }}>
+          <button className="secondary" aria-label="Previous month" onClick={() => setMonth(shift(month, -1))}><ChevronLeft size={16} /></button>
+          <strong style={{ minWidth: '9rem', textAlign: 'center', fontSize: '1rem' }}>{monthName(month)}</strong>
+          <button className="secondary" aria-label="Next month" onClick={() => setMonth(shift(month, 1))}><ChevronRight size={16} /></button>
+        </div>
         {seesCompanies && (
           <label style={{ marginBottom: 0 }}>
             Company
@@ -73,7 +81,6 @@ export default function LeaveCalendarPage() {
             </select>
           </label>
         )}
-        <Link href="/leave/holidays" style={{ alignSelf: 'center' }}>Public holidays</Link>
       </div>
       {error && <div className="notice error">{error}</div>}
 
@@ -109,7 +116,7 @@ export default function LeaveCalendarPage() {
                 </tr>
               ))}
               {people.length === 0 && (
-                <tr><td className="muted" colSpan={data.days.length + 1}>Nobody is on leave in {monthName(month)}.</td></tr>
+                <tr><td colSpan={data.days.length + 1} style={{ height: 'auto' }}><Empty icon={CalendarDays} title={`Nobody is on leave in ${monthName(month)}`} /></td></tr>
               )}
             </tbody>
           </table>

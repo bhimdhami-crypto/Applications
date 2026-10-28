@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api, Company, LibraryItem, openFile } from '@/lib/api';
+import { PageHeader } from '@/components/ui';
 
 interface Report {
   item: { id: string; code: string; title: string; version: string };
@@ -102,8 +103,7 @@ export default function ManagePoliciesPage() {
 
   return (
     <>
-      <h1>Manage policies and forms</h1>
-      <p className="muted"><Link href="/policies">Back to Policies and forms</Link></p>
+      <PageHeader back={{ href: '/policies', label: 'Policies and forms' }} title="Manage policies and forms" sub="Upload new versions, hide documents, track who has read each policy per company and send reminders." />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
 

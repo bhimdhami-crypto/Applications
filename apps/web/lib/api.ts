@@ -28,6 +28,7 @@ export interface Me {
     department: string;
     workLocation: string;
     hireDate: string;
+    hasPhoto?: boolean;
     company: { name: string; currency: string; countryCode: string };
   };
 }
@@ -723,4 +724,202 @@ export interface ActivityReport {
   month: string;
   expectedHours: number;
   rows: Array<{ employeeNo: string; name: string; daysPresent: number; hoursWorked: number; hoursLogged: number; overExpected: number; forgotClockOut: number; edited: number }>;
+}
+
+// ---------------------------------------------------------------------------
+// Workforce analytics, organisation, recruitment, performance and audit
+// ---------------------------------------------------------------------------
+
+export interface Count { label: string; value: number }
+
+export interface EntitySummary {
+  companyId: string;
+  code: string;
+  name: string;
+  country: string;
+  countryCode: string;
+  currency: string;
+  headcount: number;
+  hires12m: number;
+  exits12m: number;
+  latestRun: { id: string; periodYear: number; periodMonth: number; status: PayrollRun['status']; totalNet: string; payslips: number } | null;
+  lastPayroll: { periodYear: number; periodMonth: number; totalGross: string; totalNet: string; employerCost: string; payslips: number } | null;
+}
+
+export interface Workforce {
+  asOf: string;
+  totals: {
+    headcount: number;
+    hires12m: number;
+    exits12m: number;
+    attritionRate: number;
+    avgTenureYears: number;
+    avgAge: number;
+    remoteShare: number;
+    managers: number;
+    onLeaveToday: number;
+    documentsToVerify: number;
+    documentsExpired: number;
+    openPositions: number;
+  };
+  byCompany: EntitySummary[];
+  byDepartment: Count[];
+  byLocation: Count[];
+  byContract: Count[];
+  byGender: Count[];
+  byGrade: Count[];
+  tenure: Count[];
+  age: Count[];
+  exitReasons: Count[];
+  monthly: { label: string; hires: number; exits: number }[];
+}
+
+export interface OrgNode {
+  id: string;
+  employeeNo: string;
+  firstName: string;
+  lastName: string;
+  jobTitle: string;
+  department: string;
+  grade: string | null;
+  workLocation: Employee['workLocation'];
+  companyId: string;
+  company: { code: string; countryCode: string; name: string };
+  hasPhoto: boolean;
+  reportCount: number;
+}
+
+export interface OrgEntity {
+  id: string;
+  code: string;
+  name: string;
+  country: string;
+  countryCode: string;
+  currency: string;
+  headcount: number;
+  departments: number;
+  payrollRules: { version: string; verified: boolean } | null;
+}
+
+export type OpeningStatus = 'OPEN' | 'ON_HOLD' | 'FILLED' | 'CLOSED';
+export type CandidateStage = 'APPLIED' | 'SCREENING' | 'INTERVIEW' | 'OFFER' | 'HIRED' | 'REJECTED' | 'WITHDRAWN';
+export const STAGES: CandidateStage[] = ['APPLIED', 'SCREENING', 'INTERVIEW', 'OFFER', 'HIRED', 'REJECTED', 'WITHDRAWN'];
+export const STAGE_LABEL: Record<CandidateStage, string> = {
+  APPLIED: 'Applied',
+  SCREENING: 'Screening',
+  INTERVIEW: 'Interview',
+  OFFER: 'Offer',
+  HIRED: 'Hired',
+  REJECTED: 'Not progressing',
+  WITHDRAWN: 'Withdrew',
+};
+
+export interface JobOpening {
+  id: string;
+  reference: string;
+  title: string;
+  department: string;
+  workLocation: Employee['workLocation'];
+  employmentType: Profile['employmentType'];
+  grade: string | null;
+  city: string | null;
+  positions: number;
+  salaryMin: string | null;
+  salaryMax: string | null;
+  description: string | null;
+  status: OpeningStatus;
+  closesOn: string | null;
+  createdAt: string;
+  companyId: string;
+  company: { name: string; countryCode: string; currency: string };
+  hiringManagerId: string | null;
+  hiringManager: { id: string; firstName: string; lastName: string; jobTitle: string } | null;
+  pipeline?: Record<CandidateStage, number>;
+  candidates?: number;
+}
+
+export interface Candidate {
+  id: string;
+  openingId: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string | null;
+  source: string;
+  stage: CandidateStage;
+  rating: number | null;
+  notes: string | null;
+  employeeId: string | null;
+  employee: { id: string; employeeNo: string } | null;
+  stageChangedAt: string;
+  createdAt: string;
+}
+
+export interface ReviewPerson { id: string; employeeNo: string; firstName: string; lastName: string; jobTitle: string; department: string; hasPhoto: boolean }
+
+export interface ReviewCycle {
+  id: string;
+  name: string;
+  companyId: string;
+  company: { name: string; countryCode: string };
+  periodStart: string;
+  periodEnd: string;
+  selfDueOn: string;
+  managerDueOn: string;
+  status: 'OPEN' | 'CLOSED';
+  progress: { total: number; selfReview: number; managerReview: number; completed: number };
+  ratings: { rating: number; label: string; count: number }[];
+}
+
+export interface Review {
+  id: string;
+  cycleId: string;
+  cycle: { id: string; name: string; status: 'OPEN' | 'CLOSED'; selfDueOn: string; managerDueOn: string; periodStart: string; periodEnd: string };
+  employee: ReviewPerson;
+  reviewer: ReviewPerson | null;
+  status: 'SELF_REVIEW' | 'MANAGER_REVIEW' | 'COMPLETED';
+  selfRating: number | null;
+  selfComments: string | null;
+  managerRating: number | null;
+  managerComments: string | null;
+  selfSubmittedAt: string | null;
+  completedAt: string | null;
+}
+
+export interface Goal {
+  id: string;
+  employeeId: string;
+  cycleId: string | null;
+  cycle: { name: string } | null;
+  title: string;
+  description: string | null;
+  weight: number;
+  progress: number;
+  status: 'IN_PROGRESS' | 'COMPLETED' | 'CANCELLED';
+  dueOn: string | null;
+}
+
+export const RATING_LABEL: Record<number, string> = {
+  1: 'Below expectations',
+  2: 'Partly meets expectations',
+  3: 'Meets expectations',
+  4: 'Exceeds expectations',
+  5: 'Exceptional',
+};
+
+export interface AuditEntry {
+  id: string;
+  actorId: string | null;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  details: unknown;
+  createdAt: string;
+  actor: { email: string; role: Role; name: string | null } | null;
+}
+
+/** Short money for tiles: KES 829.3M */
+export function compactMoney(value: string | number | undefined, currency: string) {
+  if (value === undefined) return '';
+  return `${currency} ${new Intl.NumberFormat('en-GB', { notation: 'compact', maximumFractionDigits: 1 }).format(Number(value))}`;
 }

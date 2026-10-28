@@ -1,0 +1,70 @@
+# The whole portal in containers: PostgreSQL, the API, the website and Mailpit for test email.
+#   cp .env.example .env.prod   # then set JWT_SECRET, passwords, SMTP and CAPTCHA keys
+#   docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+# Migrations run when the API starts. To load the companies and test accounts once, run from a checkout:
+#   DATABASE_URL=postgresql://hr:<password>@<host>:5432/hrportal npm run db:seed
+# Website: http://localhost:3000   Test inbox: http://localhost:8025
+# For real email, point SMTP_HOST/SMTP_PORT at your mail server and remove the mail service.
+services:
+  db:
+    image: postgres:16.10-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-hr}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-hr}
+      POSTGRES_DB: ${POSTGRES_DB:-hrportal}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-hr}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mail:
+    image: axllent/mailpit:v1.31.2
+    restart: unless-stopped
+    ports:
+      - "8025:8025"
+
+  api:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: api
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-hr}:${POSTGRES_PASSWORD:-hr}@db:5432/${POSTGRES_DB:-hrportal}
+      JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET to a long random string}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-8h}
+      MAIL_TRANSPORT: smtp
+      SMTP_HOST: ${SMTP_HOST:-mail}
+      SMTP_PORT: ${SMTP_PORT:-1025}
+      MAIL_FROM: ${MAIL_FROM:-Mindspace HR <no-reply@mindspace-ai.test>}
+      CAPTCHA_PROVIDER: ${CAPTCHA_PROVIDER:-turnstile}
+      TURNSTILE_SECRET: ${TURNSTILE_SECRET:-1x0000000000000000000000000000000AA}
+      PAYROLL_AUTODRAFT: ${PAYROLL_AUTODRAFT:-true}
+      WEB_ORIGIN: ${WEB_ORIGIN:-http://localhost:3000}
+    volumes:
+      - storage:/app/apps/api/storage
+
+  web:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+      target: web
+      args:
+        API_PROXY_TARGET: http://api:4000
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:-1x00000000000000000000AA}
+    restart: unless-stopped
+    depends_on:
+      - api
+    ports:
+      - "3000:3000"
+
+volumes:
+  pgdata:
+  storage:

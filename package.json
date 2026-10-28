@@ -1,7 +1,9 @@
 {
   "name": "mindspace-hr-portal",
   "private": true,
-  "description": "Mindspace Artificial Intelligence Inc. HR and payroll portal",
+  "description": "Mindspace Artificial Intelligence Inc. HR ERP: people, payroll, leave, loans, benefits, recruitment and performance",
+  "author": "Bhim Dhami",
+  "license": "UNLICENSED",
   "workspaces": [
     "apps/api",
     "apps/web"
@@ -14,8 +16,9 @@
     "db:import-sample": "npm run prisma:import-sample -w apps/api",
     "db:test:setup": "DATABASE_URL=${TEST_DATABASE_URL:-postgresql://hr:hr@localhost:5432/hrportal_test} npm run prisma:migrate -w apps/api",
     "test": "npm test -w apps/api",
-    "typecheck": "npm run typecheck -w apps/api",
-    "build": "npm run build -w apps/api && npm run build -w apps/web"
+    "typecheck": "npm run typecheck -w apps/api && npm run typecheck -w apps/web",
+    "build": "npm run build -w apps/api && npm run build -w apps/web",
+    "db:sample-reporting-lines": "npm run prisma:sample-reporting-lines -w apps/api"
   },
   "engines": {
     "node": ">=22"

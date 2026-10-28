@@ -32,7 +32,15 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
     router.replace('/');
   }, [router]);
 
-  if (!me) return <div className="loading">Loading…</div>;
+  if (!me)
+    return (
+      <div className="splash">
+        <div className="splash-inner">
+          <img src="/logo-mark.svg" alt="" />
+          <span><span className="spinner" /> Opening your workspace…</span>
+        </div>
+      </div>
+    );
   // Admin passes every role check, matching the API.
   const can = (...roles: Role[]) => me.role === 'ADMIN' || roles.includes(me.role);
   return <SessionContext.Provider value={{ me, signOut, can }}>{children}</SessionContext.Provider>;

@@ -3,6 +3,8 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, dateRange, LEAVE_STATUS_LABEL, LeaveRequest, LeaveTypeInfo } from '@/lib/api';
+import { CalendarCheck, Check, X } from 'lucide-react';
+import { Empty, PageHeader, StatusBadge } from '@/components/ui';
 
 export default function ApprovalsPage() {
   const [rows, setRows] = useState<LeaveRequest[] | null>(null);
@@ -42,8 +44,11 @@ export default function ApprovalsPage() {
 
   return (
     <>
-      <h1>Leave approvals</h1>
-      <p className="muted">Please respond within 3 working days. Requests that have waited longer are marked overdue.</p>
+      <PageHeader
+        title="Leave approvals"
+        sub="Please respond within 3 working days. Requests that have waited longer are marked overdue."
+        actions={rows && rows.length > 0 && <span className="tag">{rows.length} waiting · {rows.filter((r) => r.overdue).length} overdue</span>}
+      />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
       <div className="card table-wrap">
@@ -61,7 +66,7 @@ export default function ApprovalsPage() {
                 <td>
                   {label(r.type)}
                   <div className="muted small">{dateRange(r.startDate, r.endDate)}</div>
-                  {r.status === 'PENDING_HR' && <span className="badge PENDING_HR">{LEAVE_STATUS_LABEL[r.status]}</span>}
+                  {r.status === 'PENDING_HR' && <StatusBadge status="PENDING_HR" label={LEAVE_STATUS_LABEL[r.status]} />}
                 </td>
                 <td className="num">{r.days}</td>
                 <td className="small">
@@ -70,18 +75,18 @@ export default function ApprovalsPage() {
                   {r.documentId && <div className="muted">Document attached (see their profile)</div>}
                 </td>
                 <td>
-                  {r.overdue ? <span className="badge DECLINED">Overdue</span> : null} {r.waitingDays} working day{r.waitingDays === 1 ? '' : 's'}
+                  {r.overdue ? <StatusBadge status="OVERDUE" label="Overdue" /> : null} {r.waitingDays} working day{r.waitingDays === 1 ? '' : 's'}
                 </td>
                 <td className="decide">
                   <input placeholder="Note (optional)" value={notes[r.id] ?? ''} onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })} />
                   <div>
-                    <button className="small" disabled={!!busy} onClick={() => decide(r, true)}>Approve</button>{' '}
-                    <button className="danger small" disabled={!!busy} onClick={() => decide(r, false)}>Decline</button>
+                    <button className="small" disabled={!!busy} onClick={() => decide(r, true)}><Check size={14} /> Approve</button>
+                    <button className="secondary danger small" disabled={!!busy} onClick={() => decide(r, false)}><X size={14} /> Decline</button>
                   </div>
                 </td>
               </tr>
             ))}
-            {rows && rows.length === 0 && <tr><td colSpan={6} className="muted">Nothing is waiting for you.</td></tr>}
+            {rows && rows.length === 0 && <tr><td colSpan={6}><Empty icon={CalendarCheck} title="Nothing is waiting for you">New leave requests from your team appear here.</Empty></td></tr>}
           </tbody>
         </table>
       </div>

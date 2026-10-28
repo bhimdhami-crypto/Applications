@@ -1,9 +1,12 @@
 'use client';
 
 import Link from 'next/link';
-import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
+import { FormEvent, Suspense, useCallback, useEffect, useState } from 'react';
+import { Search, UserPlus, Users } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
-import { api, Company, Employee, LOCATION_LABEL, money, Page, Role, ROLE_LABEL } from '@/lib/api';
+import { Empty, PageHeader, StatusBadge } from '@/components/ui';
+import { api, Company, COUNTRY_NAME, Employee, LOCATION_LABEL, money, Page, Role, ROLE_LABEL } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
 const EMPTY = {
@@ -25,12 +28,23 @@ type Row = Employee & { hasPhoto: boolean };
 const PAGE_SIZE = 25;
 
 export default function EmployeesPage() {
+  // useSearchParams needs a Suspense boundary in the App Router
+  return (
+    <Suspense>
+      <Employees />
+    </Suspense>
+  );
+}
+
+function Employees() {
   const { me, can } = useSession();
+  const params = useSearchParams();
+  const urlQ = params.get('q') ?? '';
   const [data, setData] = useState<Page<Row> | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [managers, setManagers] = useState<Employee[]>([]);
-  const [q, setQ] = useState('');
-  const [search, setSearch] = useState('');
+  const [q, setQ] = useState(urlQ);
+  const [search, setSearch] = useState(urlQ);
   const [companyId, setCompanyId] = useState('');
   const [includeLeavers, setIncludeLeavers] = useState(false);
   const [page, setPage] = useState(1);
@@ -50,6 +64,12 @@ export default function EmployeesPage() {
   }, [page, includeLeavers, search, companyId]);
 
   useEffect(load, [load]);
+  // The search box in the top bar sends people here with ?q=
+  useEffect(() => {
+    setQ(urlQ);
+    setSearch(urlQ);
+    setPage(1);
+  }, [urlQ]);
   useEffect(() => {
     if (isManager) return;
     api<Company[]>('/companies').then(setCompanies).catch(() => setCompanies([]));
@@ -112,36 +132,32 @@ export default function EmployeesPage() {
 
   return (
     <>
-      <h1>{isManager ? 'My team' : 'Employees'}</h1>
+      <PageHeader
+        title={isManager ? 'My team' : 'Employees'}
+        sub={
+          isManager
+            ? 'Your direct reports. Pay, IDs and documents stay with HR and payroll.'
+            : data
+              ? `${data.total.toLocaleString('en-GB')} ${includeLeavers ? 'people including leavers' : 'active people'}${companyId ? '' : ' across all companies'}`
+              : 'Everyone employed by Mindspace and its subsidiaries'
+        }
+        actions={canAdd && (
+          <button type="button" className={showForm ? 'secondary' : ''} onClick={() => setShowForm(!showForm)}>
+            {showForm ? 'Cancel' : <><UserPlus size={16} /> Add employee</>}
+          </button>
+        )}
+      />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
 
-      <form className="toolbar" onSubmit={submitSearch}>
-        <label>
-          Search
-          <input placeholder="Name, number, email or job" value={q} onChange={(e) => setQ(e.target.value)} />
-        </label>
-        {!isManager && (
-          <label>
-            Company
-            <select value={companyId} onChange={(e) => { setCompanyId(e.target.value); setPage(1); }}>
-              <option value="">All companies</option>
-              {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </label>
-        )}
-        <button type="submit">Search</button>
-        <div className="checks" style={{ paddingBottom: '0.6rem' }}>
-          <label>
-            <input type="checkbox" checked={includeLeavers} onChange={(e) => { setIncludeLeavers(e.target.checked); setPage(1); }} />
-            Show leavers
-          </label>
-        </div>
-        {canAdd && <button type="button" className="secondary" onClick={() => setShowForm(!showForm)}>{showForm ? 'Cancel' : 'Add employee'}</button>}
-      </form>
-
       {showForm && (
         <form className="card" onSubmit={add}>
+          <div className="card-head" style={{ padding: 0, border: 0, marginBottom: '1rem' }}>
+            <div>
+              <h2>New employee</h2>
+              <p className="sub">They get a portal login and a welcome email with a temporary password.</p>
+            </div>
+          </div>
           <div className="form-grid">
             <label>First name<input required value={form.firstName} onChange={set('firstName')} /></label>
             <label>Last name<input required value={form.lastName} onChange={set('lastName')} /></label>
@@ -178,17 +194,40 @@ export default function EmployeesPage() {
               </select>
             </label>
           </div>
-          <button type="submit">Add employee</button>
+          <div className="form-actions">
+            <button type="button" className="secondary" onClick={() => setShowForm(false)}>Cancel</button>
+            <button type="submit"><UserPlus size={16} /> Add employee</button>
+          </div>
         </form>
       )}
+
+      <form className="toolbar" onSubmit={submitSearch}>
+        <label style={{ flex: '2 1 260px' }}>
+          Search
+          <input placeholder="Name, number, email, job or department" value={q} onChange={(e) => setQ(e.target.value)} />
+        </label>
+        {!isManager && (
+          <label style={{ flex: '1 1 220px' }}>
+            Company
+            <select value={companyId} onChange={(e) => { setCompanyId(e.target.value); setPage(1); }}>
+              <option value="">All companies</option>
+              {companies.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          </label>
+        )}
+        <div className="segmented" role="group" aria-label="Employment status" style={{ marginBottom: 1 }}>
+          <button type="button" className={!includeLeavers ? 'active' : ''} onClick={() => { setIncludeLeavers(false); setPage(1); }}>Active</button>
+          <button type="button" className={includeLeavers ? 'active' : ''} onClick={() => { setIncludeLeavers(true); setPage(1); }}>Include leavers</button>
+        </div>
+        <button type="submit"><Search size={16} /> Search</button>
+      </form>
 
       <div className="card table-wrap">
         <table>
           <thead>
             <tr>
-              <th>Name</th>
-              <th>No.</th>
-              <th>Job title</th>
+              <th>Employee</th>
+              <th>Job</th>
               <th>Company</th>
               <th>Location</th>
               <th>Status</th>
@@ -201,34 +240,48 @@ export default function EmployeesPage() {
               <tr key={e.id}>
                 <td>
                   <span className="person">
-                    <Avatar employeeId={e.id} name={`${e.firstName} ${e.lastName}`} hasPhoto={e.hasPhoto} size={32} />
-                    <Link href={`/employees/${e.id}`}>{e.firstName} {e.lastName}</Link>
+                    <Avatar employeeId={e.id} name={`${e.firstName} ${e.lastName}`} hasPhoto={e.hasPhoto} size={34} />
+                    <span>
+                      <Link href={`/employees/${e.id}`}>{e.firstName} {e.lastName}</Link>
+                      <span className="sub">{e.employeeNo}</span>
+                    </span>
                   </span>
                 </td>
-                <td>{e.employeeNo}</td>
-                <td>{e.jobTitle}</td>
-                <td>{e.company.name}</td>
+                <td>
+                  {e.jobTitle}
+                  <span className="muted small" style={{ display: 'block' }}>{e.department}{e.grade ? ` · ${e.grade}` : ''}</span>
+                </td>
+                <td>
+                  <span className="person" title={e.company.name}>
+                    <span className="cc">{e.company.countryCode}</span>
+                    <span>{COUNTRY_NAME[e.company.countryCode] ?? e.company.name}{e.city && <span className="sub">{e.city}</span>}</span>
+                  </span>
+                </td>
                 <td>{LOCATION_LABEL[e.workLocation]}</td>
-                <td><span className={`badge ${e.status}`}>{e.status}</span></td>
+                <td><StatusBadge status={e.status} /></td>
                 {showPay && <td className="num">{money(e.monthlyBasic, e.company.currency)}</td>}
                 {isAdmin && (
-                  <td>
+                  <td className="actions">
                     {e.status === 'ACTIVE' && e.user?.email !== me.email && (
-                      <button className="danger small" onClick={() => remove(e)}>Delete</button>
+                      <button className="secondary danger small" onClick={() => remove(e)}>Remove</button>
                     )}
                   </td>
                 )}
               </tr>
             ))}
             {data && employees.length === 0 && (
-              <tr><td colSpan={8} className="muted">No employees match.</td></tr>
+              <tr><td colSpan={8}><Empty icon={Users} title="No employees match">Try a different name or number, or include leavers.</Empty></td></tr>
+            )}
+            {!data && !error && (
+              <tr><td colSpan={8} className="loading"><span className="spinner" /> Loading employees…</td></tr>
             )}
           </tbody>
         </table>
-        {data && (
+        {data && data.total > 0 && (
           <div className="pager">
-            <span className="muted">{data.total.toLocaleString('en-GB')} people · page {data.page} of {pages}</span>
+            <span className="muted">Showing {((data.page - 1) * data.pageSize + 1).toLocaleString('en-GB')}–{Math.min(data.page * data.pageSize, data.total).toLocaleString('en-GB')} of {data.total.toLocaleString('en-GB')}</span>
             <button className="secondary small" disabled={page <= 1} onClick={() => setPage(page - 1)}>Previous</button>
+            <span className="muted small">Page {data.page} of {pages.toLocaleString('en-GB')}</span>
             <button className="secondary small" disabled={page >= pages} onClick={() => setPage(page + 1)}>Next</button>
           </div>
         )}

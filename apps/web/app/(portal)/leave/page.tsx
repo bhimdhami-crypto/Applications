@@ -5,6 +5,8 @@ import { useSearchParams } from 'next/navigation';
 import { FormEvent, Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { api, COUNTRY_NAME, dateRange, formatDate, LEAVE_STATUS_LABEL, LeaveBalance, LeaveRequest, LeaveType, LeaveTypeInfo } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { CalendarPlus, CalendarDays } from 'lucide-react';
+import { Empty, PageHeader, StatusBadge } from '@/components/ui';
 
 interface LeaveList {
   employee: { id: string; name: string; employeeNo: string; countryCode: string; company: string };
@@ -123,30 +125,30 @@ function LeavePage() {
 
   return (
     <>
-      <div className="section-head">
-        <h1>{own ? 'My leave' : `Leave: ${data?.employee.name ?? ''}`}</h1>
-        <div className="toolbar" style={{ marginBottom: 0 }}>
-          <label style={{ marginBottom: 0 }}>
-            Year
-            <select value={year} onChange={(e) => setYear(Number(e.target.value))}>
+      <PageHeader
+        back={!own && data ? { href: `/employees/${data.employee.id}`, label: `${data.employee.employeeNo} · ${data.employee.company}` } : undefined}
+        title={own ? 'My leave' : `Leave: ${data?.employee.name ?? ''}`}
+        sub={own ? 'Balances, requests and approvals. Working days skip weekends and public holidays.' : 'HR view: record leave, check balances and adjust them.'}
+        actions={
+          <>
+            <Link className="button secondary" href="/leave/calendar"><CalendarDays size={16} /> Team calendar</Link>
+            <select value={year} onChange={(e) => setYear(Number(e.target.value))} aria-label="Year" style={{ width: 'auto', margin: 0 }}>
               {[thisYear - 1, thisYear, thisYear + 1].map((y) => <option key={y}>{y}</option>)}
             </select>
-          </label>
-        </div>
-      </div>
-      {!own && data && (
-        <p className="muted">
-          <Link href={`/employees/${data.employee.id}`}>{data.employee.employeeNo}</Link> · {data.employee.company}
-        </p>
-      )}
+          </>
+        }
+      />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
 
       {annual && (
         <div className="grid">
-          <div className="card stat">
+          <div className="card stat" style={{ gridColumn: 'span 2' }}>
             <div className="label">Annual leave left in {year}</div>
-            <div className="value">{annual.left} days</div>
+            <div className="value">{annual.left} <span className="muted small" style={{ fontWeight: 500 }}>days</span></div>
+            <div className="progress teal" style={{ margin: '0.4rem 0 0.5rem' }}>
+              <span style={{ width: `${Math.min(100, Math.max(0, ((annual.left ?? 0) / Math.max(1, (annual.entitlement ?? 0) + annual.carriedOver + annual.adjustment)) * 100))}%` }} />
+            </div>
             <div className="muted small">
               {annual.entitlement} for the year
               {annual.carriedOver ? ` + ${annual.carriedOver} carried over` : ''}
@@ -168,7 +170,7 @@ function LeavePage() {
 
       {canRequest && (
         <form className="card" onSubmit={submit}>
-          <h2 style={{ marginTop: 0 }}>{own ? 'Request leave' : 'Record leave'}</h2>
+          <h2 style={{ marginTop: 0 }}><span className="actions" style={{ gap: '0.5rem' }}><CalendarPlus size={18} className="muted" /> {own ? 'Request leave' : 'Record leave'}</span></h2>
           {!own && <p className="muted">Leave you record here is approved straight away. Use it for staff without a portal login, or to correct the record.</p>}
           <div className="form-grid">
             <label>
@@ -189,13 +191,15 @@ function LeavePage() {
           <label>Reason or notes (optional)<textarea rows={2} value={form.reason} onChange={set('reason')} /></label>
           {info && <p className="muted small">{info.note}{info.hrApproval ? ' Needs approval from your manager and then HR.' : ''}</p>}
           {preview && (
-            <p>
+            <div className="quote">
               <strong>{preview.days} working day{preview.days === 1 ? '' : 's'}</strong>
               {preview.holidays.length > 0 && <span className="muted"> (skips {preview.holidays.map((h) => `${h.name} on ${formatDate(h.date)}`).join(', ')})</span>}
-            </p>
+            </div>
           )}
           {needsCertificate && <p className="muted small">Sick leave over 2 days needs a medical certificate.</p>}
-          <button type="submit" disabled={busy}>{own ? 'Send request' : 'Record leave'}</button>
+          <div className="form-actions">
+            <button type="submit" disabled={busy}>{own ? 'Send request' : 'Record leave'}</button>
+          </div>
         </form>
       )}
 
@@ -215,12 +219,12 @@ function LeavePage() {
                   <td>{typeLabel(r.type)}</td>
                   <td>{dateRange(r.startDate, r.endDate)}</td>
                   <td className="num">{r.days}</td>
-                  <td><span className={`badge ${r.status}`}>{LEAVE_STATUS_LABEL[r.status]}</span></td>
+                  <td><StatusBadge status={r.status} label={LEAVE_STATUS_LABEL[r.status]} /></td>
                   <td className="muted small">{[r.reason, r.managerNote && `Manager: ${r.managerNote}`, r.hrNote && `HR: ${r.hrNote}`].filter(Boolean).join(' · ')}</td>
                   <td className="actions">{r.canCancel && <button className="secondary small" onClick={() => cancel(r)}>Cancel</button>}</td>
                 </tr>
               ))}
-              {data && data.requests.length === 0 && <tr><td colSpan={6} className="muted">No leave in {year}.</td></tr>}
+              {data && data.requests.length === 0 && <tr><td colSpan={6}><Empty icon={CalendarDays} title={`No leave in ${year}`}>Requests you send appear here with their approval status.</Empty></td></tr>}
             </tbody>
           </table>
         </div>

@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, Company, formatDate, LoanKind, loanStatus, money, RequestStatus } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { PageHeader } from '@/components/ui';
 
 interface BookRow {
   id: string;
@@ -73,8 +74,7 @@ export default function LoanBookPage() {
 
   return (
     <>
-      <h1>Loan book</h1>
-      <p className="muted">Every salary advance, staff loan and IOU. Payroll deducts instalments automatically; repayments are recorded when a payroll run is finalized.</p>
+      <PageHeader title="Loan book" sub={<>Every salary advance, staff loan and IOU. Payroll deducts instalments automatically; repayments are recorded when a payroll run is finalized.</>} />
       <div className="toolbar">
         <label>
           Company

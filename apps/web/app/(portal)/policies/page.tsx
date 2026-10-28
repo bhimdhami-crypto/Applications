@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { api, formatDate, LibraryItem, openFile } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { Settings2 } from 'lucide-react';
+import { PageHeader } from '@/components/ui';
 
 export default function PoliciesPage() {
   const { me, can } = useSession();
@@ -56,11 +58,11 @@ export default function PoliciesPage() {
 
   return (
     <>
-      <h1>Policies and forms</h1>
-      <p className="muted">
-        Mindspace group policies apply in every country; where local law gives you more, the law applies. Forms can be downloaded, filled in and sent to HR.
-        {can('HR') && <> <Link href="/policies/manage">Manage policies and forms</Link></>}
-      </p>
+      <PageHeader
+        title="Policies and forms"
+        sub="Mindspace group policies apply in every country; where local law gives you more, the law applies. Forms can be downloaded, filled in and sent to HR."
+        actions={can('HR') && <Link className="button secondary" href="/policies/manage"><Settings2 size={16} /> Manage policies and forms</Link>}
+      />
       {me.employee && toRead.length > 0 && (
         <div className="notice warn">
           You have {toRead.length} {toRead.length === 1 ? 'policy' : 'policies'} to read. Open each one, then press “I have read this policy”.{' '}
@@ -85,7 +87,7 @@ export default function PoliciesPage() {
       </div>
 
       {groups.map((g) => (
-        <section className="card" key={g}>
+        <section className="lib-group" key={g}>
           <h2 style={{ marginTop: 0 }}>{g}</h2>
           <div className="library">
             {shown.filter((i) => i.category === g).map((i) => (

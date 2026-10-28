@@ -6,6 +6,7 @@ import { promises as fs } from 'fs';
 import * as path from 'path';
 import { gunzipSync } from 'zlib';
 import { parseCsv } from './csv';
+import { assignSampleReportingLines } from './sample-reporting-lines';
 
 const DEFAULT_DATA_DIR = path.join(__dirname, '../../../sample-data');
 const CHUNK = 2000;
@@ -154,6 +155,7 @@ export async function importSample(prisma: PrismaClient, log: (msg: string) => v
   }
   for (const batch of chunks(docs, 5000)) await prisma.employeeDocument.createMany({ data: batch });
   log(`Documents on file: ${docs.length} (${docs.filter((d) => d.storageKey).length} with scanned files)`);
+  await assignSampleReportingLines(prisma, log);
   return { imported: idByNo.size, nextOfKin: kin.length, documents: docs.length };
 }
 

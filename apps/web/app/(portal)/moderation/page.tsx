@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, ContentReport, formatDate } from '@/lib/api';
+import { PageHeader } from '@/components/ui';
 
 const STATUS_LABEL = { OPEN: 'Waiting for review', REMOVED: 'Removed', DISMISSED: 'Kept' } as const;
 
@@ -36,8 +37,7 @@ export default function ModerationPage() {
 
   return (
     <>
-      <h1>Moderation</h1>
-      <p className="muted">Reported chat messages, posts and comments. Review each within 1 working day under <Link href="/policies">POL-20</Link>. Removed content is hidden but kept as a company record.</p>
+      <PageHeader title="Moderation" sub={<>Reported chat messages, posts and comments. Review each within 1 working day under <Link href="/policies">POL-20</Link>. Removed content is hidden but kept as a company record.</>} />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
       <div className="tabs">
@@ -63,7 +63,7 @@ export default function ModerationPage() {
                     <>
                       <input placeholder="Note for the author (optional)" value={notes[r.id] ?? ''} onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })} />
                       <div>
-                        <button className="danger small" disabled={busy === r.id} onClick={() => review(r, true)}>Remove</button>{' '}
+                        <button className="secondary danger small" disabled={busy === r.id} onClick={() => review(r, true)}>Remove</button>{' '}
                         <button className="secondary small" disabled={busy === r.id} onClick={() => review(r, false)}>Keep</button>
                       </div>
                     </>
@@ -73,7 +73,7 @@ export default function ModerationPage() {
                 </td>
               </tr>
             ))}
-            {rows && rows.length === 0 && <tr><td colSpan={4} className="muted">Nothing here.</td></tr>}
+            {rows && rows.length === 0 && <tr><td colSpan={4} className="empty">Nothing here.</td></tr>}
           </tbody>
         </table>
       </div>
