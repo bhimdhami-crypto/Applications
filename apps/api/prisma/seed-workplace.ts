@@ -2,6 +2,7 @@ import { ConversationKind, LibraryKind, PrismaClient, WorkMode } from '@prisma/c
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { localDate } from '../src/activity/time';
+import { createFileStore } from '../src/storage/file-store';
 import { addDays, fromIso, workingDays } from '../src/leave/calendar';
 import { publicHolidays } from '../src/leave/public-holidays';
 
@@ -20,14 +21,12 @@ const LIBRARY_DIR = path.resolve(__dirname, '../../../sample-data/library');
 
 /** The 22 group policies and 20 HR forms from the policy pack. Added once; HR's later changes are kept. */
 export async function seedLibrary(prisma: PrismaClient) {
-  const storageRoot = path.resolve(process.env.STORAGE_DIR ?? 'storage');
+  const store = createFileStore(prisma);
   const catalogue: CatalogueEntry[] = JSON.parse(await fs.readFile(path.join(LIBRARY_DIR, 'catalogue.json'), 'utf8'));
   for (const c of catalogue) {
     if (await prisma.libraryItem.findUnique({ where: { code: c.code } })) continue;
     const fileKey = `library/${c.code}/v${c.version}.pdf`;
-    const target = path.join(storageRoot, fileKey);
-    await fs.mkdir(path.dirname(target), { recursive: true });
-    await fs.copyFile(path.join(LIBRARY_DIR, c.file), target);
+    await store.put(fileKey, await fs.readFile(path.join(LIBRARY_DIR, c.file)));
     await prisma.libraryItem.create({
       data: {
         kind: c.kind as LibraryKind, code: c.code, title: c.title, category: c.category, owner: c.owner, summary: c.summary,

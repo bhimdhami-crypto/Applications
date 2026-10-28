@@ -20,6 +20,12 @@ export class AuthController {
   }
 
   @Public()
+  @Get('demo')
+  demo() {
+    return this.auth.demo();
+  }
+
+  @Public()
   @Post('verify')
   @HttpCode(200)
   verify(@Body() dto: VerifyDto) {

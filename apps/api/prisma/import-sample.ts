@@ -5,6 +5,7 @@ import { DocumentStatus, EmploymentStatus, EmploymentType, Prisma, PrismaClient,
 import { promises as fs } from 'fs';
 import * as path from 'path';
 import { gunzipSync } from 'zlib';
+import { createFileStore } from '../src/storage/file-store';
 import { parseCsv } from './csv';
 import { assignSampleReportingLines } from './sample-reporting-lines';
 
@@ -31,7 +32,7 @@ async function readGzCsv(dir: string, name: string) {
 export async function importSample(prisma: PrismaClient, log: (msg: string) => void = console.log, dataDir = DEFAULT_DATA_DIR) {
   const DATA_DIR = path.resolve(dataDir);
   await prisma.$connect();
-  const storageRoot = path.resolve(process.env.STORAGE_DIR ?? 'storage');
+  const store = createFileStore(prisma);
   const companies = await prisma.company.findMany();
   const companyByCountry = new Map(companies.map((c) => [c.country, c]));
   if (companies.length === 0) throw new Error('No companies found. Run "npm run db:seed" first.');
@@ -44,13 +45,14 @@ export async function importSample(prisma: PrismaClient, log: (msg: string) => v
 
   const photos: Record<string, string> = JSON.parse(gunzipSync(await fs.readFile(path.join(DATA_DIR, 'profile_photos.json.gz'))).toString('utf8'));
   const rows: Prisma.EmployeeCreateManyInput[] = [];
+  const photoFiles: Array<[string, string]> = [];
   for (const p of fresh) {
     const company = companyByCountry.get(p.country);
     if (!company) throw new Error(`No company for country "${p.country}" (${p.employee_id})`);
     let photoKey: string | null = null;
     if (photos[p.employee_id]) {
       photoKey = `photos/${p.employee_id}.svg`;
-      await writeFile(storageRoot, photoKey, photos[p.employee_id]);
+      photoFiles.push([photoKey, photos[p.employee_id]]);
     }
     rows.push({
       employeeNo: p.employee_id,
@@ -84,6 +86,7 @@ export async function importSample(prisma: PrismaClient, log: (msg: string) => v
       qualificationYear: Number(p.qualification_year) || null,
     });
   }
+  await store.putMany(photoFiles);
   for (const batch of chunks(rows)) await prisma.employee.createMany({ data: batch, skipDuplicates: true });
 
   // Only touch people this run created, never the test accounts or anyone imported before
@@ -117,7 +120,7 @@ export async function importSample(prisma: PrismaClient, log: (msg: string) => v
       const full = path.join(personalDir, folder, name);
       if (name === 'profile_photo.png' && idByNo.has(employeeNo)) {
         const key = `photos/${employeeNo}.png`;
-        await writeFile(storageRoot, key, await fs.readFile(full));
+        await store.put(key, await fs.readFile(full));
         await prisma.employee.update({ where: { id: idByNo.get(employeeNo)! }, data: { photoKey: key } });
       } else if (PERSONAL_FILES[name]) {
         scans.set(employeeNo, [...(scans.get(employeeNo) ?? []), { type: PERSONAL_FILES[name], file: full, name }]);
@@ -146,7 +149,7 @@ export async function importSample(prisma: PrismaClient, log: (msg: string) => v
     for (const f of files) {
       const key = `documents/${employeeId}/${f.name}`;
       const data = await fs.readFile(f.file);
-      await writeFile(storageRoot, key, data);
+      await store.put(key, data);
       const scan = { storageKey: key, mimeType: 'application/pdf', sizeBytes: data.length, fileName: f.name };
       const entry = docs.find((d) => d.employeeId === employeeId && d.type === f.type);
       if (entry) Object.assign(entry, scan);
@@ -157,12 +160,6 @@ export async function importSample(prisma: PrismaClient, log: (msg: string) => v
   log(`Documents on file: ${docs.length} (${docs.filter((d) => d.storageKey).length} with scanned files)`);
   await assignSampleReportingLines(prisma, log);
   return { imported: idByNo.size, nextOfKin: kin.length, documents: docs.length };
-}
-
-async function writeFile(root: string, key: string, data: string | Buffer) {
-  const file = path.join(root, key);
-  await fs.mkdir(path.dirname(file), { recursive: true });
-  await fs.writeFile(file, data);
 }
 
 if (require.main === module) {

@@ -15,7 +15,9 @@
     "test": "jest --runInBand",
     "postinstall": "prisma generate",
     "prisma:import-sample": "ts-node prisma/import-sample.ts",
-    "prisma:sample-reporting-lines": "ts-node prisma/sample-reporting-lines.ts"
+    "prisma:sample-reporting-lines": "ts-node prisma/sample-reporting-lines.ts",
+    "prisma:demo-setup": "ts-node prisma/demo-setup.ts",
+    "vercel-build": "prisma generate && DATABASE_URL=\"${DATABASE_URL_UNPOOLED:-$DATABASE_URL}\" sh -c \"prisma migrate deploy && npm run prisma:demo-setup\" && nest build"
   },
   "prisma": {
     "seed": "ts-node prisma/seed.ts"
