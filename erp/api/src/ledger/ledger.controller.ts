@@ -1,6 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators';
-import { CreateAccountDto, DateRangeQuery, PostJournalDto, ReverseJournalDto } from './ledger.dto';
+import { CreateAccountDto, DateRangeQuery } from './ledger.dto';
 import { LedgerService } from './ledger.service';
 
 @Controller('companies/:company')
@@ -13,7 +13,7 @@ export class LedgerController {
   }
 
   @Post('accounts')
-  @Roles('ACCOUNTANT')
+  @Roles('FINANCE_MANAGER', 'ACCOUNTANT')
   createAccount(@Param('company') company: string, @CurrentUser() user: AuthUser, @Body() dto: CreateAccountDto) {
     return this.ledger.createAccount(company, user, dto);
   }
@@ -26,23 +26,6 @@ export class LedgerController {
   @Get('journals/:auditNo')
   journal(@Param('company') company: string, @Param('auditNo') auditNo: string) {
     return this.ledger.journal(company, auditNo);
-  }
-
-  @Post('journals')
-  @Roles('ACCOUNTANT')
-  post(@Param('company') company: string, @CurrentUser() user: AuthUser, @Body() dto: PostJournalDto) {
-    return this.ledger.postJournal(company, user, dto);
-  }
-
-  @Post('journals/:auditNo/reverse')
-  @Roles('ACCOUNTANT')
-  reverse(
-    @Param('company') company: string,
-    @Param('auditNo') auditNo: string,
-    @CurrentUser() user: AuthUser,
-    @Body() dto: ReverseJournalDto,
-  ) {
-    return this.ledger.reverseJournal(company, user, auditNo, dto.txDate);
   }
 
   @Get('trial-balance')

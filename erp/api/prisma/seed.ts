@@ -1,4 +1,5 @@
-// Reference data for a fresh MFI ERP database: currencies, the three companies, fiscal periods, VAT codes and an admin.
+// Reference data for a fresh MFI ERP database: currencies, the three companies, fiscal periods, VAT codes,
+// starting approval rules and an admin.
 // The chart of accounts is not seeded: it comes from Sage Evolution through the ETL (erp/etl).
 import { PrismaClient } from '@prisma/client';
 import * as bcrypt from 'bcryptjs';
@@ -23,6 +24,32 @@ const TAX_CODES = [
   { code: 'VAT0', description: 'VAT zero-rated', rate: 0 },
   { code: 'EXEMPT', description: 'VAT exempt', rate: 0 },
 ];
+
+/**
+ * Starting approval routes, one set per company, until MFI's own SOPs are entered (POST /approval-rules).
+ * Every voucher must match a rule, so journals and reversals are covered at any amount.
+ */
+const APPROVAL_RULES = ['JOURNAL', 'REVERSAL'].flatMap((documentType) => [
+  {
+    documentType,
+    name: `${documentType === 'JOURNAL' ? 'Journals' : 'Reversals'} under KES 1,000,000`,
+    sopReference: 'SOP to confirm',
+    minAmount: 0,
+    maxAmount: 1_000_000,
+    stages: [{ name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' }],
+  },
+  {
+    documentType,
+    name: `${documentType === 'JOURNAL' ? 'Journals' : 'Reversals'} of KES 1,000,000 and over`,
+    sopReference: 'SOP to confirm',
+    minAmount: 1_000_000,
+    maxAmount: null,
+    stages: [
+      { name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' },
+      { name: 'Director approval', approverRole: 'DIRECTOR' },
+    ],
+  },
+]);
 
 /** Month the fiscal year starts (1 = January). The year label is the calendar year the fiscal year ends in. */
 const START_MONTH = Number(process.env.FISCAL_YEAR_START_MONTH ?? 1);
@@ -55,6 +82,17 @@ export async function seed(prisma: PrismaClient) {
           where: { companyId_year_number: { companyId: company.id, year: p.year, number: p.number } },
           create: { ...p, companyId: company.id },
           update: {},
+        });
+      }
+    }
+    if (!(await prisma.approvalRule.count({ where: { companyId: company.id } }))) {
+      for (const { stages, ...rule } of APPROVAL_RULES) {
+        await prisma.approvalRule.create({
+          data: {
+            ...rule,
+            companyId: company.id,
+            stages: { create: stages.map((st, i) => ({ ...st, stageNo: i + 1 })) },
+          },
         });
       }
     }

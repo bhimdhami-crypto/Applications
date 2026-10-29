@@ -4,12 +4,12 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/decorators';
 import { CompaniesService } from '../companies/companies.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateAccountDto, PostJournalDto } from './ledger.dto';
-import { PostingRuleError, PreparedLine, prepareLines, reverseLines } from './posting-rules';
+import { CreateAccountDto } from './ledger.dto';
+import { PreparedLine } from './posting-rules';
 
-type Tx = Prisma.TransactionClient;
+export type Tx = Prisma.TransactionClient;
 
-interface BatchHeader {
+export interface BatchHeader {
   companyId: number;
   source: string;
   documentType: string;
@@ -17,11 +17,12 @@ interface BatchHeader {
   reference?: string | null;
   txDate: Date;
   reversesId?: number;
+  intercompanyOfId?: number;
 }
 
 /**
- * The posting engine. Every ledger change goes through post(), which numbers the batch,
- * checks the period, accounts and balance, and writes header, lines and audit log in one transaction.
+ * The posting engine and ledger queries. Nothing posts directly: vouchers are approved first
+ * (VouchersService), and the final approval calls postInTx() inside its own transaction.
  */
 @Injectable()
 export class LedgerService {
@@ -66,63 +67,6 @@ export class LedgerService {
       }
       throw e;
     }
-  }
-
-  async postJournal(companyCode: string, user: AuthUser, dto: PostJournalDto) {
-    const company = await this.companies.byCode(companyCode);
-    const lines = this.prepare(() => prepareLines(dto.lines, company.homeCurrency, company.currency.decimals));
-    return this.post(
-      user,
-      {
-        companyId: company.id,
-        source: 'GL',
-        documentType: 'JOURNAL',
-        description: dto.description,
-        reference: dto.reference,
-        txDate: toDate(dto.txDate),
-      },
-      lines,
-    );
-  }
-
-  async reverseJournal(companyCode: string, user: AuthUser, auditNo: string, txDate?: string) {
-    const company = await this.companies.byCode(companyCode);
-    const original = await this.prisma.postingBatch.findUnique({
-      where: { companyId_auditNo: { companyId: company.id, auditNo } },
-      include: { entries: { orderBy: { lineNo: 'asc' } }, reversedBy: true },
-    });
-    if (!original) throw new NotFoundException(`No journal ${auditNo}`);
-    if (original.reversedBy) throw new ConflictException(`${auditNo} was already reversed by ${original.reversedBy.auditNo}`);
-    if (original.reversesId) throw new ConflictException(`${auditNo} is itself a reversal`);
-
-    const lines = reverseLines(
-      original.entries.map((e) => ({
-        lineNo: e.lineNo,
-        accountId: e.accountId,
-        debit: e.debit.toFixed(4),
-        credit: e.credit.toFixed(4),
-        currencyCode: e.currencyCode,
-        exchangeRate: e.exchangeRate.toFixed(6),
-        foreignDebit: e.foreignDebit.toFixed(4),
-        foreignCredit: e.foreignCredit.toFixed(4),
-        description: e.description ?? undefined,
-        projectId: e.projectId ?? undefined,
-        taxCodeId: e.taxCodeId ?? undefined,
-      })),
-    );
-    return this.post(
-      user,
-      {
-        companyId: company.id,
-        source: original.source,
-        documentType: 'REVERSAL',
-        description: `Reversal of ${auditNo}: ${original.description}`.slice(0, 400),
-        reference: original.reference,
-        txDate: txDate ? toDate(txDate) : original.txDate,
-        reversesId: original.id,
-      },
-      lines,
-    );
   }
 
   async journal(companyCode: string, auditNo: string) {
@@ -192,46 +136,43 @@ export class LedgerService {
     };
   }
 
-  private prepare(fn: () => PreparedLine[]) {
-    try {
-      return fn();
-    } catch (e) {
-      // Rule failures (unbalanced, bad amount) are the caller's mistake, so they come back as 400 with the reason
-      if (e instanceof PostingRuleError || e instanceof Error) throw new BadRequestException(e.message);
-      throw e;
-    }
+  /**
+   * Checks a batch can post: the date falls in an open period, and every account, project, tax code
+   * and currency exists and belongs to the company. Returns the period. Used at submission as a dry run,
+   * and again at posting.
+   */
+  async checkPostable(tx: Tx, companyId: number, txDate: Date, lines: PreparedLine[]) {
+    const period = await tx.fiscalPeriod.findFirst({
+      where: { companyId, startDate: { lte: txDate }, endDate: { gte: txDate } },
+      orderBy: { number: 'asc' },
+    });
+    const company = await tx.company.findUniqueOrThrow({ where: { id: companyId } });
+    if (!period) throw new BadRequestException(`${company.code}: no fiscal period covers ${isoDate(txDate)}`);
+    if (period.isClosed) throw new BadRequestException(`${company.code}: period ${period.year}/${period.number} is closed`);
+    await this.checkReferences(tx, companyId, lines);
+    return period;
   }
 
-  private async post(user: AuthUser, header: BatchHeader, lines: PreparedLine[]) {
-    return this.prisma.$transaction(
-      async (tx) => {
-        const period = await tx.fiscalPeriod.findFirst({
-          where: { companyId: header.companyId, startDate: { lte: header.txDate }, endDate: { gte: header.txDate } },
-          orderBy: { number: 'asc' },
-        });
-        if (!period) throw new BadRequestException(`No fiscal period covers ${isoDate(header.txDate)}`);
-        if (period.isClosed) throw new BadRequestException(`Period ${period.year}/${period.number} is closed`);
-
-        await this.checkReferences(tx, header.companyId, lines);
-        const auditNo = await this.nextNumber(tx, header.companyId, 'AUDIT', 'GL');
-
-        const batch = await tx.postingBatch.create({
-          data: {
-            ...header,
-            auditNo,
-            periodId: period.id,
-            postedById: user.id,
-            entries: {
-              create: lines.map((l) => ({ ...l, companyId: header.companyId, txDate: header.txDate, periodId: period.id })),
-            },
-          },
-          include: { entries: { orderBy: { lineNo: 'asc' } } },
-        });
-        await this.audit.record(user.id, `gl.${header.documentType.toLowerCase()}_posted`, 'PostingBatch', batch.id, { auditNo }, tx);
-        return batch;
+  /**
+   * The only way rows reach the ledger. Runs inside the caller's transaction (the final approval),
+   * numbers the batch and writes header, lines and audit log.
+   */
+  async postInTx(tx: Tx, userId: number, header: BatchHeader, lines: PreparedLine[]) {
+    const period = await this.checkPostable(tx, header.companyId, header.txDate, lines);
+    const auditNo = await this.nextNumber(tx, header.companyId, 'AUDIT', 'GL');
+    const batch = await tx.postingBatch.create({
+      data: {
+        ...header,
+        auditNo,
+        periodId: period.id,
+        postedById: userId,
+        entries: {
+          create: lines.map((l) => ({ ...l, companyId: header.companyId, txDate: header.txDate, periodId: period.id })),
+        },
       },
-      { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
-    );
+    });
+    await this.audit.record(userId, `gl.${header.documentType.toLowerCase()}_posted`, 'PostingBatch', batch.id, { auditNo }, tx);
+    return batch;
   }
 
   /** Accounts, projects, tax codes and currencies must exist, belong to this company and be open for posting */
@@ -262,7 +203,7 @@ export class LedgerService {
   }
 
   /** Takes the next number in a series inside the posting transaction, so numbers are never reused or skipped */
-  private async nextNumber(tx: Tx, companyId: number, name: string, prefix: string) {
+  async nextNumber(tx: Tx, companyId: number, name: string, prefix: string) {
     const seq = await tx.numberSequence.upsert({
       where: { companyId_name: { companyId, name } },
       create: { companyId, name, prefix, next: 2 },
@@ -277,7 +218,7 @@ function unique<T>(items: T[]) {
 }
 
 /** Ledger dates are calendar days: parse YYYY-MM-DD as UTC midnight so no timezone shifts the day */
-function toDate(iso: string) {
+export function toDate(iso: string) {
   return new Date(`${iso.slice(0, 10)}T00:00:00.000Z`);
 }
 

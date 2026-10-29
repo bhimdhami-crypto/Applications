@@ -6,7 +6,7 @@ This is **phase 0**: the foundation. See the [plan](https://claude.ai/artifact/F
 
 | Part | What it is |
 |---|---|
-| `api` | NestJS 11 API, Prisma 6 on SQL Server, sign-in with roles, audit log, the posting engine and general ledger endpoints |
+| `api` | NestJS 11 API, Prisma 6 on SQL Server: sign-in with roles, approval workflow, document archive, intercompany posting, the posting engine and general ledger endpoints |
 | `etl` | Migration tool: reads Evolution (SELECT only), stages its tables in `stg_evo`, maps the chart of accounts |
 | `etl/sql` | Scripts to run in SSMS: profile the Evolution databases, trace how Evolution posts a document, map account types |
 
@@ -22,7 +22,10 @@ The app is original work. Evolution is studied only from the outside:
 
 - **One database, many companies.** Every table carries `companyId`, so group reports need no `Table.Combine`. SQL Server Express caps a database at 10 GB; if the three companies outgrow that, move to SQL Server Standard.
 - **One posting engine.** Every ledger change goes through `LedgerService.post()`: it checks the period is open, the accounts are postable and belong to the company, and debits equal credits to the cent. Header, lines and audit log are written in one serializable transaction, under a gapless audit number (`GL000001`), like Evolution's `cAuditNumber`.
-- **Posted rows are never changed.** Mistakes are corrected with a reversing journal. A database CHECK keeps every ledger row one-sided and non-negative.
+- **Nothing posts without approval.** Every transaction is a voucher: drafted, submitted, approved stage by stage under the company's approval rule (its SOP), and posted by the last approval. Rules are set per document type and amount band, e.g. under KES 1,000,000 the finance manager approves; from KES 1,000,000 the director approves as well. The author never approves their own voucher, and one person approves at most one stage. A rejection needs a reason and sends the voucher back to its author.
+- **Paperless.** Files dropped on the inbox (invoice scans, statements, contracts) become a draft voucher with the files attached; more can be added at any stage. Files are checked by content, fingerprinted with SHA-256, stored on disk under `ARCHIVE_DIR` (not in SQL Server, to spare the 10 GB limit) and searchable. Once a voucher is submitted its files can no longer be removed.
+- **Intercompany in one step.** Each pair of companies has a current account on each side. A voucher line can name a sister company and its account: posting writes this company's side and a linked batch in the sister company in the same transaction, and a reconciliation report checks the two current accounts cancel out.
+- **Posted rows are never changed.** Mistakes are corrected with a reversing voucher, which is approved like any other. A database CHECK keeps every ledger row one-sided and non-negative.
 - **Exact money.** Amounts are `DECIMAL(19,4)` and the engine adds them as integers of 0.0001, so float rounding never unbalances a journal. Foreign lines store the foreign amount and rate; the KES amount is rate × foreign amount, rounded once.
 - **Traceable migration.** Migrated accounts keep Evolution's `AccountLink` in `sourceLinkId`.
 
@@ -36,39 +39,54 @@ cp .env.example api/.env          # then edit the passwords and connection strin
 npm install
 # create the empty database once, e.g. in SSMS: CREATE DATABASE mfierp
 npm run db:migrate
-npm run db:seed                   # currencies, MFI-DS/MFI-MDS/MFI-TS, fiscal periods, VAT codes, admin account
+npm run db:seed                   # currencies, MFI-DS/MFI-MDS/MFI-TS, fiscal periods, VAT codes, starting approval rules, admin
 npm run dev:api                   # http://localhost:4100/api
 ```
 
 Sign in with `POST /api/auth/login` and send the returned token as `Authorization: Bearer <token>`.
 
+Roles: `ADMIN`, `DIRECTOR`, `FINANCE_MANAGER`, `ACCOUNTANT`, `VIEWER`. Paths below start with `/api/companies/:company` unless shown in full.
+
 | Endpoint | Who | What |
 |---|---|---|
 | `GET /api/health` | anyone | API and database status |
 | `GET /api/companies` | signed in | Companies |
-| `GET /api/companies/:company/periods` | signed in | Fiscal periods |
-| `GET /api/companies/:company/accounts` | signed in | Chart of accounts |
-| `POST /api/companies/:company/accounts` | accountant | Add an account |
-| `POST /api/companies/:company/journals` | accountant | Post a journal |
-| `GET /api/companies/:company/journals?from=&to=` | signed in | Journals in a date range |
-| `GET /api/companies/:company/journals/:auditNo` | signed in | One journal with its lines |
-| `POST /api/companies/:company/journals/:auditNo/reverse` | accountant | Reverse a journal once |
-| `GET /api/companies/:company/trial-balance?from=&to=` | signed in | Trial balance |
+| `GET /periods` | signed in | Fiscal periods |
+| `GET /accounts`, `POST /accounts` | signed in; finance | Chart of accounts |
+| `POST /vouchers` | finance | Draft a voucher |
+| `POST /inbox` | finance | Drop files (multipart `files`) to start a draft with them attached |
+| `GET /vouchers?status=`, `GET /vouchers/:no` | signed in | Vouchers, one voucher with lines, approval history and files |
+| `PUT /vouchers/:no` | author | Change a draft or rejected voucher |
+| `POST /vouchers/:no/submit` | author | Check it would post, then start its approval route |
+| `POST /vouchers/:no/approve` | stage approver | Approve the current stage; the last stage posts |
+| `POST /vouchers/:no/reject` | stage approver | Send back with a reason |
+| `POST /vouchers/:no/recall`, `POST /vouchers/:no/cancel` | author | Withdraw from approval; cancel a draft |
+| `POST /vouchers/:no/attachments`, `DELETE /vouchers/:no/attachments/:id` | signed in; author | Add files; remove one from a draft |
+| `GET /api/approvals/pending` | signed in | Vouchers in any company waiting for me |
+| `GET /approval-rules`, `POST /approval-rules` | signed in; admin | Approval rules (SOPs) |
+| `GET /archive?q=&from=&to=`, `GET /archive/:id/download` | signed in | Search the archive by file, voucher number or reference; download |
+| `GET /intercompany-links`, `POST /intercompany-links` | signed in; finance manager | Current account with each sister company |
+| `GET /api/intercompany/reconciliation?to=` | signed in | Both sides of every intercompany pair, and the difference |
+| `GET /journals?from=&to=`, `GET /journals/:auditNo` | signed in | Posted journals |
+| `POST /journals/:auditNo/reverse` | finance | Draft a reversing voucher |
+| `GET /trial-balance?from=&to=` | signed in | Trial balance |
 
-Example journal (a KES line and a USD line):
+Example voucher (a USD line, a KES line, and an intercompany line charging MFI-MDS's rent):
 
 ```json
 {
   "txDate": "2026-03-20",
-  "description": "USD sale",
+  "description": "USD sale; MDS rent paid on its behalf",
   "lines": [
     { "accountId": 12, "currencyCode": "USD", "exchangeRate": "129.5", "foreignAmount": "1000" },
-    { "accountId": 40, "credit": "129500" }
+    { "accountId": 40, "credit": "129500" },
+    { "debit": "80000", "partnerCompany": "MFI-MDS", "partnerAccountId": 310 },
+    { "accountId": 11, "credit": "80000" }
   ]
 }
 ```
 
-On a foreign line a positive `foreignAmount` is a debit and a negative one a credit.
+On a foreign line a positive `foreignAmount` is a debit and a negative one a credit. An intercompany line names the partner company and its account; this company's side goes to its current account with that partner.
 
 ## Migrating from Evolution
 
