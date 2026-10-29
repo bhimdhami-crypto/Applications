@@ -6,6 +6,8 @@ HR, payroll and people-operations platform for **Mindspace Artificial Intelligen
 
 ![Admin dashboard](docs/screenshots/02-admin-dashboard.png)
 
+> **New:** [`erp/`](erp/README.md) holds the MFI finance ERP on SQL Server Express (general ledger, then AR, AP, inventory and orders), a separate app with its own install.
+
 ## Modules
 
 | Area | Module | What it covers |

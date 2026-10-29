@@ -1,0 +1,216 @@
+// MFI ERP data model, phase 0: companies, users, periods, currencies, tax, projects and the general ledger.
+// SQL Server has no native enums in Prisma, so closed sets are strings checked in code (see src/common/constants.ts).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id           Int      @id @default(autoincrement())
+  code         String   @unique @db.NVarChar(20) // MFI-DS, MFI-MDS, MFI-TS
+  name         String   @db.NVarChar(200)
+  homeCurrency String   @db.Char(3)
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  currency  Currency        @relation(fields: [homeCurrency], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  periods   FiscalPeriod[]
+  taxCodes  TaxCode[]
+  projects  Project[]
+  accounts  GlAccount[]
+  batches   PostingBatch[]
+  entries   LedgerEntry[]
+  sequences NumberSequence[]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.NVarChar(200)
+  name         String   @db.NVarChar(200)
+  passwordHash String   @db.NVarChar(100)
+  role         String   @db.NVarChar(20) // ADMIN, ACCOUNTANT, VIEWER
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  batches  PostingBatch[]
+  auditLog AuditLog[]
+}
+
+model Currency {
+  code     String @id @db.Char(3) // ISO 4217: KES, USD, AED
+  name     String @db.NVarChar(100)
+  decimals Int    @default(2)
+
+  companies Company[]
+  rates     ExchangeRate[]
+  entries   LedgerEntry[]
+}
+
+/// Units of home currency per one unit of foreign currency, per day
+model ExchangeRate {
+  id           Int      @id @default(autoincrement())
+  currencyCode String   @db.Char(3)
+  rateDate     DateTime @db.Date
+  rate         Decimal  @db.Decimal(19, 6)
+
+  currency Currency @relation(fields: [currencyCode], references: [code])
+
+  @@unique([currencyCode, rateDate])
+}
+
+model FiscalPeriod {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  year      Int // fiscal year label, e.g. 2027 for Jul 2026 to Jun 2027
+  number    Int // 1 to 12 (13 for year-end adjustments)
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isClosed  Boolean  @default(false)
+
+  company Company        @relation(fields: [companyId], references: [id])
+  batches PostingBatch[]
+  entries LedgerEntry[]
+
+  @@unique([companyId, year, number])
+  @@index([companyId, startDate])
+}
+
+model TaxCode {
+  id          Int     @id @default(autoincrement())
+  companyId   Int
+  code        String  @db.NVarChar(20)
+  description String  @db.NVarChar(200)
+  rate        Decimal @db.Decimal(9, 4) // percent, 16.0000 for standard VAT
+  isActive    Boolean @default(true)
+
+  company Company       @relation(fields: [companyId], references: [id])
+  entries LedgerEntry[]
+
+  @@unique([companyId, code])
+}
+
+model Project {
+  id        Int     @id @default(autoincrement())
+  companyId Int
+  code      String  @db.NVarChar(30)
+  name      String  @db.NVarChar(200)
+  isActive  Boolean @default(true)
+
+  company Company       @relation(fields: [companyId], references: [id])
+  entries LedgerEntry[]
+
+  @@unique([companyId, code])
+}
+
+model GlAccount {
+  id           Int     @id @default(autoincrement())
+  companyId    Int
+  code         String  @db.NVarChar(50)
+  description  String  @db.NVarChar(200)
+  type         String  @db.NVarChar(20) // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
+  parentId     Int?
+  isPostable   Boolean @default(true) // false for header accounts that only group others
+  isActive     Boolean @default(true)
+  costCentre   String? @db.NVarChar(50)
+  sector       String? @db.NVarChar(50)
+  reportGroup  String? @db.NVarChar(100)
+  /// Accounts.AccountLink in Sage Evolution, kept so migrated history can be traced back
+  sourceLinkId Int?
+
+  company  Company       @relation(fields: [companyId], references: [id])
+  parent   GlAccount?    @relation("AccountTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children GlAccount[]   @relation("AccountTree")
+  entries  LedgerEntry[]
+
+  @@unique([companyId, code])
+  @@index([companyId, sourceLinkId])
+}
+
+/// One posted document: every ledger row it writes shares the batch and its audit number, and the rows balance
+model PostingBatch {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  auditNo      String   @db.NVarChar(20)
+  source       String   @db.NVarChar(10) // GL, AR, AP, ST
+  documentType String   @db.NVarChar(20) // JOURNAL, REVERSAL, OPENING, MIGRATED
+  reference    String?  @db.NVarChar(50)
+  description  String   @db.NVarChar(400)
+  txDate       DateTime @db.Date
+  periodId     Int
+  postedById   Int
+  postedAt     DateTime @default(now())
+  reversesId   Int?     @unique
+
+  company    Company       @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  period     FiscalPeriod  @relation(fields: [periodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  postedBy   User          @relation(fields: [postedById], references: [id])
+  reverses   PostingBatch? @relation("Reversal", fields: [reversesId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reversedBy PostingBatch? @relation("Reversal")
+  entries    LedgerEntry[]
+
+  @@unique([companyId, auditNo])
+  @@index([companyId, txDate])
+}
+
+/// A general ledger row. Rows are never updated or deleted once posted; corrections are reversing batches.
+model LedgerEntry {
+  id            BigInt   @id @default(autoincrement())
+  batchId       Int
+  companyId     Int
+  lineNo        Int
+  accountId     Int
+  txDate        DateTime @db.Date
+  periodId      Int
+  debit         Decimal  @default(0) @db.Decimal(19, 4)
+  credit        Decimal  @default(0) @db.Decimal(19, 4)
+  currencyCode  String   @db.Char(3)
+  exchangeRate  Decimal  @default(1) @db.Decimal(19, 6)
+  foreignDebit  Decimal  @default(0) @db.Decimal(19, 4)
+  foreignCredit Decimal  @default(0) @db.Decimal(19, 4)
+  description   String?  @db.NVarChar(400)
+  projectId     Int?
+  taxCodeId     Int?
+
+  batch    PostingBatch @relation(fields: [batchId], references: [id])
+  company  Company      @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account  GlAccount    @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  period   FiscalPeriod @relation(fields: [periodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currency Currency     @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  project  Project?     @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  taxCode  TaxCode?     @relation(fields: [taxCodeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([batchId, lineNo])
+  @@index([companyId, accountId, txDate])
+  @@index([companyId, periodId])
+}
+
+/// Next number per company and series, taken inside the posting transaction so numbers have no gaps
+model NumberSequence {
+  companyId Int
+  name      String @db.NVarChar(20)
+  prefix    String @db.NVarChar(10)
+  next      Int    @default(1)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@id([companyId, name])
+}
+
+model AuditLog {
+  id       BigInt   @id @default(autoincrement())
+  userId   Int?
+  action   String   @db.NVarChar(50)
+  entity   String   @db.NVarChar(50)
+  entityId String?  @db.NVarChar(50)
+  detail   String?  @db.NVarChar(Max)
+  at       DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([entity, entityId])
+  @@index([at])
+}

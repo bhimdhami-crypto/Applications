@@ -1,0 +1,14 @@
+# Local SQL Server 2022 Express for development. On the office server, install SQL Server Express directly instead.
+services:
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      ACCEPT_EULA: 'Y'
+      MSSQL_PID: Express
+      MSSQL_SA_PASSWORD: 'Erp#Local2026'
+    ports:
+      - '1433:1433'
+    volumes:
+      - erp-sql:/var/opt/mssql
+volumes:
+  erp-sql:
