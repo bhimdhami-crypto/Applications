@@ -1,5 +1,8 @@
 // End-to-end checks against a real SQL Server test database (TEST_DATABASE_URL, a database ending in _test).
 process.env.JWT_SECRET ??= 'e2e-secret';
+// Emails are built in full but not sent, and the worker only runs when a test calls it
+process.env.EMAIL_TRANSPORT = 'json';
+process.env.EMAIL_WORKER = 'off';
 process.env.ARCHIVE_DIR = require('fs').mkdtempSync(require('path').join(require('os').tmpdir(), 'erp-archive-'));
 process.env.DATABASE_URL =
   process.env.TEST_DATABASE_URL ??
@@ -13,6 +16,7 @@ import * as bcrypt from 'bcryptjs';
 import request from 'supertest';
 import { seed } from '../prisma/seed';
 import { AppModule } from '../src/app.module';
+import { MailerService } from '../src/notifications/mailer.service';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { setupApp } from '../src/setup-app';
 
@@ -58,6 +62,7 @@ describe('MFI ERP API', () => {
 
     // Children before parents
     await prisma.auditLog.deleteMany();
+    await prisma.emailMessage.deleteMany();
     await prisma.attachment.deleteMany();
     await prisma.approvalAction.deleteMany();
     await prisma.voucherLine.deleteMany();
@@ -525,6 +530,67 @@ describe('MFI ERP API', () => {
     await api('get', '/sign-ins', 'manager').expect(403);
     const signIns = (await api('get', '/sign-ins', 'admin').expect(200)).body;
     expect(signIns.items.map((e: { action: string }) => e.action)).toContain('auth.login_failed');
+  });
+
+  it('emails approvers when a voucher waits for them, and the author when it is rejected or posted', async () => {
+    await prisma.emailMessage.deleteMany();
+    const outbox = () => prisma.emailMessage.findMany({ orderBy: { id: 'asc' } });
+    const draft = (await api('post', '/companies/MFI-DS/vouchers').send(journal('250', { description: 'Courier' })).expect(201)).body;
+    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    let mails = await outbox();
+    // Only the finance manager: administrators stand in only when nobody holds the role
+    expect(mails.map((m) => [m.kind, m.toEmail])).toEqual([['APPROVAL_NEEDED', 'manager@mfi-erp.test']]);
+    expect(mails[0].subject).toBe(`Approval needed: MFI-DS ${draft.voucherNo}, KES 250.00, Courier`);
+    expect(mails[0].text).toContain(`/vouchers/${draft.voucherNo}`);
+
+    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/reject`, 'manager').send({ comment: 'Attach the waybill' }).expect(200);
+    mails = await outbox();
+    expect(mails[1]).toMatchObject({ kind: 'REJECTED', toEmail: 'accountant@mfi-erp.test' });
+    expect(mails[1].text).toContain('Reason: Attach the waybill');
+
+    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    const posted = (await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/approve`, 'manager').send({}).expect(200)).body;
+    mails = await outbox();
+    expect(mails.slice(2).map((m) => [m.kind, m.toEmail])).toEqual([
+      ['APPROVAL_NEEDED', 'manager@mfi-erp.test'],
+      ['POSTED', 'accountant@mfi-erp.test'],
+    ]);
+    expect(mails[3].subject).toBe(`Posted: MFI-DS ${draft.voucherNo} as ${posted.postedBatch.auditNo}`);
+
+    // A two-stage voucher goes to the directors once the manager has approved
+    const big = (await api('post', '/companies/MFI-DS/vouchers').send(journal('2000000')).expect(201)).body;
+    await api('post', `/companies/MFI-DS/vouchers/${big.voucherNo}/submit`).send({}).expect(200);
+    await api('post', `/companies/MFI-DS/vouchers/${big.voucherNo}/approve`, 'manager').send({}).expect(200);
+    const stage2 = await prisma.emailMessage.findMany({ where: { voucherId: big.id, kind: 'APPROVAL_NEEDED' }, orderBy: { id: 'asc' } });
+    expect(stage2.map((m) => m.toEmail)).toEqual(['manager@mfi-erp.test', 'director@mfi-erp.test', 'director2@mfi-erp.test']);
+
+    // Anyone can turn their alerts off
+    expect((await api('get', '/me/email-alerts').expect(200)).body).toEqual({ emailAlerts: true, configured: true });
+    await api('put', '/me/email-alerts').send({ emailAlerts: false }).expect(200);
+    await api('post', `/companies/MFI-DS/vouchers/${big.voucherNo}/approve`, 'director').send({}).expect(200);
+    expect(await prisma.emailMessage.count({ where: { voucherId: big.id, kind: 'POSTED' } })).toBe(0);
+    await api('put', '/me/email-alerts').send({ emailAlerts: true }).expect(200);
+
+    // The worker sends what is queued; administrators see the outbox
+    const mailer = app.get(MailerService);
+    expect(await mailer.flush()).toBeGreaterThanOrEqual(6);
+    expect(await prisma.emailMessage.count({ where: { status: 'PENDING' } })).toBe(0);
+    await api('get', '/email/outbox').expect(403);
+    const box = (await api('get', '/email/outbox?status=SENT', 'admin').expect(200)).body;
+    expect(box.counts.SENT).toBeGreaterThanOrEqual(6);
+    expect((await api('post', '/email/test', 'admin').expect(200)).body).toMatchObject({ status: 'SENT', toEmail: 'admin@mfi-erp.test' });
+
+    // Weekday mornings, one reminder per person of what has waited a day or more
+    const waiting = (await api('post', '/companies/MFI-DS/vouchers').send(journal('75', { description: 'Stationery' })).expect(201)).body;
+    await api('post', `/companies/MFI-DS/vouchers/${waiting.voucherNo}/submit`).send({}).expect(200);
+    const morning = new Date(Date.now() + 2 * 86_400_000);
+    while ([0, 6].includes(new Date(morning.getTime() + 3 * 3_600_000).getUTCDay())) morning.setTime(morning.getTime() + 86_400_000);
+    morning.setUTCHours(6, 0, 0, 0); // 09:00 in Nairobi
+    expect(await mailer.queueDigests(new Date(morning.getTime() - 4 * 3_600_000))).toBe(0); // 05:00, too early
+    expect(await mailer.queueDigests(morning)).toBeGreaterThanOrEqual(1);
+    expect(await mailer.queueDigests(morning)).toBe(0);
+    const reminder = await prisma.emailMessage.findFirstOrThrow({ where: { kind: 'DIGEST', toEmail: 'manager@mfi-erp.test' } });
+    expect(reminder.text).toContain(`${waiting.voucherNo} · KES 75.00 · Stationery · Finance manager review · 2 days`);
   });
 
   it('keeps an audit trail of every step', async () => {

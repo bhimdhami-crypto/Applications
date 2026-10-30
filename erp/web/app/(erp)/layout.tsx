@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, BookOpen, CheckSquare, Clock, FileText, History, ListChecks, LogOut, Notebook, Scale, Truck, Users } from 'lucide-react';
+import { Archive, BookOpen, CheckSquare, Clock, FileText, History, ListChecks, LogOut, Mail, Notebook, Scale, Truck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -53,6 +53,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         { href: '/accounts', label: 'Chart of accounts', icon: BookOpen },
         { href: '/approval-rules', label: 'Approval rules', icon: ListChecks },
         ...(can('FINANCE_MANAGER', 'DIRECTOR') ? [{ href: '/history', label: 'Change history', icon: History }] : []),
+        ...(user.role === 'ADMIN' ? [{ href: '/email-outbox', label: 'Email outbox', icon: Mail }] : []),
       ],
     },
   ];

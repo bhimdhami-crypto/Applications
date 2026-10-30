@@ -244,3 +244,11 @@ td.overdue { color: var(--danger); }
 .line-change.added { color: var(--success); }
 .drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); z-index: 20; display: flex; justify-content: flex-end; }
 .drawer { width: min(520px, 100vw); height: 100%; overflow-y: auto; background: var(--surface); padding: 20px; box-shadow: var(--shadow); }
+
+/* Email outbox */
+.outbox-tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin-bottom: 18px; }
+.outbox-tile { text-align: left; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 10px 12px; font: inherit; color: var(--text); cursor: pointer; }
+.outbox-tile span { display: block; font-size: 12px; color: var(--text-3); }
+.outbox-tile strong { font-size: 20px; }
+.outbox-tile.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
+.email-body { white-space: pre-wrap; font-family: inherit; font-size: 13px; background: var(--surface-2); border-radius: 6px; padding: 12px; margin: 0; }
