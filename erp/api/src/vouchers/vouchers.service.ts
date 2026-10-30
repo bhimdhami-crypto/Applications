@@ -3,6 +3,7 @@ import { Prisma, Voucher, VoucherLine } from '@prisma/client';
 import { approvalBlocker, selectRule } from '../approvals/approval-rules';
 import { ArchiveService, UploadedFile } from '../archive/archive.service';
 import { AuditService } from '../audit/audit.service';
+import { fieldChanges, lineChanges } from '../audit/changes';
 import { AuthUser } from '../auth/decorators';
 import { fromUnits, toUnits } from '../common/money';
 import { CompaniesService } from '../companies/companies.service';
@@ -56,7 +57,7 @@ export class VouchersService {
         },
       }),
     );
-    await this.audit.record(user.id, 'voucher.created', 'Voucher', voucher.id, { voucherNo: voucher.voucherNo });
+    await this.log(user, voucher, 'voucher.created');
     return this.get(companyCode, voucher.voucherNo);
   }
 
@@ -83,7 +84,7 @@ export class VouchersService {
       await this.prisma.voucher.delete({ where: { id: voucher.id } });
       throw e;
     }
-    await this.audit.record(user.id, 'voucher.created_from_files', 'Voucher', voucher.id, { voucherNo: voucher.voucherNo });
+    await this.log(user, voucher, 'voucher.created_from_files');
     return this.get(companyCode, voucher.voucherNo);
   }
 
@@ -93,6 +94,7 @@ export class VouchersService {
     if (!EDITABLE.includes(voucher.status)) throw new ConflictException(`${voucherNo} is ${voucher.status} and cannot be edited`);
     if (voucher.documentType === 'REVERSAL') throw new ConflictException('A reversal copies its journal and cannot be edited');
     const lines = await this.toLineRows(company.id, dto.lines);
+    const before = await this.prisma.voucher.findUniqueOrThrow({ where: { id: voucher.id }, include: { lines: { orderBy: { lineNo: 'asc' } } } });
     await this.prisma.$transaction([
       this.prisma.voucherLine.deleteMany({ where: { voucherId: voucher.id } }),
       this.prisma.voucher.update({
@@ -105,7 +107,13 @@ export class VouchersService {
         },
       }),
     ]);
-    await this.audit.record(user.id, 'voucher.updated', 'Voucher', voucher.id);
+    const after = await this.prisma.voucher.findUniqueOrThrow({ where: { id: voucher.id }, include: { lines: { orderBy: { lineNo: 'asc' } } } });
+    const changes = fieldChanges(before, after, { txDate: 'Date', description: 'Description', reference: 'Reference' });
+    const [was, now] = await this.describeLines([before.lines, after.lines]);
+    const { removed, added } = lineChanges(was, now);
+    if (changes.length || removed.length || added.length) {
+      await this.log(user, voucher, 'voucher.updated', { changes, removedLines: removed, addedLines: added });
+    }
     return this.get(companyCode, voucherNo);
   }
 
@@ -142,13 +150,14 @@ export class VouchersService {
       });
       await tx.approvalAction.create({ data: { voucherId: voucher.id, action: 'SUBMITTED', userId: user.id, comment } });
     });
-    await this.audit.record(user.id, 'voucher.submitted', 'Voucher', voucher.id);
+    await this.log(user, voucher, 'voucher.submitted', comment ? { comment } : undefined);
     return this.get(companyCode, voucherNo);
   }
 
   /** Approves the current stage; the last stage posts the voucher in the same transaction */
   async approve(companyCode: string, voucherNo: string, user: AuthUser, comment?: string) {
     const { company } = await this.load(companyCode, voucherNo);
+    let approved = { id: 0, stageNo: 0 };
     await this.prisma.$transaction(
       async (tx) => {
         // Re-read inside the transaction so two approvers cannot both act on the same stage
@@ -157,6 +166,7 @@ export class VouchersService {
           include: { lines: { orderBy: { lineNo: 'asc' } }, actions: { orderBy: { id: 'asc' } } },
         });
         const stage = await this.currentStage(tx, voucher, user);
+        approved = { id: voucher.id, stageNo: stage.stageNo };
         const stageCount = await tx.approvalRuleStage.count({ where: { ruleId: voucher.ruleId! } });
         await tx.approvalAction.create({
           data: { voucherId: voucher.id, stageNo: stage.stageNo, action: 'APPROVED', userId: user.id, comment },
@@ -172,22 +182,24 @@ export class VouchersService {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000 },
     );
-    await this.audit.record(user.id, 'voucher.approved', 'Voucher', voucherNo);
+    await this.log(user, { id: approved.id, companyId: company.id, voucherNo }, 'voucher.approved', { stage: approved.stageNo, comment });
     return this.get(companyCode, voucherNo);
   }
 
   async reject(companyCode: string, voucherNo: string, user: AuthUser, comment: string) {
     const { company } = await this.load(companyCode, voucherNo);
+    let rejected = { id: 0, stageNo: 0 };
     await this.prisma.$transaction(async (tx) => {
       const voucher = await tx.voucher.findUniqueOrThrow({
         where: { companyId_voucherNo: { companyId: company.id, voucherNo } },
         include: { actions: { orderBy: { id: 'asc' } } },
       });
       const stage = await this.currentStage(tx, voucher, user);
+      rejected = { id: voucher.id, stageNo: stage.stageNo };
       await tx.approvalAction.create({ data: { voucherId: voucher.id, stageNo: stage.stageNo, action: 'REJECTED', userId: user.id, comment } });
       await tx.voucher.update({ where: { id: voucher.id }, data: { status: 'REJECTED', currentStage: null } });
     });
-    await this.audit.record(user.id, 'voucher.rejected', 'Voucher', voucherNo, { comment });
+    await this.log(user, { id: rejected.id, companyId: company.id, voucherNo }, 'voucher.rejected', { stage: rejected.stageNo, comment });
     return this.get(companyCode, voucherNo);
   }
 
@@ -200,6 +212,7 @@ export class VouchersService {
       this.prisma.voucher.update({ where: { id: voucher.id }, data: { status: 'DRAFT', currentStage: null } }),
       this.prisma.approvalAction.create({ data: { voucherId: voucher.id, action: 'RECALLED', userId: user.id } }),
     ]);
+    await this.log(user, voucher, 'voucher.recalled');
     return this.get(companyCode, voucherNo);
   }
 
@@ -208,7 +221,7 @@ export class VouchersService {
     this.mustBeAuthor(voucher, user);
     if (!EDITABLE.includes(voucher.status)) throw new ConflictException(`${voucherNo} is ${voucher.status} and cannot be cancelled`);
     await this.prisma.voucher.update({ where: { id: voucher.id }, data: { status: 'CANCELLED' } });
-    await this.audit.record(user.id, 'voucher.cancelled', 'Voucher', voucher.id);
+    await this.log(user, voucher, 'voucher.cancelled');
     return this.get(companyCode, voucherNo);
   }
 
@@ -258,7 +271,7 @@ export class VouchersService {
         },
       }),
     );
-    await this.audit.record(user.id, 'voucher.reversal_drafted', 'Voucher', voucher.id, { auditNo });
+    await this.log(user, voucher, 'voucher.reversal_drafted', { auditNo });
     return this.get(companyCode, voucher.voucherNo);
   }
 
@@ -456,6 +469,31 @@ export class VouchersService {
    * Draft lines: accounts must belong to the company, and an intercompany line's account to its partner.
    * An intercompany line's own side is always the current account with that partner.
    */
+  private log(user: AuthUser, voucher: { id: number; companyId: number; voucherNo: string }, action: string, detail?: object) {
+    return this.audit.record({ userId: user.id, companyId: voucher.companyId, action, entity: 'Voucher', entityId: voucher.id, label: voucher.voucherNo, detail });
+  }
+
+  /** Voucher lines as one line of text each (account, side, amount, party), for the change history */
+  private async describeLines(sets: VoucherLine[][]) {
+    const all = sets.flat();
+    const [accounts, parties] = await Promise.all([
+      this.prisma.glAccount.findMany({ where: { id: { in: [...new Set(all.map((l) => l.accountId))] } }, select: { id: true, code: true } }),
+      this.prisma.party.findMany({ where: { id: { in: [...new Set(all.flatMap((l) => (l.partyId ? [l.partyId] : [])))] } }, select: { id: true, code: true } }),
+    ]);
+    const code = new Map(accounts.map((a) => [a.id, a.code]));
+    const party = new Map(parties.map((p) => [p.id, p.code]));
+    return sets.map((lines) =>
+      lines.map((l) => {
+        const money = (d: Prisma.Decimal | null) => (d ? Number(d.toFixed(2)).toLocaleString('en-US', { minimumFractionDigits: 2 }) : '');
+        const side = l.debit && !l.debit.isZero() ? `Dr ${money(l.debit)}` : l.credit && !l.credit.isZero() ? `Cr ${money(l.credit)}` : '';
+        const foreign = l.currencyCode ? ` ${l.currencyCode} ${money(l.foreignAmount)} @ ${l.exchangeRate?.toString()}` : '';
+        return [code.get(l.accountId), side + foreign, l.partyId ? party.get(l.partyId) : null, l.description]
+          .filter(Boolean)
+          .join(' · ');
+      }),
+    );
+  }
+
   private async toLineRows(companyId: number, lines: VoucherLineDto[]) {
     const rows = [];
     for (const [i, l] of lines.entries()) {

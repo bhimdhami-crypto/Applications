@@ -457,6 +457,76 @@ describe('MFI ERP API', () => {
     expect(JSON.parse(logged.detail!).reason).toBe(reason);
   });
 
+  it('shows what changed, who changed it and when, field by field', async () => {
+    // A draft edited before submission: the history keeps the old lines as well as the new
+    const draft = (await api('post', '/companies/MFI-DS/vouchers').send(journal('100')).expect(201)).body;
+    await api('put', `/companies/MFI-DS/vouchers/${draft.voucherNo}`)
+      .send({
+        txDate: '2026-03-16',
+        description: 'Rent for March',
+        lines: [
+          { accountId: ds['5000'], debit: '120' },
+          { accountId: ds['1100'], credit: '120' },
+        ],
+      })
+      .expect(200);
+    // Saving with nothing changed adds nothing to the history
+    await api('put', `/companies/MFI-DS/vouchers/${draft.voucherNo}`)
+      .send({ txDate: '2026-03-16', description: 'Rent for March', lines: [{ accountId: ds['5000'], debit: '120.00' }, { accountId: ds['1100'], credit: '120' }] })
+      .expect(200);
+    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/approve`, 'manager').send({ comment: 'ok' }).expect(200);
+
+    const trail = (await api('get', `/companies/MFI-DS/history/Voucher/${draft.id}`, 'viewer').expect(200)).body;
+    expect(trail.map((e: { action: string }) => e.action)).toEqual(['voucher.created', 'voucher.updated', 'voucher.submitted', 'voucher.approved']);
+    expect(trail[1]).toMatchObject({
+      user: 'accountant',
+      label: draft.voucherNo,
+      detail: {
+        changes: [
+          { field: 'Date', from: '2026-03-15', to: '2026-03-16' },
+          { field: 'Description', from: 'Rent', to: 'Rent for March' },
+        ],
+        removedLines: ['5000 · Dr 100.00', '1100 · Cr 100.00'],
+        addedLines: ['5000 · Dr 120.00', '1100 · Cr 120.00'],
+      },
+    });
+    expect(trail[3]).toMatchObject({ user: 'manager', detail: { stage: 1, comment: 'ok' } });
+
+    // A customer's terms and limit, before and after
+    const acme = (await api('get', '/companies/MFI-DS/parties?kind=CUSTOMER').expect(200)).body.find((p: { code: string }) => p.code === 'C001');
+    await api('patch', `/companies/MFI-DS/parties/${acme.id}`, 'manager').send({ termsDays: 45, creditLimit: '80000.00', name: acme.name }).expect(200);
+    const partyTrail = (await api('get', `/companies/MFI-DS/history/Party/${acme.id}`).expect(200)).body;
+    expect(partyTrail.at(-1)).toMatchObject({
+      action: 'party.updated',
+      label: 'Customer C001 Acme Ltd',
+      detail: { changes: [{ field: 'Terms (days)', from: '30', to: '45' }] },
+    });
+
+    // The company-wide trail is for managers, directors and administrators
+    await api('get', '/companies/MFI-DS/history').expect(403);
+    const all = (await api('get', '/companies/MFI-DS/history?limit=3', 'manager').expect(200)).body;
+    expect(all.items).toHaveLength(3);
+    expect(all.items[0].action).toBe('party.updated');
+    const older = (await api('get', `/companies/MFI-DS/history?limit=3&before=${all.next}`, 'manager').expect(200)).body;
+    expect(BigInt(older.items[0].id)).toBeLessThan(BigInt(all.items[2].id));
+
+    const found = (await api('get', `/companies/MFI-DS/history?q=${draft.voucherNo}`, 'director').expect(200)).body;
+    expect(found.items).toHaveLength(4);
+    const manager = await prisma.user.findFirstOrThrow({ where: { name: 'manager' } });
+    const byManager = (await api('get', `/companies/MFI-DS/history?entity=Party&userId=${manager.id}`, 'manager').expect(200)).body;
+    expect(byManager.items.length).toBeGreaterThan(0);
+    expect(byManager.items.every((e: { user: string; entity: string }) => e.user === 'manager' && e.entity === 'Party')).toBe(true);
+    // Another company's trail holds none of this
+    const mdsTrail = (await api('get', `/companies/MFI-MDS/history?q=${draft.voucherNo}`, 'manager').expect(200)).body;
+    expect(mdsTrail.items).toHaveLength(0);
+
+    // Sign-ins, including failed ones, are for administrators only
+    await api('get', '/sign-ins', 'manager').expect(403);
+    const signIns = (await api('get', '/sign-ins', 'admin').expect(200)).body;
+    expect(signIns.items.map((e: { action: string }) => e.action)).toContain('auth.login_failed');
+  });
+
   it('keeps an audit trail of every step', async () => {
     const actions = await prisma.auditLog.groupBy({ by: ['action'], _count: true });
     const seen = actions.map((a) => a.action);

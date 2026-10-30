@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, BookOpen, CheckSquare, Clock, FileText, ListChecks, LogOut, Notebook, Scale, Truck, Users } from 'lucide-react';
+import { Archive, BookOpen, CheckSquare, Clock, FileText, History, ListChecks, LogOut, Notebook, Scale, Truck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -17,7 +17,7 @@ const ROLE_LABEL: Record<string, string> = {
 
 function Shell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
-  const { user, companies, company, setCompany, signOut } = useSession();
+  const { user, companies, company, setCompany, signOut, can } = useSession();
   const [pending, setPending] = useState(0);
 
   // The count beside "Approvals" is everything waiting for this person, in every company
@@ -52,6 +52,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         { href: '/suppliers', label: 'Suppliers', icon: Truck },
         { href: '/accounts', label: 'Chart of accounts', icon: BookOpen },
         { href: '/approval-rules', label: 'Approval rules', icon: ListChecks },
+        ...(can('FINANCE_MANAGER', 'DIRECTOR') ? [{ href: '/history', label: 'Change history', icon: History }] : []),
       ],
     },
   ];

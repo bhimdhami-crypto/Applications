@@ -225,3 +225,22 @@ td.overdue { color: var(--danger); }
 .stage-no { font-weight: 600; color: var(--text-3); width: 16px; text-align: center; }
 .warning { background: var(--warning-soft); color: var(--warning); border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 14px; }
 @media (max-width: 640px) { .stage-row { grid-template-columns: auto 1fr; } }
+
+/* Change history */
+.history { list-style: none; padding: 0; margin: 0; display: grid; gap: 0; }
+.history li { padding: 10px 0 10px 14px; border-left: 3px solid var(--border); border-bottom: 1px solid var(--border); }
+.history li:last-child { border-bottom: 0; }
+.history li[class$="-updated"], .history li.approval-matrix_changed { border-left-color: var(--warning); }
+.history li.voucher-approved, .history li[class$="_posted"] { border-left-color: var(--success); }
+.history li.voucher-rejected, .history li.auth-login_failed, .history li.archive-removed { border-left-color: var(--danger); }
+.history-meta { font-size: 12px; margin-top: 2px; }
+.history-detail { margin-top: 6px; font-size: 13px; display: grid; gap: 3px; }
+.changes { border-collapse: collapse; width: auto; }
+.changes td { padding: 2px 12px 2px 0; border: 0; }
+.changes del { color: var(--danger); }
+.changes ins { color: var(--success); text-decoration: none; font-weight: 600; }
+.line-change { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12px; }
+.line-change.removed { color: var(--danger); }
+.line-change.added { color: var(--success); }
+.drawer-backdrop { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.3); z-index: 20; display: flex; justify-content: flex-end; }
+.drawer { width: min(520px, 100vw); height: 100%; overflow-y: auto; background: var(--surface); padding: 20px; box-shadow: var(--shadow); }

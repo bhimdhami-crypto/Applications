@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DropZone, filesForm } from '@/components/DropZone';
+import { RecordHistory } from '@/components/RecordHistory';
 import { StatusBadge } from '@/components/StatusBadge';
 import { Account, Attachment, Party, Voucher, api, download, errorText } from '@/lib/api';
 import { cleanAmount, formatAmount, formatDate, formatSize, toUnits } from '@/lib/money';
@@ -569,6 +570,16 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
                 </ul>
               )}
             </div>
+          )}
+          {voucher && (
+            <details className="card">
+              <summary>
+                <h2 style={{ display: 'inline' }}>History</h2> <span className="muted">every edit with its old values, approvals and files</span>
+              </summary>
+              <div style={{ marginTop: 12 }}>
+                <RecordHistory entity="Voucher" id={voucher.id} refresh={voucher} />
+              </div>
+            </details>
           )}
         </div>
 

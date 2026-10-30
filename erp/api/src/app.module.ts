@@ -5,6 +5,7 @@ import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
 import { HealthModule } from './health/health.module';
+import { HistoryModule } from './history/history.module';
 import { LedgerModule } from './ledger/ledger.module';
 import { PartiesModule } from './parties/parties.module';
 import { PrismaModule } from './prisma/prisma.module';
@@ -24,6 +25,7 @@ import { VouchersModule } from './vouchers/vouchers.module';
     PartiesModule,
     ReportsModule,
     ApprovalsModule,
+    HistoryModule,
   ],
 })
 export class AppModule {}

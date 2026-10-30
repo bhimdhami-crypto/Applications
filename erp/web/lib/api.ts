@@ -243,6 +243,41 @@ export async function api<T>(path: string, init: { method?: string; body?: unkno
 }
 
 /** Downloads an archived file with the sign-in token and hands it to the browser */
+export interface FieldChange {
+  field: string;
+  from: string | null;
+  to: string | null;
+}
+
+/** One entry of the change history; detail depends on the action */
+export interface HistoryEntry {
+  id: string;
+  at: string;
+  action: string;
+  entity: string;
+  entityId: string | null;
+  label: string | null;
+  user: string | null;
+  detail: {
+    changes?: FieldChange[];
+    removedLines?: string[];
+    addedLines?: string[];
+    comment?: string;
+    reason?: string;
+    stage?: number;
+    files?: string[];
+    file?: string;
+    auditNo?: string;
+    email?: string;
+    [key: string]: unknown;
+  } | null;
+}
+
+export interface HistoryPage {
+  items: HistoryEntry[];
+  next: string | null;
+}
+
 export async function download(company: string, attachment: { id: number; fileName: string }) {
   const res = await send(`/companies/${company}/archive/${attachment.id}/download`);
   const url = URL.createObjectURL(await res.blob());

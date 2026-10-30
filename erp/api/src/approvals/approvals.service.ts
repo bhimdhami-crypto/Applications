@@ -152,11 +152,15 @@ export class ApprovalsService {
         }
         if (created.length || retired.length) {
           await this.audit.record(
-            user.id,
-            'approval.matrix_changed',
-            'ApprovalRule',
-            `${company.code}/${documentType}`,
-            { reason: dto.reason, retired: retired.map(band), created, bands },
+            {
+              userId: user.id,
+              companyId: company.id,
+              action: 'approval.matrix_changed',
+              entity: 'ApprovalRule',
+              entityId: `${company.code}/${documentType}`,
+              label: `${documentType} approval matrix`,
+              detail: { reason: dto.reason, retired: retired.map(band), created, bands },
+            },
             tx,
           );
         }
