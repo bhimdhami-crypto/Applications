@@ -642,6 +642,12 @@ describe('MFI ERP API', () => {
     expect(preview).toMatchObject({ problems: [], lineCount: 4, newLines: 4, skipped: 0, layout: { headerRow: 2, moneyOut: 'Debit', moneyIn: 'Credit' } });
     expect(preview.lines[0]).toMatchObject({ txDate: '2026-03-02', amount: '50000.0000' });
     await upload('/statements/preview', 'x', 'march.pdf').expect(400);
+    // A file whose printed currency or account number is another account's is refused
+    const usd = csv.replace('Account,0102030405060', 'Account Currency:,USD');
+    expect((await upload('/statements/preview', usd).expect(200)).body.problems[0]).toBe('This statement is in USD but SCB Harambee KES is a KES account');
+    await upload('/statements', usd).expect(400);
+    const other = csv.replace('Account,0102030405060', 'Account No:,0100003275358 - SBICKENX');
+    expect((await upload('/statements', other).expect(400)).body.message).toBe('This statement is for account 0100003275358 but SCB Harambee KES is account 0102030405060');
 
     const imported = (await upload('/statements', csv).expect(201)).body;
     // Deposit, cheque and receipt match; the bank charge is not in the ledger yet
