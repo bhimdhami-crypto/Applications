@@ -63,6 +63,12 @@ describe('MFI ERP API', () => {
     // Children before parents
     await prisma.auditLog.deleteMany();
     await prisma.emailMessage.deleteMany();
+    await prisma.bankReconciliation.deleteMany();
+    await prisma.bankStatementLine.deleteMany();
+    await prisma.bankMatchEntry.deleteMany();
+    await prisma.bankMatch.deleteMany();
+    await prisma.bankStatement.deleteMany();
+    await prisma.bankAccount.deleteMany();
     await prisma.attachment.deleteMany();
     await prisma.approvalAction.deleteMany();
     await prisma.voucherLine.deleteMany();
@@ -591,6 +597,109 @@ describe('MFI ERP API', () => {
     expect(await mailer.queueDigests(morning)).toBe(0);
     const reminder = await prisma.emailMessage.findFirstOrThrow({ where: { kind: 'DIGEST', toEmail: 'manager@mfi-erp.test' } });
     expect(reminder.text).toContain(`${waiting.voucherNo} · KES 75.00 · Stationery · Finance manager review · 2 days`);
+  });
+
+  it('imports a bank statement, matches it to the ledger and signs off the reconciliation', async () => {
+    const bank = (await api('post', '/companies/MFI-DS/accounts').send({ code: '1120', description: 'SCB Harambee KES', type: 'ASSET' }).expect(201)).body;
+    const setup = { glAccountId: bank.id, name: 'SCB Harambee KES', bankName: 'Standard Chartered', accountNumber: '0102030405060', reconcileFrom: '2026-03-01' };
+    await api('post', '/companies/MFI-DS/bank-accounts').send(setup).expect(403);
+    const account = (await api('post', '/companies/MFI-DS/bank-accounts', 'manager').send(setup).expect(201)).body;
+    const B = `/companies/MFI-DS/bank-accounts/${account.id}`;
+
+    const pay = (txDate: string, description: string, amount: string, into: boolean, reference?: string) =>
+      postVoucher({
+        txDate,
+        description,
+        reference,
+        lines: into
+          ? [
+              { accountId: bank.id, debit: amount },
+              { accountId: ds['4000'], credit: amount },
+            ]
+          : [
+              { accountId: ds['5000'], debit: amount },
+              { accountId: bank.id, credit: amount },
+            ],
+      });
+    await pay('2026-03-02', 'Capital deposit', '50000', true);
+    await pay('2026-03-20', 'KPLC March', '4821', false, '000123');
+    await pay('2026-03-28', 'Receipt Nairobi Hospital INV 0091', '25000', true);
+    await pay('2026-03-30', 'Petty cash top-up', '1000', false, '000124');
+
+    // The bank's export, newest first, with the account details above the headings
+    const csv = [
+      'Standard Chartered Bank Kenya',
+      'Account,0102030405060',
+      'Transaction Date,Value Date,Description,Cheque No,Debit,Credit,Balance',
+      '31/03/2026,31/03/2026,"SERVICE CHARGE, MAR",,450.00,,"69,729.00"',
+      '29/03/2026,29/03/2026,RTGS NAIROBI HOSPITAL INV 0091,,,"25,000.00","70,179.00"',
+      '27/03/2026,27/03/2026,CHQ 000123 KENYA POWER,000123,"4,821.00",,"45,179.00"',
+      '02/03/2026,02/03/2026,CASH DEPOSIT,,,"50,000.00","50,000.00"',
+    ].join('\r\n');
+    const upload = (path: string, body: string, name = 'march.csv', who = 'accountant') => api('post', `${B}${path}`, who).attach('file', Buffer.from(body), name);
+
+    const preview = (await upload('/statements/preview', csv).expect(200)).body;
+    expect(preview).toMatchObject({ problems: [], lineCount: 4, newLines: 4, skipped: 0, layout: { headerRow: 2, moneyOut: 'Debit', moneyIn: 'Credit' } });
+    expect(preview.lines[0]).toMatchObject({ txDate: '2026-03-02', amount: '50000.0000' });
+    await upload('/statements/preview', 'x', 'march.pdf').expect(400);
+
+    const imported = (await upload('/statements', csv).expect(201)).body;
+    // Deposit, cheque and receipt match; the bank charge is not in the ledger yet
+    expect(imported).toMatchObject({ imported: 4, skipped: 0, matched: 3 });
+    await upload('/statements', csv).expect(409);
+
+    let ws = (await api('get', `${B}/workspace`).expect(200)).body;
+    expect(ws.lines.map((l: { description: string }) => l.description)).toEqual(['SERVICE CHARGE, MAR']);
+    expect(ws.entries.map((e: { amount: string }) => e.amount)).toEqual(['-1000.0000']);
+
+    // The bank charge becomes a voucher, goes through approval and is then ticked off automatically
+    const charge = ws.lines[0];
+    const draft = (await api('post', `${B}/lines/${charge.id}/voucher`).send({ contraAccountId: ds['5000'] }).expect(201)).body;
+    expect(draft).toMatchObject({ txDate: expect.stringMatching(/^2026-03-31/), status: 'DRAFT', lines: [{ credit: '450' }, { debit: '450' }] });
+    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/approve`, 'manager').send({}).expect(200);
+    expect((await api('post', `${B}/auto-match`).expect(200)).body).toEqual({ matched: 1 });
+
+    // A match can be undone and made by hand; both sides must add up to the same amount
+    ws = (await api('get', `${B}/workspace`).expect(200)).body;
+    const deposit = ws.matches.find((m: { lines: Array<{ description: string }> }) => m.lines[0].description === 'CASH DEPOSIT');
+    await api('delete', `${B}/matches/${deposit.id}`).expect(200);
+    const petty = ws.entries.find((e: { amount: string }) => e.amount === '-1000.0000');
+    const wrong = await api('post', `${B}/matches`).send({ lineIds: [deposit.lines[0].id], entryIds: [petty.id] }).expect(400);
+    expect(wrong.body.message).toBe('The statement lines come to 50000.0000 and the ledger rows to -1000.0000; they must be equal');
+    await api('post', `${B}/matches`).send({ lineIds: [deposit.lines[0].id], entryIds: deposit.entries.map((e: { id: string }) => e.id) }).expect(201);
+
+    // An overlapping export brings in only the new line
+    const rows = csv.split('\r\n');
+    const april = [...rows.slice(0, 3), '02/04/2026,02/04/2026,INTEREST,,,12.50,"69,741.50"', ...rows.slice(3, 5)].join('\r\n');
+    expect((await upload('/statements', april, 'march-april.csv').expect(201)).body).toMatchObject({ imported: 1, skipped: 2 });
+
+    const recon = (await api('get', `${B}/reconciliation?asAt=2026-03-31`, 'viewer').expect(200)).body;
+    expect(recon).toMatchObject({
+      statementBalance: '69729.0000',
+      depositsInTransit: '0.0000',
+      unpresentedPayments: '1000.0000',
+      bankMoneyIn: '0.0000',
+      bankMoneyOut: '0.0000',
+      ledgerBalance: '68729.0000',
+      difference: '0.0000',
+    });
+    expect(recon.outstandingEntries.map((e: { reference: string }) => e.reference)).toEqual(['000124']);
+
+    // Prepared by one person, reviewed by another; then the matches it relies on are locked
+    const prepared = (await api('post', `${B}/reconciliations`).send({ asAt: '2026-03-31' }).expect(201)).body;
+    await api('post', `${B}/reconciliations/${prepared.id}/review`).expect(403);
+    await api('post', `${B}/reconciliations/${prepared.id}/review`, 'manager').expect(200);
+    const locked = (await api('get', `${B}/workspace`).expect(200)).body.matches[0];
+    await api('delete', `${B}/matches/${locked.id}`).expect(409);
+    await api('post', `${B}/reconciliations`).send({ asAt: '2026-03-31' }).expect(409);
+
+    const listed = (await api('get', '/companies/MFI-DS/bank-accounts').expect(200)).body;
+    expect(listed[0]).toMatchObject({ name: 'SCB Harambee KES', statementBalance: '69741.5000', unmatchedLines: 1, unmatchedEntries: 1 });
+    const trail = (await api('get', `/companies/MFI-DS/history/BankAccount/${account.id}`).expect(200)).body;
+    expect(trail.map((e: { action: string }) => e.action)).toEqual(
+      expect.arrayContaining(['bank.account_created', 'bank.statement_imported', 'bank.auto_matched', 'bank.unmatched', 'bank.matched', 'bank.reconciliation_reviewed']),
+    );
   });
 
   it('keeps an audit trail of every step', async () => {

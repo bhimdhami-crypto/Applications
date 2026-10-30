@@ -2,7 +2,7 @@ import { Type } from 'class-transformer';
 import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 
 /** Records whose own history can be opened from their screen */
-export const HISTORY_ENTITIES = ['Voucher', 'Party', 'GlAccount', 'PostingBatch', 'ApprovalRule', 'IntercompanyLink'] as const;
+export const HISTORY_ENTITIES = ['Voucher', 'Party', 'GlAccount', 'PostingBatch', 'ApprovalRule', 'IntercompanyLink', 'BankAccount'] as const;
 export type HistoryEntity = (typeof HISTORY_ENTITIES)[number];
 
 export class HistoryQuery {

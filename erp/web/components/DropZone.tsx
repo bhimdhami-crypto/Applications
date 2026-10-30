@@ -16,12 +16,16 @@ export function DropZone({
   onFiles,
   disabled,
   compact,
+  accept = ACCEPT,
+  multiple = true,
 }: {
   title: string;
   hint?: string;
   onFiles: (files: File[]) => void;
   disabled?: boolean;
   compact?: boolean;
+  accept?: string;
+  multiple?: boolean;
 }) {
   const [over, setOver] = useState(false);
   const input = useRef<HTMLInputElement>(null);
@@ -54,8 +58,8 @@ export function DropZone({
       <input
         ref={input}
         type="file"
-        multiple
-        accept={ACCEPT}
+        multiple={multiple}
+        accept={accept}
         hidden
         onChange={(e) => {
           const files = Array.from(e.target.files ?? []);

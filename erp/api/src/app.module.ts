@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { ApprovalsModule } from './approvals/approvals.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
+import { BankModule } from './bank/bank.module';
 import { CompaniesModule } from './companies/companies.module';
 import { HealthModule } from './health/health.module';
 import { HistoryModule } from './history/history.module';
@@ -28,6 +29,7 @@ import { VouchersModule } from './vouchers/vouchers.module';
     ApprovalsModule,
     HistoryModule,
     NotificationsModule,
+    BankModule,
   ],
 })
 export class AppModule {}

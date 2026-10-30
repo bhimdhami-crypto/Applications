@@ -252,3 +252,32 @@ td.overdue { color: var(--danger); }
 .outbox-tile strong { font-size: 20px; }
 .outbox-tile.active { border-color: var(--primary); box-shadow: 0 0 0 1px var(--primary); }
 .email-body { white-space: pre-wrap; font-family: inherit; font-size: 13px; background: var(--surface-2); border-radius: 6px; padding: 12px; margin: 0; }
+
+/* Bank reconciliation */
+.bank-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(380px, 1fr)); gap: 16px; }
+.bank-card { display: grid; gap: 14px; color: inherit; text-decoration: none; margin: 0; }
+.bank-card:hover { border-color: var(--primary); }
+.bank-card-head { display: flex; gap: 10px; align-items: flex-start; }
+.bank-figures { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 16px; font-size: 14px; }
+.bank-figures span { display: block; font-size: 12px; color: var(--text-3); }
+.match-bar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; position: sticky; top: 58px; z-index: 3; }
+.match-board { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; align-items: start; }
+.match-list { display: grid; gap: 6px; max-height: 60vh; overflow-y: auto; }
+.match-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: start; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; cursor: pointer; font-size: 14px; background: var(--surface); }
+.match-row[draggable='true'] { cursor: grab; }
+.match-row.picked { border-color: var(--primary); background: var(--primary-soft); }
+.match-row.drop-on { border-color: var(--success); box-shadow: 0 0 0 2px var(--success); }
+.match-main { min-width: 0; display: grid; gap: 2px; }
+.match-main .muted { font-size: 12px; }
+.match-amount { display: grid; justify-items: end; gap: 4px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.amount-in { color: var(--success); font-weight: 600; }
+.amount-out { color: var(--danger); font-weight: 600; }
+.line-voucher { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+.line-voucher select { max-width: 260px; }
+.recon { max-width: 640px; }
+.recon td { padding: 6px 0; }
+.recon-total td { font-weight: 700; border-top: 1px solid var(--border-strong); }
+.recon-total.ok td { color: var(--success); }
+.recon-total.bad td { color: var(--danger); }
+h3 { font-size: 14px; margin: 18px 0 6px; }
+@media (max-width: 900px) { .match-board { grid-template-columns: 1fr; } .bank-cards { grid-template-columns: 1fr; } }

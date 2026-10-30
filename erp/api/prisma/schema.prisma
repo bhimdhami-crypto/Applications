@@ -17,22 +17,23 @@ model Company {
   isActive     Boolean  @default(true)
   createdAt    DateTime @default(now())
 
-  currency  Currency           @relation(fields: [homeCurrency], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  periods   FiscalPeriod[]
-  taxCodes  TaxCode[]
-  projects  Project[]
-  accounts  GlAccount[]
-  batches   PostingBatch[]
-  entries   LedgerEntry[]
-  sequences NumberSequence[]
-  vouchers  Voucher[]
-  rules     ApprovalRule[]
-  icLinks   IntercompanyLink[] @relation("IcOwner")
-  icPartner IntercompanyLink[] @relation("IcPartner")
-  voucherIc VoucherLine[]      @relation("LinePartner")
-  files     Attachment[]
-  parties   Party[]
-  auditLog  AuditLog[]
+  currency     Currency           @relation(fields: [homeCurrency], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  periods      FiscalPeriod[]
+  taxCodes     TaxCode[]
+  projects     Project[]
+  accounts     GlAccount[]
+  batches      PostingBatch[]
+  entries      LedgerEntry[]
+  sequences    NumberSequence[]
+  vouchers     Voucher[]
+  rules        ApprovalRule[]
+  icLinks      IntercompanyLink[] @relation("IcOwner")
+  icPartner    IntercompanyLink[] @relation("IcPartner")
+  voucherIc    VoucherLine[]      @relation("LinePartner")
+  files        Attachment[]
+  parties      Party[]
+  auditLog     AuditLog[]
+  bankAccounts BankAccount[]
 }
 
 model User {
@@ -53,8 +54,12 @@ model User {
   actions  ApprovalAction[]
   files    Attachment[]
 
-  rulesCreated ApprovalRule[] @relation("RuleCreatedBy")
-  rulesRetired ApprovalRule[] @relation("RuleRetiredBy")
+  rulesCreated   ApprovalRule[]       @relation("RuleCreatedBy")
+  rulesRetired   ApprovalRule[]       @relation("RuleRetiredBy")
+  bankStatements BankStatement[]
+  bankMatches    BankMatch[]
+  reconsPrepared BankReconciliation[] @relation("ReconPreparedBy")
+  reconsReviewed BankReconciliation[] @relation("ReconReviewedBy")
 }
 
 model Currency {
@@ -62,10 +67,11 @@ model Currency {
   name     String @db.NVarChar(100)
   decimals Int    @default(2)
 
-  companies Company[]
-  rates     ExchangeRate[]
-  entries   LedgerEntry[]
-  parties   Party[]
+  companies    Company[]
+  rates        ExchangeRate[]
+  entries      LedgerEntry[]
+  parties      Party[]
+  bankAccounts BankAccount[]
 }
 
 /// Units of home currency per one unit of foreign currency, per day
@@ -141,13 +147,14 @@ model GlAccount {
   /// Accounts.AccountLink in Sage Evolution, kept so migrated history can be traced back
   sourceLinkId Int?
 
-  company  Company            @relation(fields: [companyId], references: [id])
-  parent   GlAccount?         @relation("AccountTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  children GlAccount[]        @relation("AccountTree")
-  entries  LedgerEntry[]
-  lines    VoucherLine[]      @relation("LineAccount")
-  icLines  VoucherLine[]      @relation("LinePartnerAccount")
-  icLinks  IntercompanyLink[]
+  company     Company            @relation(fields: [companyId], references: [id])
+  parent      GlAccount?         @relation("AccountTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    GlAccount[]        @relation("AccountTree")
+  entries     LedgerEntry[]
+  lines       VoucherLine[]      @relation("LineAccount")
+  icLines     VoucherLine[]      @relation("LinePartnerAccount")
+  icLinks     IntercompanyLink[]
+  bankAccount BankAccount?
 
   @@unique([companyId, code])
   @@index([companyId, sourceLinkId])
@@ -207,14 +214,15 @@ model LedgerEntry {
   /// When the amount falls due, from the party's payment terms; ageing counts from here
   dueDate       DateTime? @db.Date
 
-  batch    PostingBatch @relation(fields: [batchId], references: [id])
-  company  Company      @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  account  GlAccount    @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  period   FiscalPeriod @relation(fields: [periodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  currency Currency     @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
-  project  Project?     @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  taxCode  TaxCode?     @relation(fields: [taxCodeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
-  party    Party?       @relation(fields: [partyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  batch     PostingBatch    @relation(fields: [batchId], references: [id])
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account   GlAccount       @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  period    FiscalPeriod    @relation(fields: [periodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currency  Currency        @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  project   Project?        @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  taxCode   TaxCode?        @relation(fields: [taxCodeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  party     Party?          @relation(fields: [partyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bankMatch BankMatchEntry?
 
   @@unique([batchId, lineNo])
   @@index([companyId, accountId, txDate])
@@ -466,4 +474,136 @@ model EmailMessage {
 
   @@index([status, nextAttemptAt])
   @@index([userId, kind, createdAt])
+}
+
+/**
+ * A bank account the company reconciles: its ledger account, and the bank's own details
+ */
+model BankAccount {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  glAccountId   Int      @unique
+  name          String   @db.NVarChar(100)
+  bankName      String?  @db.NVarChar(100)
+  accountNumber String?  @db.NVarChar(50)
+  currencyCode  String   @db.Char(3)
+  /// Ledger rows before this date were reconciled before the ERP (in Evolution) and are left out
+  reconcileFrom DateTime @db.Date
+  /// The CSV layout of the last import (JSON), offered again next time
+  csvLayout     String?  @db.NVarChar(Max)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  company         Company              @relation(fields: [companyId], references: [id])
+  glAccount       GlAccount            @relation(fields: [glAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currency        Currency             @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  statements      BankStatement[]
+  lines           BankStatementLine[]
+  matches         BankMatch[]
+  reconciliations BankReconciliation[]
+
+  @@unique([companyId, name])
+}
+
+/**
+ * One imported statement file, kept on disk in the archive
+ */
+model BankStatement {
+  id            Int      @id @default(autoincrement())
+  bankAccountId Int
+  fileName      String   @db.NVarChar(260)
+  sha256        String   @db.Char(64)
+  storageKey    String   @db.NVarChar(400)
+  fromDate      DateTime @db.Date
+  toDate        DateTime @db.Date
+  lineCount     Int
+  /// Lines already imported from an earlier, overlapping statement
+  skipped       Int
+  importedById  Int
+  importedAt    DateTime @default(now())
+
+  bankAccount BankAccount         @relation(fields: [bankAccountId], references: [id])
+  importedBy  User                @relation(fields: [importedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lines       BankStatementLine[]
+
+  @@unique([bankAccountId, sha256])
+}
+
+/// Money in is positive, money out negative, in the bank account's currency
+model BankStatementLine {
+  id            Int      @id @default(autoincrement())
+  statementId   Int
+  bankAccountId Int
+  lineNo        Int
+  txDate        DateTime @db.Date
+  description   String   @db.NVarChar(400)
+  reference     String?  @db.NVarChar(100)
+  amount        Decimal  @db.Decimal(19, 4)
+  balance       Decimal? @db.Decimal(19, 4)
+  /// Same date, amount, text and balance (and the count of such lines before it): an overlap with an earlier file
+  fingerprint   String   @db.Char(64)
+  matchId       Int?
+
+  statement   BankStatement @relation(fields: [statementId], references: [id])
+  bankAccount BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  match       BankMatch?    @relation(fields: [matchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([bankAccountId, fingerprint])
+  @@index([bankAccountId, txDate])
+  @@index([matchId])
+}
+
+/**
+ * Statement lines and ledger rows ticked off against each other. Both sides add up to the same amount:
+ * one cheque to one line, or one deposit slip in the ledger to several lines, and so on.
+ */
+model BankMatch {
+  id            Int      @id @default(autoincrement())
+  bankAccountId Int
+  method        String   @db.NVarChar(10) // AUTO, MANUAL
+  matchedById   Int
+  matchedAt     DateTime @default(now())
+
+  bankAccount BankAccount         @relation(fields: [bankAccountId], references: [id])
+  matchedBy   User                @relation(fields: [matchedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lines       BankStatementLine[]
+  entries     BankMatchEntry[]
+}
+
+/// A ledger row can be matched once; posted rows themselves are never changed
+model BankMatchEntry {
+  id            Int    @id @default(autoincrement())
+  matchId       Int
+  ledgerEntryId BigInt @unique
+
+  match       BankMatch   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  ledgerEntry LedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/**
+ * A signed-off reconciliation: the figures as they stood, who prepared them and who reviewed them.
+ * Once reviewed, matches on or before its date can no longer be undone.
+ */
+model BankReconciliation {
+  id                  Int       @id @default(autoincrement())
+  bankAccountId       Int
+  asAt                DateTime  @db.Date
+  statementBalance    Decimal   @db.Decimal(19, 4)
+  depositsInTransit   Decimal   @db.Decimal(19, 4)
+  unpresentedPayments Decimal   @db.Decimal(19, 4)
+  bankMoneyIn         Decimal   @db.Decimal(19, 4)
+  bankMoneyOut        Decimal   @db.Decimal(19, 4)
+  ledgerBalance       Decimal   @db.Decimal(19, 4)
+  difference          Decimal   @db.Decimal(19, 4)
+  note                String?   @db.NVarChar(1000)
+  preparedById        Int
+  preparedAt          DateTime  @default(now())
+  reviewedById        Int?
+  reviewedAt          DateTime?
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+  preparedBy  User        @relation("ReconPreparedBy", fields: [preparedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviewedBy  User?       @relation("ReconReviewedBy", fields: [reviewedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([bankAccountId, asAt])
 }
