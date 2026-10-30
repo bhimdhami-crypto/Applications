@@ -37,7 +37,7 @@ const TAX_CODES = [
 const FM = { name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' };
 const DIRECTOR = { name: 'Director approval', approverRole: 'DIRECTOR' };
 const SECOND_DIRECTOR = { name: 'Second director approval', approverRole: 'DIRECTOR' };
-const SOP = 'Assumed control matrix, Oct 2026: replace with MFI SOP';
+const SOP = 'Assumed matrix Oct 2026, pending MFI SOP';
 const APPROVAL_RULES = [
   { documentType: 'JOURNAL', name: 'Journals under KES 500,000', sopReference: SOP, minAmount: 0, maxAmount: 500_000, stages: [FM] },
   { documentType: 'JOURNAL', name: 'Journals from KES 500,000 to under 5,000,000', sopReference: SOP, minAmount: 500_000, maxAmount: 5_000_000, stages: [FM, DIRECTOR] },
