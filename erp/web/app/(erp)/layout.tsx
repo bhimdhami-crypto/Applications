@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, BookOpen, CheckSquare, FileText, LogOut, Scale } from 'lucide-react';
+import { Archive, BookOpen, CheckSquare, Clock, FileText, LogOut, Notebook, Scale, Truck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -27,12 +27,32 @@ function Shell({ children }: { children: React.ReactNode }) {
       .catch(() => setPending(0));
   }, [path]);
 
-  const nav = [
-    { href: '/approvals', label: 'Approvals', icon: CheckSquare, count: pending },
-    { href: '/vouchers', label: 'Vouchers', icon: FileText },
-    { href: '/archive', label: 'Archive', icon: Archive },
-    { href: '/trial-balance', label: 'Trial balance', icon: Scale },
-    { href: '/accounts', label: 'Chart of accounts', icon: BookOpen },
+  const groups = [
+    {
+      title: '',
+      links: [
+        { href: '/approvals', label: 'Approvals', icon: CheckSquare, count: pending },
+        { href: '/vouchers', label: 'Vouchers', icon: FileText },
+        { href: '/archive', label: 'Archive', icon: Archive },
+      ],
+    },
+    {
+      title: 'Reports',
+      links: [
+        { href: '/trial-balance', label: 'Trial balance', icon: Scale },
+        { href: '/reports/general-ledger', label: 'General ledger', icon: Notebook },
+        { href: '/reports/aged-debtors', label: 'Aged debtors', icon: Clock },
+        { href: '/reports/aged-creditors', label: 'Aged creditors', icon: Clock },
+      ],
+    },
+    {
+      title: 'Records',
+      links: [
+        { href: '/customers', label: 'Customers', icon: Users },
+        { href: '/suppliers', label: 'Suppliers', icon: Truck },
+        { href: '/accounts', label: 'Chart of accounts', icon: BookOpen },
+      ],
+    },
   ];
 
   return (
@@ -41,12 +61,20 @@ function Shell({ children }: { children: React.ReactNode }) {
         <div className="brand">
           MFI <span>ERP</span>
         </div>
-        {nav.map(({ href, label, icon: Icon, count }) => (
-          <Link key={href} href={href} className={`nav-link${path.startsWith(href) ? ' active' : ''}`}>
-            <Icon size={17} />
-            {label}
-            {!!count && <span className="nav-count">{count}</span>}
-          </Link>
+        {groups.map((g) => (
+          <div key={g.title} style={{ display: 'contents' }}>
+            {g.title && <div className="nav-group">{g.title}</div>}
+            {g.links.map(({ href, label, icon: Icon, ...rest }) => {
+              const count = 'count' in rest ? rest.count : 0;
+              return (
+                <Link key={href} href={href} className={`nav-link${path.startsWith(href) ? ' active' : ''}`}>
+                  <Icon size={17} />
+                  {label}
+                  {!!count && <span className="nav-count">{count}</span>}
+                </Link>
+              );
+            })}
+          </div>
         ))}
         <div className="sidebar-foot">
           <div>

@@ -13,6 +13,10 @@ export interface PostingLineInput {
   description?: string;
   projectId?: number;
   taxCodeId?: number;
+  /** Customer or supplier, on a Debtors or Creditors Control line */
+  partyId?: number;
+  /** YYYY-MM-DD; worked out from the party's terms at posting when not given */
+  dueDate?: string;
 }
 
 export interface PreparedLine {
@@ -27,6 +31,8 @@ export interface PreparedLine {
   description?: string;
   projectId?: number;
   taxCodeId?: number;
+  partyId?: number;
+  dueDate?: string;
 }
 
 export class PostingRuleError extends Error {}
@@ -99,6 +105,8 @@ export function prepareLines(lines: PostingLineInput[], homeCurrency: string, ho
       description: line.description,
       projectId: line.projectId,
       taxCodeId: line.taxCodeId,
+      partyId: line.partyId,
+      dueDate: line.dueDate,
     };
   });
 

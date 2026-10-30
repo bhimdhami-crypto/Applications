@@ -1,4 +1,4 @@
-// MFI ERP data model, phase 0: companies, users, periods, currencies, tax, projects and the general ledger.
+// MFI ERP data model: companies, users, periods, currencies, tax, projects, the general ledger, customers and suppliers.
 // SQL Server has no native enums in Prisma, so closed sets are strings checked in code (see src/common/constants.ts).
 generator client {
   provider = "prisma-client-js"
@@ -31,6 +31,7 @@ model Company {
   icPartner IntercompanyLink[] @relation("IcPartner")
   voucherIc VoucherLine[]      @relation("LinePartner")
   files     Attachment[]
+  parties   Party[]
 }
 
 model User {
@@ -57,6 +58,7 @@ model Currency {
   companies Company[]
   rates     ExchangeRate[]
   entries   LedgerEntry[]
+  parties   Party[]
 }
 
 /// Units of home currency per one unit of foreign currency, per day
@@ -127,6 +129,8 @@ model GlAccount {
   costCentre   String? @db.NVarChar(50)
   sector       String? @db.NVarChar(50)
   reportGroup  String? @db.NVarChar(100)
+  /// AR on Debtors Control, AP on Creditors Control: every line posted there names a customer or supplier
+  subledger    String? @db.NVarChar(2)
   /// Accounts.AccountLink in Sage Evolution, kept so migrated history can be traced back
   sourceLinkId Int?
 
@@ -175,22 +179,26 @@ model PostingBatch {
 
 /// A general ledger row. Rows are never updated or deleted once posted; corrections are reversing batches.
 model LedgerEntry {
-  id            BigInt   @id @default(autoincrement())
+  id            BigInt    @id @default(autoincrement())
   batchId       Int
   companyId     Int
   lineNo        Int
   accountId     Int
-  txDate        DateTime @db.Date
+  txDate        DateTime  @db.Date
   periodId      Int
-  debit         Decimal  @default(0) @db.Decimal(19, 4)
-  credit        Decimal  @default(0) @db.Decimal(19, 4)
-  currencyCode  String   @db.Char(3)
-  exchangeRate  Decimal  @default(1) @db.Decimal(19, 6)
-  foreignDebit  Decimal  @default(0) @db.Decimal(19, 4)
-  foreignCredit Decimal  @default(0) @db.Decimal(19, 4)
-  description   String?  @db.NVarChar(400)
+  debit         Decimal   @default(0) @db.Decimal(19, 4)
+  credit        Decimal   @default(0) @db.Decimal(19, 4)
+  currencyCode  String    @db.Char(3)
+  exchangeRate  Decimal   @default(1) @db.Decimal(19, 6)
+  foreignDebit  Decimal   @default(0) @db.Decimal(19, 4)
+  foreignCredit Decimal   @default(0) @db.Decimal(19, 4)
+  description   String?   @db.NVarChar(400)
   projectId     Int?
   taxCodeId     Int?
+  /// The customer or supplier, on lines posted to a Debtors or Creditors Control account
+  partyId       Int?
+  /// When the amount falls due, from the party's payment terms; ageing counts from here
+  dueDate       DateTime? @db.Date
 
   batch    PostingBatch @relation(fields: [batchId], references: [id])
   company  Company      @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -199,9 +207,11 @@ model LedgerEntry {
   currency Currency     @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
   project  Project?     @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   taxCode  TaxCode?     @relation(fields: [taxCodeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  party    Party?       @relation(fields: [partyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([batchId, lineNo])
   @@index([companyId, accountId, txDate])
+  @@index([partyId, txDate])
   @@index([companyId, periodId])
 }
 
@@ -268,26 +278,31 @@ model Voucher {
 }
 
 model VoucherLine {
-  id               Int      @id @default(autoincrement())
+  id               Int       @id @default(autoincrement())
   voucherId        Int
   lineNo           Int
   accountId        Int
-  debit            Decimal? @db.Decimal(19, 4)
-  credit           Decimal? @db.Decimal(19, 4)
-  currencyCode     String?  @db.Char(3)
-  exchangeRate     Decimal? @db.Decimal(19, 6)
-  foreignAmount    Decimal? @db.Decimal(19, 4)
-  description      String?  @db.NVarChar(400)
+  debit            Decimal?  @db.Decimal(19, 4)
+  credit           Decimal?  @db.Decimal(19, 4)
+  currencyCode     String?   @db.Char(3)
+  exchangeRate     Decimal?  @db.Decimal(19, 6)
+  foreignAmount    Decimal?  @db.Decimal(19, 4)
+  description      String?   @db.NVarChar(400)
   projectId        Int?
   taxCodeId        Int?
   /// Intercompany: the other company this line is for, and the account there that takes the cost or income
   partnerCompanyId Int?
   partnerAccountId Int?
+  /// The customer or supplier, required on a Debtors or Creditors Control line
+  partyId          Int?
+  /// Overrides the due date worked out from the party's payment terms
+  dueDate          DateTime? @db.Date
 
   voucher        Voucher    @relation(fields: [voucherId], references: [id], onDelete: Cascade)
   account        GlAccount  @relation("LineAccount", fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   partnerCompany Company?   @relation("LinePartner", fields: [partnerCompanyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   partnerAccount GlAccount? @relation("LinePartnerAccount", fields: [partnerAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  party          Party?     @relation(fields: [partyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([voucherId, lineNo])
 }
@@ -374,4 +389,33 @@ model Attachment {
   @@index([companyId, entityType, entityId])
   @@index([companyId, uploadedAt])
   @@index([sha256])
+}
+
+/// A customer (Client in Evolution) or supplier (Vendor). Their balances live on the control accounts,
+/// split by the party on each ledger row.
+model Party {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  kind         String   @db.NVarChar(10) // CUSTOMER, SUPPLIER
+  code         String   @db.NVarChar(50)
+  name         String   @db.NVarChar(200)
+  currencyCode String?  @db.Char(3)
+  /// Days after the document date that an amount falls due
+  termsDays    Int      @default(30)
+  creditLimit  Decimal? @db.Decimal(19, 4)
+  taxNumber    String?  @db.NVarChar(50)
+  email        String?  @db.NVarChar(200)
+  phone        String?  @db.NVarChar(50)
+  isActive     Boolean  @default(true)
+  /// Client.DCLink or Vendor.DCLink in Sage Evolution
+  sourceLinkId Int?
+  createdAt    DateTime @default(now())
+
+  company  Company       @relation(fields: [companyId], references: [id])
+  currency Currency?     @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  entries  LedgerEntry[]
+  lines    VoucherLine[]
+
+  @@unique([companyId, kind, code])
+  @@index([companyId, kind, sourceLinkId])
 }

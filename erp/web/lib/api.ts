@@ -27,6 +27,24 @@ export interface Account {
   type: 'ASSET' | 'LIABILITY' | 'EQUITY' | 'INCOME' | 'EXPENSE';
   isPostable: boolean;
   isActive: boolean;
+  /** AR on Debtors Control, AP on Creditors Control */
+  subledger: 'AR' | 'AP' | null;
+}
+
+export type PartyKind = 'CUSTOMER' | 'SUPPLIER';
+
+export interface Party {
+  id: number;
+  kind: PartyKind;
+  code: string;
+  name: string;
+  currencyCode: string | null;
+  termsDays: number;
+  creditLimit: string | null;
+  taxNumber: string | null;
+  email: string | null;
+  phone: string | null;
+  isActive: boolean;
 }
 
 export interface VoucherLine {
@@ -40,7 +58,10 @@ export interface VoucherLine {
   description: string | null;
   partnerCompanyId: number | null;
   partnerAccountId: number | null;
+  partyId: number | null;
+  dueDate: string | null;
   account: { code: string; description: string } | null;
+  party: { code: string; name: string; kind: PartyKind } | null;
   partnerCompany: { code: string } | null;
   partnerAccount: { code: string; description: string } | null;
 }
@@ -108,6 +129,66 @@ export interface TrialBalance {
   rows: { accountId: number; code: string; description: string; type: string; debit: string; credit: string; balance: string }[];
   totalDebit: string;
   totalCredit: string;
+}
+
+export type Buckets = Record<'current' | 'days1to30' | 'days31to60' | 'days61to90' | 'over90', string>;
+
+export interface GeneralLedgerRow {
+  txDate: string;
+  auditNo: string;
+  voucherNo: string | null;
+  reference: string | null;
+  documentType: string;
+  description: string | null;
+  party: string | null;
+  currencyCode: string;
+  foreignAmount: string | null;
+  debit: string;
+  credit: string;
+  balance: string;
+}
+
+export interface GeneralLedger {
+  currency: string;
+  from: string;
+  to: string;
+  accounts: {
+    accountId: number;
+    code: string;
+    description: string;
+    type: string;
+    opening: string;
+    debit: string;
+    credit: string;
+    closing: string;
+    rows: GeneralLedgerRow[];
+  }[];
+  totalDebit: string;
+  totalCredit: string;
+}
+
+export interface AgedReport {
+  currency: string;
+  kind: PartyKind;
+  asAt: string;
+  controlAccounts: string[];
+  rows: ({ partyId: number; code: string; name: string; termsDays: number; creditLimit: string | null; overLimit: boolean; balance: string } & Buckets)[];
+  totals: Buckets;
+  total: string;
+  controlBalance: string;
+  difference: string;
+}
+
+export interface Statement {
+  currency: string;
+  party: { id: number; kind: PartyKind; code: string; name: string; termsDays: number; email: string | null };
+  from: string;
+  to: string;
+  opening: string;
+  rows: { txDate: string; dueDate: string | null; auditNo: string; voucherNo: string | null; reference: string | null; description: string | null; debit: string; credit: string; balance: string }[];
+  closing: string;
+  ageing: Buckets;
+  openItems: { txDate: string; dueDate: string; auditNo: string; reference: string | null; description: string | null; amount: string; open: string; daysOverdue: number }[];
 }
 
 export class ApiError extends Error {

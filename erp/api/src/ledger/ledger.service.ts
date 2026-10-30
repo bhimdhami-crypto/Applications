@@ -4,8 +4,9 @@ import { AuditService } from '../audit/audit.service';
 import { AuthUser } from '../auth/decorators';
 import { CompaniesService } from '../companies/companies.service';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateAccountDto } from './ledger.dto';
+import { CreateAccountDto, UpdateAccountDto } from './ledger.dto';
 import { PreparedLine } from './posting-rules';
+import { dueDateFor, subledgerProblem } from './subledger-rules';
 
 export type Tx = Prisma.TransactionClient;
 
@@ -57,6 +58,7 @@ export class LedgerService {
           parentId,
           isPostable: dto.isPostable ?? true,
           costCentre: dto.costCentre,
+          subledger: dto.subledger,
         },
       });
       await this.audit.record(user.id, 'gl.account_created', 'GlAccount', account.id, dto);
@@ -69,12 +71,45 @@ export class LedgerService {
     }
   }
 
+  /**
+   * Marks an account as Debtors or Creditors Control (or clears it). Refused once rows posted to it would
+   * disagree: a control account with rows that name no party, or a plain account whose rows name parties.
+   */
+  async updateAccount(companyCode: string, accountId: number, user: AuthUser, dto: UpdateAccountDto) {
+    const company = await this.companies.byCode(companyCode);
+    const account = await this.prisma.glAccount.findFirst({ where: { id: accountId, companyId: company.id } });
+    if (!account) throw new NotFoundException(`No account id ${accountId}`);
+    const data: Prisma.GlAccountUpdateInput = {};
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.isActive !== undefined) data.isActive = dto.isActive;
+    if (dto.subledger !== undefined && (dto.subledger ?? null) !== account.subledger) {
+      const subledger = dto.subledger ?? null;
+      if (subledger) {
+        if (!account.isPostable) throw new BadRequestException(`${account.code} is a header account`);
+        const unnamed = await this.prisma.ledgerEntry.count({ where: { accountId, partyId: null } });
+        if (unnamed) {
+          throw new ConflictException(`${account.code} already has ${unnamed} posted rows with no customer or supplier, so it cannot become a control account`);
+        }
+      } else {
+        const named = await this.prisma.ledgerEntry.count({ where: { accountId, partyId: { not: null } } });
+        if (named) throw new ConflictException(`${account.code} holds customer or supplier balances and must stay a control account`);
+      }
+      data.subledger = subledger;
+    }
+    const updated = await this.prisma.glAccount.update({ where: { id: accountId }, data });
+    await this.audit.record(user.id, 'gl.account_updated', 'GlAccount', accountId, dto);
+    return updated;
+  }
+
   async journal(companyCode: string, auditNo: string) {
     const company = await this.companies.byCode(companyCode);
     const batch = await this.prisma.postingBatch.findUnique({
       where: { companyId_auditNo: { companyId: company.id, auditNo } },
       include: {
-        entries: { orderBy: { lineNo: 'asc' }, include: { account: { select: { code: true, description: true } } } },
+        entries: {
+          orderBy: { lineNo: 'asc' },
+          include: { account: { select: { code: true, description: true } }, party: { select: { code: true, name: true } } },
+        },
         postedBy: { select: { name: true } },
       },
     });
@@ -159,6 +194,7 @@ export class LedgerService {
    */
   async postInTx(tx: Tx, userId: number, header: BatchHeader, lines: PreparedLine[]) {
     const period = await this.checkPostable(tx, header.companyId, header.txDate, lines);
+    const terms = await this.termsByParty(tx, lines);
     const auditNo = await this.nextNumber(tx, header.companyId, 'AUDIT', 'GL');
     const batch = await tx.postingBatch.create({
       data: {
@@ -167,7 +203,13 @@ export class LedgerService {
         periodId: period.id,
         postedById: userId,
         entries: {
-          create: lines.map((l) => ({ ...l, companyId: header.companyId, txDate: header.txDate, periodId: period.id })),
+          create: lines.map((l) => ({
+            ...l,
+            companyId: header.companyId,
+            txDate: header.txDate,
+            periodId: period.id,
+            dueDate: l.partyId ? dueDateFor(header.txDate, terms.get(l.partyId) ?? 0, l.dueDate) : null,
+          })),
         },
       },
     });
@@ -175,7 +217,16 @@ export class LedgerService {
     return batch;
   }
 
-  /** Accounts, projects, tax codes and currencies must exist, belong to this company and be open for posting */
+  private async termsByParty(tx: Tx, lines: PreparedLine[]) {
+    const ids = unique(lines.flatMap((l) => (l.partyId ? [l.partyId] : [])));
+    const parties = ids.length ? await tx.party.findMany({ where: { id: { in: ids } }, select: { id: true, termsDays: true } }) : [];
+    return new Map(parties.map((p) => [p.id, p.termsDays]));
+  }
+
+  /**
+   * Accounts, projects, tax codes and currencies must exist, belong to this company and be open for posting,
+   * and control account lines must name a customer or supplier of this company
+   */
   private async checkReferences(tx: Tx, companyId: number, lines: PreparedLine[]) {
     const accountIds = unique(lines.map((l) => l.accountId));
     const accounts = await tx.glAccount.findMany({ where: { id: { in: accountIds }, companyId } });
@@ -186,6 +237,16 @@ export class LedgerService {
       if (!a.isActive) throw new BadRequestException(`Account ${a.code} is inactive`);
       if (!a.isPostable) throw new BadRequestException(`Account ${a.code} is a header account and cannot be posted to`);
     }
+
+    const partyIds = unique(lines.flatMap((l) => (l.partyId ? [l.partyId] : [])));
+    const parties = partyIds.length ? await tx.party.findMany({ where: { id: { in: partyIds }, companyId } }) : [];
+    const partyById = new Map(parties.map((p) => [p.id, p]));
+    lines.forEach((l, i) => {
+      const party = l.partyId ? partyById.get(l.partyId) : null;
+      if (l.partyId && !party) throw new BadRequestException(`Line ${i + 1}: customer or supplier id ${l.partyId} is not in this company`);
+      const problem = subledgerProblem(`Line ${i + 1}`, found.get(l.accountId)!, party);
+      if (problem) throw new BadRequestException(problem);
+    });
 
     const projectIds = unique(lines.flatMap((l) => (l.projectId ? [l.projectId] : [])));
     if (projectIds.length) {

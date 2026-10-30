@@ -5,7 +5,9 @@ import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
 import { HealthModule } from './health/health.module';
 import { LedgerModule } from './ledger/ledger.module';
+import { PartiesModule } from './parties/parties.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { ReportsModule } from './reports/reports.module';
 import { VouchersModule } from './vouchers/vouchers.module';
 
 @Module({
@@ -18,6 +20,8 @@ import { VouchersModule } from './vouchers/vouchers.module';
     CompaniesModule,
     LedgerModule,
     VouchersModule,
+    PartiesModule,
+    ReportsModule,
   ],
 })
 export class AppModule {}

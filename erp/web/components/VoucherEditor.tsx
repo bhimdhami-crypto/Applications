@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { DropZone, filesForm } from '@/components/DropZone';
 import { StatusBadge } from '@/components/StatusBadge';
-import { Account, Attachment, Voucher, api, download, errorText } from '@/lib/api';
+import { Account, Attachment, Party, Voucher, api, download, errorText } from '@/lib/api';
 import { cleanAmount, formatAmount, formatDate, formatSize, toUnits } from '@/lib/money';
 import { useSession } from '@/lib/session';
 
@@ -20,6 +20,10 @@ interface LineDraft {
   credit: string;
   fx: { currencyCode: string; exchangeRate: string; foreignAmount: string } | null;
   ic: { partnerCompany: string; partnerAccountId: number | null; partnerAccountText: string } | null;
+  /** Customer or supplier, on a Debtors or Creditors Control line */
+  partyId: number | null;
+  partyText: string;
+  dueDate: string;
 }
 
 const ACCOUNT_DRAG = 'application/x-mfi-account';
@@ -27,6 +31,8 @@ const LINE_DRAG = 'application/x-mfi-line';
 let nextKey = 1;
 
 const accountLabel = (a: { code: string; description: string }) => `${a.code} · ${a.description}`;
+const partyLabel = (p: { code: string; name: string }) => `${p.code} · ${p.name}`;
+const KIND_FOR = { AR: 'CUSTOMER', AP: 'SUPPLIER' } as const;
 
 function blankLine(account?: Account): LineDraft {
   return {
@@ -38,7 +44,22 @@ function blankLine(account?: Account): LineDraft {
     credit: '',
     fx: null,
     ic: null,
+    partyId: null,
+    partyText: '',
+    dueDate: '',
   };
+}
+
+function findParty(parties: Party[], text: string) {
+  const t = text.trim().toLowerCase();
+  if (!t) return undefined;
+  return parties.find((p) => partyLabel(p).toLowerCase() === t) ?? parties.find((p) => p.code.toLowerCase() === t);
+}
+
+/** Choosing another account keeps the customer or supplier only while the line stays on the same kind of control account */
+function withAccount(from: Account | undefined, to: Account | undefined): Partial<LineDraft> {
+  const keep = !!to?.subledger && to.subledger === from?.subledger;
+  return keep ? {} : { partyId: null, partyText: '', dueDate: '' };
 }
 
 /** Matches what the user typed or picked to an account: the "code · description" label, or the code alone */
@@ -71,6 +92,9 @@ function draftFrom(v: Voucher): LineDraft[] {
     ic: l.partnerCompany
       ? { partnerCompany: l.partnerCompany.code, partnerAccountId: l.partnerAccountId, partnerAccountText: l.partnerAccount ? accountLabel(l.partnerAccount) : '' }
       : null,
+    partyId: l.partyId,
+    partyText: l.party ? partyLabel(l.party) : '',
+    dueDate: l.dueDate?.slice(0, 10) ?? '',
   }));
 }
 
@@ -80,6 +104,7 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
   const [voucher, setVoucher] = useState<Voucher | null>(null);
   const [accounts, setAccounts] = useState<Account[]>([]);
   const [partnerAccounts, setPartnerAccounts] = useState<Record<string, Account[]>>({});
+  const [parties, setParties] = useState<Party[]>([]);
   const [txDate, setTxDate] = useState(() => new Date().toISOString().slice(0, 10));
   const [description, setDescription] = useState('');
   const [reference, setReference] = useState('');
@@ -109,6 +134,12 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
   useEffect(() => {
     api<Account[]>(`/companies/${company.code}/accounts`)
       .then((a) => setAccounts(a.filter((x) => x.isActive)))
+      .catch((e) => setError(errorText(e)));
+  }, [company.code]);
+
+  useEffect(() => {
+    api<Party[]>(`/companies/${company.code}/parties`)
+      .then((p) => setParties(p.filter((x) => x.isActive)))
       .catch((e) => setError(errorText(e)));
   }, [company.code]);
 
@@ -155,7 +186,7 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
 
   function setAccountText(key: number, text: string) {
     const a = findAccount(postable, text);
-    change(key, { accountText: text, accountId: a?.id ?? null });
+    setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...withAccount(accountObj(l), a), accountText: text, accountId: a?.id ?? null } : l)));
   }
 
   function moveLine(from: number, to: number) {
@@ -174,7 +205,7 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
     if (accountId) {
       e.preventDefault();
       const a = postable.find((x) => x.id === Number(accountId));
-      if (a) change(key, { accountId: a.id, accountText: accountLabel(a), ic: null });
+      if (a) setLines((ls) => ls.map((l) => (l.key === key ? { ...l, ...withAccount(accountObj(l), a), accountId: a.id, accountText: accountLabel(a), ic: null } : l)));
     } else if (lineIndex !== '') {
       e.preventDefault();
       moveLine(Number(lineIndex), index);
@@ -185,6 +216,16 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
   const accountOf = (l: LineDraft) => l.accountId ?? findAccount(postable, l.accountText)?.id ?? null;
   const partnerAccountOf = (ic: NonNullable<LineDraft['ic']>) =>
     ic.partnerAccountId ?? findAccount(partnerAccounts[ic.partnerCompany] ?? [], ic.partnerAccountText)?.id ?? null;
+  function accountObj(l: LineDraft) {
+    const id = accountOf(l);
+    return id ? postable.find((a) => a.id === id) : undefined;
+  }
+  const controlOf = (l: LineDraft) => (l.ic ? null : (accountObj(l)?.subledger ?? null));
+  const partiesFor = (control: 'AR' | 'AP' | null) => (control ? parties.filter((p) => p.kind === KIND_FOR[control]) : []);
+  const partyOf = (l: LineDraft) => l.partyId ?? findParty(partiesFor(controlOf(l)), l.partyText)?.id ?? null;
+  /** Only a control account line carries a customer or supplier */
+  const partyFields = (l: LineDraft) =>
+    controlOf(l) ? { partyId: partyOf(l) ?? undefined, dueDate: l.dueDate || undefined } : {};
 
   function payload() {
     const used = lines.filter((l) => l.accountId || l.accountText.trim() || l.ic || l.debit || l.credit || l.fx);
@@ -206,13 +247,14 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
         if (l.fx) {
           return {
             ...base,
+            ...partyFields(l),
             accountId: accountOf(l) ?? undefined,
             currencyCode: l.fx.currencyCode.toUpperCase(),
             exchangeRate: l.fx.exchangeRate.trim(),
             foreignAmount: l.fx.foreignAmount.trim().replace(/,/g, ''),
           };
         }
-        return { ...base, accountId: accountOf(l) ?? undefined, debit: cleanAmount(l.debit), credit: cleanAmount(l.credit) };
+        return { ...base, ...partyFields(l), accountId: accountOf(l) ?? undefined, debit: cleanAmount(l.debit), credit: cleanAmount(l.credit) };
       }),
     };
   }
@@ -225,6 +267,11 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
     if (missing >= 0) return `Line ${missing + 1}: pick an account from the list, or drag one from the chart on the right`;
     const noPartner = lines.findIndex((l) => l.ic && !partnerAccountOf(l.ic));
     if (noPartner >= 0) return `Line ${noPartner + 1}: pick the sister company's account that takes the amount`;
+    const noParty = lines.findIndex((l) => controlOf(l) && !partyOf(l));
+    if (noParty >= 0) {
+      const l = lines[noParty];
+      return `Line ${noParty + 1}: ${accountObj(l)!.code} is a control account, so choose the ${controlOf(l) === 'AR' ? 'customer' : 'supplier'}`;
+    }
     return '';
   }
 
@@ -361,6 +408,8 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
                       editable={editable}
                       sisters={sisters.map((c) => c.code)}
                       partnerAccounts={l.ic ? (partnerAccounts[l.ic.partnerCompany] ?? []) : []}
+                      control={controlOf(l)}
+                      parties={partiesFor(controlOf(l))}
                       dragOver={dragOver}
                       setDragOver={setDragOver}
                       onDrop={(e) => dropOnLine(e, i, l.key)}
@@ -545,6 +594,7 @@ export function VoucherEditor({ voucherNo }: { voucherNo?: string }) {
                 >
                   <b>{a.code}</b>
                   {a.description}
+                  {a.subledger && <span className="tag">{a.subledger}</span>}
                 </div>
               ))}
               {shown.length === 0 && <div className="muted">No accounts match.</div>}
@@ -563,6 +613,8 @@ function LineRow({
   editable,
   sisters,
   partnerAccounts,
+  control,
+  parties,
   dragOver,
   setDragOver,
   onDrop,
@@ -575,6 +627,8 @@ function LineRow({
   editable: boolean;
   sisters: string[];
   partnerAccounts: Account[];
+  control: 'AR' | 'AP' | null;
+  parties: Party[];
   dragOver: string | null;
   setDragOver: (k: string | null) => void;
   onDrop: (e: React.DragEvent) => void;
@@ -584,6 +638,8 @@ function LineRow({
 }) {
   const rowKey = `row-${l.key}`;
   const listId = `partner-${l.key}`;
+  const partyListId = `party-${l.key}`;
+  const word = control === 'AR' ? 'Customer' : 'Supplier';
   const homeOfFx = l.fx ? fxHomeUnits(l.fx.exchangeRate, l.fx.foreignAmount) : 0n;
 
   return (
@@ -699,6 +755,38 @@ function LineRow({
               <label className="field">
                 Foreign amount (minus for a credit)
                 <input inputMode="decimal" value={l.fx.foreignAmount} onChange={(e) => onChange({ fx: { ...l.fx!, foreignAmount: e.target.value } })} disabled={!editable} />
+              </label>
+            </div>
+          </td>
+        </tr>
+      )}
+      {control && (
+        <tr>
+          {editable && <td />}
+          <td colSpan={5}>
+            <div className="line-extra">
+              <label className="field" style={{ gridColumn: 'span 2' }}>
+                {word}
+                <input
+                  list={partyListId}
+                  value={l.partyText}
+                  onChange={(e) => {
+                    const p = findParty(parties, e.target.value);
+                    onChange({ partyText: e.target.value, partyId: p?.id ?? null });
+                  }}
+                  disabled={!editable}
+                  placeholder={`${word} code or name`}
+                  style={l.partyText && !l.partyId && !findParty(parties, l.partyText) ? { borderColor: 'var(--danger)' } : undefined}
+                />
+                <datalist id={partyListId}>
+                  {parties.map((p) => (
+                    <option key={p.id} value={partyLabel(p)} />
+                  ))}
+                </datalist>
+              </label>
+              <label className="field">
+                Due date (blank: from the terms)
+                <input type="date" value={l.dueDate} onChange={(e) => onChange({ dueDate: e.target.value })} disabled={!editable} />
               </label>
             </div>
           </td>
