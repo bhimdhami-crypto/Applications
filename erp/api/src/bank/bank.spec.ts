@@ -1,6 +1,6 @@
 import { autoMatch } from './matching';
 import { reconcile } from './reconciliation';
-import { balanceBreaks, guessLayout, inDateOrder, parseAmount, parseCsv, parseDate, readStatement } from './statement-csv';
+import { balanceBreaks, guessLayout, inDateOrder, parseAmount, parseCsv, parseDate, readStatement, statementDetails } from './statement-csv';
 
 const SCB = `Standard Chartered Bank Kenya
 Account,0102030405060
@@ -11,7 +11,38 @@ Transaction Date,Value Date,Description,Cheque No,Debit,Credit,Balance
 ,,Closing balance,,,,"1,210,350.00"
 `;
 
+// The Stanbic layout: a title line with no commas, account details, an opening balance row with no
+// transaction date, "Transaction Description" as the heading and a summary below the closing balance
+const STANBIC = `BANK STATEMENT / TAX INVOICE
+Account Name:,EXAMPLE LIMITED
+Date Range:,01/01/2023 to 28/02/2023
+Account Currency:,USD
+Account No:,0100009999999 - SBICKENX
+ Transaction Date ,Value Date,Transaction Description,Type,Debit,Credit,Balance
+,31/12/2022,Opening Balance,,,,"1,269.78"
+03/01/2023,31/12/2022,SERVICE FEE FT23003AAAAABNK,CHG,"3.31",,"1,266.47"
+05/01/2023,05/01/2023,INWARD SWIFT-TELEX PAYMENT FT23005BBBBB EXAMPLE CUSTOMER,103,,"7000.00","8,266.47"
+,28/02/2023,Closing Balance,,,,"8,266.47"
+Summary Of Transactions
+Credits,7000.00
+Debits,3.31
+`;
+
 describe('bank statement files', () => {
+  it('reads a Stanbic export and the account details above the table', () => {
+    const rows = parseCsv(STANBIC);
+    const layout = guessLayout(rows)!;
+    expect(layout).toMatchObject({ headerRow: 5, date: 'Transaction Date', description: 'Transaction Description', moneyOut: 'Debit', moneyIn: 'Credit', balance: 'Balance' });
+    const { lines, problems } = readStatement(rows, layout);
+    expect(problems).toEqual([]);
+    expect(lines.map((l) => [l.txDate, l.amount])).toEqual([
+      ['2023-01-03', -33_100n],
+      ['2023-01-05', 70_000_000n],
+    ]);
+    expect(balanceBreaks(lines)).toEqual([]);
+    expect(statementDetails(rows, layout.headerRow)).toEqual({ currency: 'USD', accountNumber: '0100009999999' });
+  });
+
   it('reads CSV with quotes, BOM and semicolons', () => {
     expect(parseCsv('﻿a,"b, c","d ""e"""\r\n1,2,3\n')).toEqual([
       ['a', 'b, c', 'd "e"'],

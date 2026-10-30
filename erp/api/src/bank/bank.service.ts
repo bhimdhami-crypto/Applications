@@ -16,7 +16,7 @@ import { VouchersService } from '../vouchers/vouchers.service';
 import { CreateBankAccountDto, LayoutHolder, LineVoucherDto, MatchDto, PrepareReconciliationDto, UpdateBankAccountDto } from './bank.dto';
 import { BankItem, autoMatch } from './matching';
 import { ReconItem, outstanding, reconcile } from './reconciliation';
-import { ParsedLine, StatementLayout, balanceBreaks, guessLayout, inDateOrder, parseCsv, readStatement } from './statement-csv';
+import { ParsedLine, StatementDetails, StatementLayout, balanceBreaks, guessLayout, inDateOrder, parseCsv, readStatement, statementDetails } from './statement-csv';
 
 const MAX_STATEMENT_BYTES = 5 * 1024 * 1024;
 const iso = (d: Date) => d.toISOString().slice(0, 10);
@@ -147,7 +147,7 @@ export class BankService {
   /** Reads a statement without saving it, so the person can check the columns first */
   async preview(companyCode: string, id: number, file: UploadedStatement | undefined, layoutJson?: string, openingBalance?: string) {
     const account = await this.account(companyCode, id);
-    const { rows, layout } = this.read(account, file, layoutJson);
+    const { rows, layout, mismatch } = this.read(account, file, layoutJson);
     const result = layout ? this.lines(rows, layout) : { lines: [], problems: ['Could not find the heading row: choose the columns'] };
     const { fresh, skipped } = layout ? await this.newLines(account.id, result.lines) : { fresh: [], skipped: 0 };
     const opening = await this.openingFor(account.id, result.lines, openingBalance);
@@ -155,7 +155,7 @@ export class BankService {
       headings: layout ? rows[layout.headerRow] : (rows[0] ?? []),
       rows: rows.slice(0, 15),
       layout,
-      problems: result.problems,
+      problems: mismatch ? [mismatch, ...result.problems] : result.problems,
       needsOpeningBalance: result.lines.length > 0 && result.lines.some((l) => l.balance == null) && opening == null,
       lines: result.lines.slice(0, 200).map((l) => ({ ...l, amount: money(l.amount), balance: l.balance == null ? null : money(l.balance) })),
       lineCount: result.lines.length,
@@ -166,8 +166,9 @@ export class BankService {
 
   async import(companyCode: string, id: number, user: AuthUser, file: UploadedStatement | undefined, layoutJson?: string, openingBalance?: string) {
     const account = await this.account(companyCode, id);
-    const { rows, layout, sha256 } = this.read(account, file, layoutJson);
+    const { rows, layout, mismatch, sha256 } = this.read(account, file, layoutJson);
     if (!layout) throw new BadRequestException('Could not find the heading row: choose the columns');
+    if (mismatch) throw new BadRequestException(mismatch);
     const { lines, problems } = this.lines(rows, layout);
     if (problems.length) throw new BadRequestException(`The statement has rows that could not be read. ${problems.slice(0, 5).join('; ')}`);
     if (!lines.length) throw new BadRequestException('The statement has no transactions');
@@ -625,7 +626,8 @@ export class BankService {
       // The remembered layout is used only if this file has the same headings
       layout = saved && rows[saved.headerRow]?.map((h) => h.trim()).includes(saved.date) ? saved : guessLayout(rows);
     }
-    return { rows, layout, sha256: createHash('sha256').update(file.buffer).digest('hex') };
+    const mismatch = layout ? wrongAccount(account, statementDetails(rows, layout.headerRow)) : null;
+    return { rows, layout, mismatch, sha256: createHash('sha256').update(file.buffer).digest('hex') };
   }
 
   private lines(rows: string[][], layout: StatementLayout) {
@@ -669,4 +671,18 @@ export class BankService {
   private log(user: AuthUser, account: { id: number; companyId: number; name: string }, action: string, detail: object) {
     return this.audit.record({ userId: user.id, companyId: account.companyId, action, entity: 'BankAccount', entityId: account.id, label: account.name, detail });
   }
+}
+
+/** Why the file's printed currency or account number says it belongs to another bank account, if it does */
+function wrongAccount(account: { name: string; currencyCode: string; accountNumber: string | null }, details: StatementDetails) {
+  if (details.currency && details.currency !== account.currencyCode) {
+    return `This statement is in ${details.currency} but ${account.name} is a ${account.currencyCode} account`;
+  }
+  const ours = (account.accountNumber ?? '').replace(/\D/g, '');
+  const theirs = details.accountNumber ?? '';
+  // Banks sometimes print the number with or without a branch prefix, so one ending with the other is a match
+  if (ours.length >= 5 && theirs.length >= 5 && !ours.endsWith(theirs) && !theirs.endsWith(ours)) {
+    return `This statement is for account ${theirs} but ${account.name} is account ${account.accountNumber}`;
+  }
+  return null;
 }

@@ -39,8 +39,9 @@ export interface ParseResult {
 /** RFC 4180 CSV, also with semicolons or tabs; strips a byte order mark */
 export function parseCsv(text: string): string[][] {
   const body = text.replace(/^﻿/, '');
-  const firstLine = body.split(/\r?\n/, 1)[0] ?? '';
-  const delimiter = [',', ';', '\t'].reduce((best, d) => (count(firstLine, d) > count(firstLine, best) ? d : best), ',');
+  // Judged on the first lines together: a bank's title line above the table often has no delimiter at all
+  const top = body.split(/\r?\n/, 15).join('\n');
+  const delimiter = [',', ';', '\t'].reduce((best, d) => (count(top, d) > count(top, best) ? d : best), ',');
   const rows: string[][] = [];
   let row: string[] = [];
   let cell = '';
@@ -80,7 +81,7 @@ const norm = (h: string) => h.toLowerCase().replace(/[^a-z]/g, '');
 
 const GUESSES: Record<'date' | 'description' | 'reference' | 'amount' | 'moneyOut' | 'moneyIn' | 'balance', string[]> = {
   date: ['transactiondate', 'trandate', 'txndate', 'postingdate', 'bookingdate', 'date', 'valuedate'],
-  description: ['description', 'narrative', 'narration', 'details', 'transactiondetails', 'particulars', 'remarks', 'memo'],
+  description: ['description', 'transactiondescription', 'narrative', 'narration', 'details', 'transactiondetails', 'particulars', 'remarks', 'memo'],
   reference: ['reference', 'ref', 'chequeno', 'chequenumber', 'customerreference', 'bankreference', 'refno', 'transactionreference'],
   amount: ['amount', 'transactionamount', 'value'],
   moneyOut: ['debit', 'debits', 'withdrawal', 'withdrawals', 'moneyout', 'paidout', 'debitamount', 'dr'],
@@ -97,6 +98,8 @@ export function guessLayout(rows: string[][]): StatementLayout | null {
         const hit = headings.find((h) => norm(h) === want);
         if (hit) return hit;
       }
+      // Headings such as "Transaction Narrative" or "Payment Details"
+      if (key === 'description') return headings.find((h) => /description|narrat|details|particulars/.test(norm(h))) ?? null;
       return null;
     };
     const date = find('date');
@@ -121,6 +124,26 @@ export function guessLayout(rows: string[][]): StatementLayout | null {
     return layout;
   }
   return null;
+}
+
+export interface StatementDetails {
+  currency: string | null;
+  accountNumber: string | null;
+}
+
+/**
+ * The account details banks print above the table ("Account Currency:,USD", "Account No:,0100003275358 - SBICKENX"),
+ * used to catch a file dropped on the wrong bank account.
+ */
+export function statementDetails(rows: string[][], headerRow: number): StatementDetails {
+  const details: StatementDetails = { currency: null, accountNumber: null };
+  for (const row of rows.slice(0, headerRow)) {
+    const label = norm(row[0] ?? '');
+    const value = row.slice(1).join(' ').trim();
+    if (!details.currency && label.includes('currency')) details.currency = value.match(/\b[A-Z]{3}\b/)?.[0] ?? null;
+    if (!details.accountNumber && /^(account|acc|ac)(no|number|num)$/.test(label)) details.accountNumber = value.match(/\d[\d\s-]{4,}\d/)?.[0].replace(/\D/g, '') ?? null;
+  }
+  return details;
 }
 
 /** The first format that reads every sample, preferring day-first as Kenyan banks print dates */
