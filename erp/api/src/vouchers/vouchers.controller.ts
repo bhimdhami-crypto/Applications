@@ -21,7 +21,6 @@ import { AuthUser, CurrentUser, Roles } from '../auth/decorators';
 import {
   ArchiveQuery,
   CommentDto,
-  CreateApprovalRuleDto,
   InboxDto,
   RejectDto,
   ReverseDto,
@@ -152,16 +151,5 @@ export class VouchersController {
       'Content-Disposition': `attachment; filename*=UTF-8''${encodeURIComponent(row.fileName)}`,
     });
     res.send(data);
-  }
-
-  @Get('companies/:company/approval-rules')
-  rules(@Param('company') company: string) {
-    return this.vouchers.rules(company);
-  }
-
-  @Post('companies/:company/approval-rules')
-  @Roles('ADMIN')
-  createRule(@Param('company') company: string, @CurrentUser() user: AuthUser, @Body() dto: CreateApprovalRuleDto) {
-    return this.vouchers.createRule(company, user, dto);
   }
 }

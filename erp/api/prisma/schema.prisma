@@ -48,6 +48,9 @@ model User {
   vouchers Voucher[]
   actions  ApprovalAction[]
   files    Attachment[]
+
+  rulesCreated ApprovalRule[] @relation("RuleCreatedBy")
+  rulesRetired ApprovalRule[] @relation("RuleRetiredBy")
 }
 
 model Currency {
@@ -309,19 +312,27 @@ model VoucherLine {
 
 /// A standard operating procedure for one document type and amount band: who approves, in which order
 model ApprovalRule {
-  id           Int      @id @default(autoincrement())
+  id           Int       @id @default(autoincrement())
   companyId    Int
-  documentType String   @db.NVarChar(20)
-  name         String   @db.NVarChar(200)
-  sopReference String?  @db.NVarChar(50) // e.g. SOP-FIN-004
-  minAmount    Decimal  @default(0) @db.Decimal(19, 4)
+  documentType String    @db.NVarChar(20)
+  name         String    @db.NVarChar(200)
+  sopReference String?   @db.NVarChar(50) // e.g. SOP-FIN-004
+  minAmount    Decimal   @default(0) @db.Decimal(19, 4)
   /// Exclusive upper bound; empty means no limit
-  maxAmount    Decimal? @db.Decimal(19, 4)
-  isActive     Boolean  @default(true)
+  maxAmount    Decimal?  @db.Decimal(19, 4)
+  isActive     Boolean   @default(true)
+  /// Rules are never edited: a change retires the old rule and creates a new one, so vouchers already
+  /// on their way keep the route they started on, and the history shows who changed what and when
+  createdAt    DateTime  @default(now())
+  createdById  Int?
+  retiredAt    DateTime?
+  retiredById  Int?
 
-  company  Company             @relation(fields: [companyId], references: [id])
-  stages   ApprovalRuleStage[]
-  vouchers Voucher[]
+  company   Company             @relation(fields: [companyId], references: [id])
+  createdBy User?               @relation("RuleCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  retiredBy User?               @relation("RuleRetiredBy", fields: [retiredById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stages    ApprovalRuleStage[]
+  vouchers  Voucher[]
 
   @@index([companyId, documentType])
 }

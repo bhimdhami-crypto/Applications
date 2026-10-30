@@ -11,7 +11,7 @@ import {
   MaxLength,
   ValidateNested,
 } from 'class-validator';
-import { ROLES, Role, VOUCHER_STATUSES, VOUCHER_TYPES, VoucherStatus, VoucherType } from '../common/constants';
+import { VOUCHER_STATUSES, VoucherStatus } from '../common/constants';
 
 const AMOUNT = /^\d+(\.\d{1,4})?$/;
 const SIGNED_AMOUNT = /^-?\d+(\.\d{1,4})?$/;
@@ -140,38 +140,4 @@ export class ArchiveQuery {
   @IsOptional()
   @IsDateString({ strict: true })
   to?: string;
-}
-
-export class RuleStageDto {
-  @IsString()
-  @Length(1, 100)
-  name: string;
-
-  @IsIn(ROLES)
-  approverRole: Role;
-}
-
-export class CreateApprovalRuleDto {
-  @IsIn(VOUCHER_TYPES)
-  documentType: VoucherType;
-
-  @IsString()
-  @Length(1, 200)
-  name: string;
-
-  @IsOptional()
-  @IsString()
-  @MaxLength(50)
-  sopReference?: string;
-
-  @Matches(AMOUNT)
-  minAmount: string;
-
-  @IsOptional()
-  @Matches(AMOUNT)
-  maxAmount?: string;
-
-  @ValidateNested({ each: true })
-  @Type(() => RuleStageDto)
-  stages: RuleStageDto[];
 }
