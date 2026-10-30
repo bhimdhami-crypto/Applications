@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
+import { EmailAlertsToggle } from '@/components/EmailAlertsToggle';
 import { PendingVoucher, api, errorText } from '@/lib/api';
 import { formatAmount, formatDate } from '@/lib/money';
 import { useSession } from '@/lib/session';
@@ -47,6 +48,8 @@ export default function Approvals() {
     <>
       <div className="page-head">
         <h1>Waiting for your approval</h1>
+        <div className="spacer" />
+        <EmailAlertsToggle />
       </div>
       {error && <div className="error">{error}</div>}
       {notice && <div className="notice">{notice}</div>}

@@ -10,6 +10,7 @@ import { CompaniesService } from '../companies/companies.service';
 import { IntercompanyError, IntercompanyLineInput, LinkMap, linkKey, planIntercompany } from '../ledger/intercompany';
 import { LedgerService, Tx, toDate } from '../ledger/ledger.service';
 import { PostingRuleError, PreparedLine, prepareLines } from '../ledger/posting-rules';
+import { NotificationsService } from '../notifications/notifications.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { SaveVoucherDto, VoucherLineDto } from './vouchers.dto';
 
@@ -37,6 +38,7 @@ export class VouchersService {
     private readonly ledger: LedgerService,
     private readonly archive: ArchiveService,
     private readonly audit: AuditService,
+    private readonly notifications: NotificationsService,
   ) {}
 
   async create(companyCode: string, user: AuthUser, dto: SaveVoucherDto) {
@@ -149,6 +151,7 @@ export class VouchersService {
         data: { status: 'SUBMITTED', ruleId: rule.id, currentStage: 1, totalAmount: fromUnits(plan.total), submittedAt: new Date() },
       });
       await tx.approvalAction.create({ data: { voucherId: voucher.id, action: 'SUBMITTED', userId: user.id, comment } });
+      await this.notifications.stageWaiting(tx, voucher.id);
     });
     await this.log(user, voucher, 'voucher.submitted', comment ? { comment } : undefined);
     return this.get(companyCode, voucherNo);
@@ -174,11 +177,17 @@ export class VouchersService {
 
         if (stage.stageNo < stageCount) {
           await tx.voucher.update({ where: { id: voucher.id }, data: { currentStage: stage.stageNo + 1 } });
+          await this.notifications.stageWaiting(tx, voucher.id);
           return;
         }
         const batchId = await this.post(tx, company, voucher, user.id);
         await tx.voucher.update({ where: { id: voucher.id }, data: { status: 'POSTED', currentStage: null, postedBatchId: batchId } });
         await tx.approvalAction.create({ data: { voucherId: voucher.id, action: 'POSTED', userId: user.id } });
+        const [batch, approver] = await Promise.all([
+          tx.postingBatch.findUniqueOrThrow({ where: { id: batchId }, select: { auditNo: true } }),
+          tx.user.findUniqueOrThrow({ where: { id: user.id }, select: { name: true } }),
+        ]);
+        await this.notifications.posted(tx, voucher.id, batch.auditNo, approver.name);
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable, timeout: 20_000 },
     );
@@ -198,6 +207,8 @@ export class VouchersService {
       rejected = { id: voucher.id, stageNo: stage.stageNo };
       await tx.approvalAction.create({ data: { voucherId: voucher.id, stageNo: stage.stageNo, action: 'REJECTED', userId: user.id, comment } });
       await tx.voucher.update({ where: { id: voucher.id }, data: { status: 'REJECTED', currentStage: null } });
+      const by = await tx.user.findUniqueOrThrow({ where: { id: user.id }, select: { name: true } });
+      await this.notifications.rejected(tx, voucher.id, by.name, `stage ${stage.stageNo}, ${stage.name}`, comment);
     });
     await this.log(user, { id: rejected.id, companyId: company.id, voucherNo }, 'voucher.rejected', { stage: rejected.stageNo, comment });
     return this.get(companyCode, voucherNo);
