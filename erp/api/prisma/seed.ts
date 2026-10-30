@@ -29,27 +29,22 @@ const TAX_CODES = [
  * Starting approval routes, one set per company, until MFI's own SOPs are entered (POST /approval-rules).
  * Every voucher must match a rule, so journals and reversals are covered at any amount.
  */
-const APPROVAL_RULES = ['JOURNAL', 'REVERSAL'].flatMap((documentType) => [
-  {
-    documentType,
-    name: `${documentType === 'JOURNAL' ? 'Journals' : 'Reversals'} under KES 1,000,000`,
-    sopReference: 'SOP to confirm',
-    minAmount: 0,
-    maxAmount: 1_000_000,
-    stages: [{ name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' }],
-  },
-  {
-    documentType,
-    name: `${documentType === 'JOURNAL' ? 'Journals' : 'Reversals'} of KES 1,000,000 and over`,
-    sopReference: 'SOP to confirm',
-    minAmount: 1_000_000,
-    maxAmount: null,
-    stages: [
-      { name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' },
-      { name: 'Director approval', approverRole: 'DIRECTOR' },
-    ],
-  },
-]);
+/**
+ * Starting approval matrix, set from common internal-control practice until MFI's written SOP replaces it
+ * (Bhim, 30 Oct 2026). Bands are KES, minimum inclusive, maximum exclusive. The author never approves, and
+ * no one approves two stages of the same voucher, so the top band needs two different directors.
+ */
+const FM = { name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' };
+const DIRECTOR = { name: 'Director approval', approverRole: 'DIRECTOR' };
+const SECOND_DIRECTOR = { name: 'Second director approval', approverRole: 'DIRECTOR' };
+const SOP = 'Assumed control matrix, Oct 2026: replace with MFI SOP';
+const APPROVAL_RULES = [
+  { documentType: 'JOURNAL', name: 'Journals under KES 500,000', sopReference: SOP, minAmount: 0, maxAmount: 500_000, stages: [FM] },
+  { documentType: 'JOURNAL', name: 'Journals from KES 500,000 to under 5,000,000', sopReference: SOP, minAmount: 500_000, maxAmount: 5_000_000, stages: [FM, DIRECTOR] },
+  { documentType: 'JOURNAL', name: 'Journals of KES 5,000,000 and over', sopReference: SOP, minAmount: 5_000_000, maxAmount: null, stages: [FM, DIRECTOR, SECOND_DIRECTOR] },
+  // Undoing posted entries is a sensitive change for audit, so every reversal needs a director whatever its size.
+  { documentType: 'REVERSAL', name: 'Reversals, any amount', sopReference: SOP, minAmount: 0, maxAmount: null, stages: [FM, DIRECTOR] },
+];
 
 /** Month the fiscal year starts (1 = January). The year label is the calendar year the fiscal year ends in. */
 const START_MONTH = Number(process.env.FISCAL_YEAR_START_MONTH ?? 1);

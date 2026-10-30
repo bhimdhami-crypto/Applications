@@ -86,6 +86,7 @@ describe('MFI ERP API', () => {
       ['accountant', 'ACCOUNTANT'],
       ['manager', 'FINANCE_MANAGER'],
       ['director', 'DIRECTOR'],
+      ['director2', 'DIRECTOR'],
       ['viewer', 'VIEWER'],
     ];
     await prisma.user.createMany({
@@ -164,6 +165,18 @@ describe('MFI ERP API', () => {
     expect(stage2.body).toMatchObject({ status: 'SUBMITTED', currentStage: 2 });
     await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({}).expect(403);
     const done = await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director').send({}).expect(200);
+    expect(done.body.status).toBe('POSTED');
+  });
+
+  it('needs two different directors from KES 5,000,000', async () => {
+    const draft = await api('post', '/companies/MFI-DS/vouchers').send(journal('5000000')).expect(201);
+    const no = draft.body.voucherNo;
+    const submitted = await api('post', `/companies/MFI-DS/vouchers/${no}/submit`).send({}).expect(200);
+    expect(submitted.body.rule.stages.map((s: { approverRole: string }) => s.approverRole)).toEqual(['FINANCE_MANAGER', 'DIRECTOR', 'DIRECTOR']);
+    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({}).expect(200);
+    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director').send({}).expect(200);
+    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director').send({}).expect(403);
+    const done = await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director2').send({}).expect(200);
     expect(done.body.status).toBe('POSTED');
   });
 
@@ -292,7 +305,9 @@ describe('MFI ERP API', () => {
     expect(draft.body).toMatchObject({ documentType: 'REVERSAL', status: 'DRAFT' });
     await api('post', '/companies/MFI-DS/journals/GL000001/reverse').send({}).expect(409);
     await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(200);
-    const posted = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/approve`, 'manager').send({}).expect(200);
+    const reviewed = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/approve`, 'manager').send({}).expect(200);
+    expect(reviewed.body).toMatchObject({ status: 'SUBMITTED', currentStage: 2 });
+    const posted = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/approve`, 'director').send({}).expect(200);
     expect(posted.body.status).toBe('POSTED');
     await api('post', '/companies/MFI-DS/journals/GL000001/reverse').send({}).expect(409);
 
