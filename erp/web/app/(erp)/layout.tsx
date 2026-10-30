@@ -63,6 +63,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
+          <img src="/logo-mark.svg" alt="" />
           Mindspace <span>ERP</span>
         </div>
         {groups.map((g) => (
