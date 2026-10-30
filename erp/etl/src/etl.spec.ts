@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
 import { mapAccounts } from './accounts';
 import { ColumnInfo, quoteName, stageable, typeDeclaration } from './columns';
 import { assertReadOnly } from './connections';
@@ -84,5 +86,16 @@ describe('mapAccounts', () => {
   it('rejects a type map value that is not an account type', () => {
     const { unknown } = mapAccounts(rows, { '2': 'BANK', '9': 'INCOME' });
     expect([...unknown.keys()]).toEqual([2]);
+  });
+});
+
+describe('account-types.json', () => {
+  it('maps every MFI-DS iAccountType to a known type', () => {
+    const typeMap = JSON.parse(readFileSync(path.join(__dirname, '..', 'account-types.json'), 'utf8'));
+    const seen = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 14, 17, 19, 22, 23, 24, 25, 26, 27, 29, 30, 32, 35, 36];
+    const rows = seen.map((n) => ({ AccountLink: n, Master_Sub_Account: `T${n}`, Account: null, Description: 'x', iAccountType: n, SubAccOfLink: null, ActiveAccount: true }));
+    const { mapped, unknown } = mapAccounts(rows, typeMap);
+    expect(unknown.size).toBe(0);
+    expect(mapped).toHaveLength(seen.length);
   });
 });
