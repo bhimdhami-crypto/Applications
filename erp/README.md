@@ -96,7 +96,7 @@ The ETL reads Evolution with SELECT statements only. Give it a SQL login with **
 2. Copy Evolution tables into the ERP database's `stg_evo` schema:
    `npm run etl -- stage MFI-DS` (or name tables: `npm run etl -- stage MFI-DS Accounts,PostGL`)
 3. Run `etl/sql/04-account-types.sql` in SSMS, and record in `etl/account-types.json` which `iAccountType` number is an asset, liability, equity, income or expense account. The tool never guesses: unmapped numbers stop it and are listed with examples.
-4. Load the chart of accounts: `npm run etl -- accounts MFI-DS`. Safe to re-run; accounts are matched on `AccountLink`.
+4. Load the chart of accounts: `npm run etl -- accounts MFI-DS`. Safe to re-run; accounts are matched on `AccountLink`. Main accounts listed in `etl/excluded-accounts.json` (39000 MFI ROUTING ACCOUNT) and their sub-accounts are not migrated.
 
 Opening balances, history and reconciliation reports come in phase 1.
 

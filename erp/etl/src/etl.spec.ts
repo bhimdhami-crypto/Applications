@@ -83,6 +83,18 @@ describe('mapAccounts', () => {
     expect(unknown.get(9)).toEqual(['4000 Sales']);
   });
 
+  it('leaves out excluded main accounts and their sub-accounts', () => {
+    const withRouting = [
+      ...rows,
+      { AccountLink: 4, Master_Sub_Account: '39000/KEGEA', Account: '39000', Description: 'MFI ROUTING ACCOUNT', iAccountType: 30, SubAccOfLink: 0, ActiveAccount: true },
+      { AccountLink: 5, Master_Sub_Account: '39000>001', Account: null, Description: 'Routing sub', iAccountType: 30, SubAccOfLink: 4, ActiveAccount: true },
+    ];
+    const { mapped, unknown, skipped } = mapAccounts(withRouting, { '2': 'ASSET', '9': 'INCOME' }, ['39000']);
+    expect(mapped.map((m) => m.sourceLinkId)).toEqual([1, 2, 3]);
+    expect(unknown.size).toBe(0);
+    expect(skipped.map((r) => r.AccountLink)).toEqual([4, 5]);
+  });
+
   it('rejects a type map value that is not an account type', () => {
     const { unknown } = mapAccounts(rows, { '2': 'BANK', '9': 'INCOME' });
     expect([...unknown.keys()]).toEqual([2]);

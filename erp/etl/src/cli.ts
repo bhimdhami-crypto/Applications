@@ -52,6 +52,7 @@ async function stage(company: string, only?: string[]) {
 
 async function accounts(company: string) {
   const typeMap = JSON.parse(readFileSync(path.join(__dirname, '..', 'account-types.json'), 'utf8'));
+  const excluded: string[] = JSON.parse(readFileSync(path.join(__dirname, '..', 'excluded-accounts.json'), 'utf8'));
   const erp = await connectErp();
   try {
     const companyRow = (await erp.request().input('code', sql.NVarChar(20), company).query<{ id: number }>(
@@ -64,13 +65,14 @@ async function accounts(company: string) {
     )).recordset;
     if (!rows.length) throw new Error(`No staged accounts for ${company}; run: npm run etl -- stage ${company} Accounts`);
 
-    const { mapped, unknown } = mapAccounts(rows, typeMap);
+    const { mapped, unknown, skipped } = mapAccounts(rows, typeMap, excluded);
     if (unknown.size) {
       console.error('These iAccountType values are not in account-types.json yet. Map each to ASSET, LIABILITY, EQUITY, INCOME or EXPENSE:');
       for (const [type, examples] of unknown) console.error(`  ${type}: e.g. ${examples.join('; ')}`);
       process.exitCode = 1;
       return;
     }
+    for (const r of skipped) console.log(`  not migrated (excluded-accounts.json): ${r.Master_Sub_Account} ${r.Description ?? ''}`);
     await loadAccounts(erp, companyRow.id, mapped);
     console.log(`${company}: ${mapped.length} accounts loaded into the chart of accounts`);
   } finally {

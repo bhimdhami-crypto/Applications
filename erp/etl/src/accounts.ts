@@ -28,10 +28,12 @@ export interface MappedAccount {
  * by running sql/04-account-types.sql and filling account-types.json. Unknown numbers stop the mapping
  * and are listed, so no account is ever filed under a guessed type.
  */
-export function mapAccounts(rows: EvoAccount[], typeMap: Record<string, string>) {
+export function mapAccounts(rows: EvoAccount[], typeMap: Record<string, string>, excluded: string[] = []) {
   const unknown = new Map<number | null, string[]>();
   const mapped: MappedAccount[] = [];
+  const skipped = excludedLinks(rows, excluded);
   for (const r of rows) {
+    if (skipped.has(r.AccountLink)) continue;
     const type = typeMap[String(r.iAccountType)];
     if (!type || !TYPES.includes(type as AccountType)) {
       const examples = unknown.get(r.iAccountType) ?? [];
@@ -48,7 +50,30 @@ export function mapAccounts(rows: EvoAccount[], typeMap: Record<string, string>)
       isActive: r.ActiveAccount !== false,
     });
   }
-  return { mapped, unknown };
+  return { mapped, unknown, skipped: rows.filter((r) => skipped.has(r.AccountLink)) };
+}
+
+/** Main account number of an Evolution account: the part before any segment or sub-account separator */
+function mainAccount(r: EvoAccount) {
+  return (r.Account || r.Master_Sub_Account || '').split(/[/>]/)[0].trim();
+}
+
+/**
+ * Accounts MFI has decided not to carry into the ERP (excluded-accounts.json, by main account number),
+ * together with every sub-account beneath them.
+ */
+function excludedLinks(rows: EvoAccount[], excluded: string[]) {
+  const links = new Set(rows.filter((r) => excluded.includes(mainAccount(r))).map((r) => r.AccountLink));
+  for (let grew = links.size > 0; grew; ) {
+    grew = false;
+    for (const r of rows) {
+      if (!links.has(r.AccountLink) && r.SubAccOfLink && links.has(r.SubAccOfLink)) {
+        links.add(r.AccountLink);
+        grew = true;
+      }
+    }
+  }
+  return links;
 }
 
 /**
