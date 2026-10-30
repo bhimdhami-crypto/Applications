@@ -2,12 +2,13 @@
 
 Web ERP for MFI on **SQL Server Express**: general ledger first, then receivables, payables, inventory, and sales and purchase orders. It is built to replace Sage Evolution 200 one module at a time, and it migrates MFI's own data from the Evolution company databases (MFI-DS, MFI-MDS, MFI-TS).
 
-This is **phase 0**: the foundation. See the [plan](https://claude.ai/artifact/FzcWuJUY41BAEHUJoc6fat) for all phases.
+Phase 0 (the foundation) is done and phase 1 is under way: the web screens, and the general ledger, debtors and creditors reports. See the [plan](https://claude.ai/artifact/FzcWuJUY41BAEHUJoc6fat) for all phases.
 
 | Part | What it is |
 |---|---|
 | `api` | NestJS 11 API, Prisma 6 on SQL Server: sign-in with roles, approval workflow, document archive, intercompany posting, the posting engine and general ledger endpoints |
-| `etl` | Migration tool: reads Evolution (SELECT only), stages its tables in `stg_evo`, maps the chart of accounts |
+| `web` | Next.js screens: vouchers with drag and drop, approvals inbox, archive, customers and suppliers, and the reports |
+| `etl` | Migration tool: reads Evolution (SELECT only), stages its tables in `stg_evo`, maps the chart of accounts, customers and suppliers |
 | `etl/sql` | Scripts to run in SSMS: profile the Evolution databases, trace how Evolution posts a document, map account types |
 
 ## Clean-room rules
@@ -27,7 +28,8 @@ The app is original work. Evolution is studied only from the outside:
 - **Intercompany in one step.** Each pair of companies has a current account on each side. A voucher line can name a sister company and its account: posting writes this company's side and a linked batch in the sister company in the same transaction, and a reconciliation report checks the two current accounts cancel out.
 - **Posted rows are never changed.** Mistakes are corrected with a reversing voucher, which is approved like any other. A database CHECK keeps every ledger row one-sided and non-negative.
 - **Exact money.** Amounts are `DECIMAL(19,4)` and the engine adds them as integers of 0.0001, so float rounding never unbalances a journal. Foreign lines store the foreign amount and rate; the KES amount is rate × foreign amount, rounded once.
-- **Traceable migration.** Migrated accounts keep Evolution's `AccountLink` in `sourceLinkId`.
+- **Customer and supplier balances live on the control accounts.** An account marked as Debtors Control (`AR`) or Creditors Control (`AP`) takes only lines that name a customer or supplier, and no other account takes them. Every row there carries its party and a due date (the document date plus the party's payment terms, unless the line gives one), so aged debtors and creditors come straight from the ledger and always add up to the control accounts; the reports show the check. Payments and credits clear the oldest amounts first.
+- **Traceable migration.** Migrated accounts keep Evolution's `AccountLink`, and customers and suppliers their `DCLink`, in `sourceLinkId`.
 
 ## Quick start
 
@@ -41,6 +43,7 @@ npm install
 npm run db:migrate
 npm run db:seed                   # currencies, MFI-DS/MFI-MDS/MFI-TS, fiscal periods, VAT codes, starting approval rules, admin
 npm run dev:api                   # http://localhost:4100/api
+npm run dev:web                   # http://localhost:3100, in a second terminal
 ```
 
 Sign in with `POST /api/auth/login` and send the returned token as `Authorization: Bearer <token>`.
@@ -53,6 +56,11 @@ Roles: `ADMIN`, `DIRECTOR`, `FINANCE_MANAGER`, `ACCOUNTANT`, `VIEWER`. Paths bel
 | `GET /api/companies` | signed in | Companies |
 | `GET /periods` | signed in | Fiscal periods |
 | `GET /accounts`, `POST /accounts` | signed in; finance | Chart of accounts |
+| `PATCH /accounts/:id` | finance manager | Mark as Debtors (`AR`) or Creditors (`AP`) Control, rename, deactivate |
+| `GET /parties?kind=`, `POST /parties`, `PATCH /parties/:id` | signed in; finance; finance manager | Customers and suppliers |
+| `GET /reports/general-ledger?from=&to=&account=` | signed in | Each account's postings with opening and running balance |
+| `GET /reports/aged?kind=CUSTOMER\|SUPPLIER&asAt=` | signed in | Aged debtors or creditors, checked against the control accounts |
+| `GET /reports/statement?party=&from=&to=` | signed in | A customer's or supplier's statement and open items |
 | `POST /vouchers` | finance | Draft a voucher |
 | `POST /inbox` | finance | Drop files (multipart `files`) to start a draft with them attached |
 | `GET /vouchers?status=`, `GET /vouchers/:no` | signed in | Vouchers, one voucher with lines, approval history and files |
@@ -86,7 +94,7 @@ Example voucher (a USD line, a KES line, and an intercompany line charging MFI-M
 }
 ```
 
-On a foreign line a positive `foreignAmount` is a debit and a negative one a credit. An intercompany line names the partner company and its account; this company's side goes to its current account with that partner.
+On a foreign line a positive `foreignAmount` is a debit and a negative one a credit. An intercompany line names the partner company and its account; this company's side goes to its current account with that partner. A line on a control account adds `"partyId"` (the customer or supplier) and, optionally, `"dueDate"`.
 
 ## Migrating from Evolution
 
@@ -98,7 +106,9 @@ The ETL reads Evolution with SELECT statements only. Give it a SQL login with **
 3. Run `etl/sql/04-account-types.sql` in SSMS, and record in `etl/account-types.json` which `iAccountType` number is an asset, liability, equity, income or expense account. The tool never guesses: unmapped numbers stop it and are listed with examples.
 4. Load the chart of accounts: `npm run etl -- accounts MFI-DS`. Safe to re-run; accounts are matched on `AccountLink`. Main accounts listed in `etl/excluded-accounts.json` (39000 MFI ROUTING ACCOUNT) and their sub-accounts are not migrated. When balances and history are loaded (phase 1), each 39000 line goes to 42000 Debtors Control if its counterparty is a client, or 22000 Creditors Control if it is a supplier.
 
-Opening balances, history and reconciliation reports come in phase 1.
+5. Load customers and suppliers: `npm run etl -- stage MFI-DS Client,Vendor,Currency`, then `npm run etl -- parties MFI-DS`. Evolution clients become customers and vendors become suppliers, matched on `DCLink`, so it is safe to re-run. The accounts in `etl/control-accounts.json` (42000 Debtors Control, 22000 Creditors Control) are marked as control accounts. Payment terms start at 30 days; set each party's terms on the Customers and Suppliers pages.
+
+Opening balances and history come later in phase 1.
 
 ### Learning how Evolution posts
 

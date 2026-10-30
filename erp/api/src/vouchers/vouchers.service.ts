@@ -249,6 +249,9 @@ export class VouchersService {
                 description: e.description,
                 projectId: e.projectId,
                 taxCodeId: e.taxCodeId,
+                // The reversal clears the same item, so it keeps its party and due date
+                partyId: e.partyId,
+                dueDate: e.dueDate,
               };
             }),
           },
@@ -290,6 +293,7 @@ export class VouchersService {
             account: { select: { code: true, description: true } },
             partnerCompany: { select: { code: true } },
             partnerAccount: { select: { code: true, description: true } },
+            party: { select: { code: true, name: true, kind: true } },
           },
         },
         actions: { orderBy: { id: 'asc' }, include: { user: { select: { name: true } } } },
@@ -441,6 +445,8 @@ export class VouchersService {
       taxCodeId: l.taxCodeId ?? undefined,
       partnerCompanyId: l.partnerCompanyId ?? undefined,
       partnerAccountId: l.partnerAccountId ?? undefined,
+      partyId: l.partyId ?? undefined,
+      dueDate: l.dueDate?.toISOString().slice(0, 10),
     }));
     const links: LinkMap = new Map(
       (await tx.intercompanyLink.findMany()).map((l) => [linkKey(l.companyId, l.partnerCompanyId), l.accountId]),
@@ -514,11 +520,19 @@ export class VouchersService {
         taxCodeId: l.taxCodeId,
         partnerCompanyId,
         partnerAccountId: l.partnerAccountId,
+        partyId: l.partyId,
+        dueDate: l.dueDate ? toDate(l.dueDate) : undefined,
       });
     }
     const accountIds = [...new Set(rows.map((r) => r.accountId))];
     const own = await this.prisma.glAccount.count({ where: { id: { in: accountIds }, companyId } });
     if (own !== accountIds.length) throw new BadRequestException('An account on this voucher is not in this company');
+    // Whether each control line names the right kind of party is checked at submission; a draft may be half done
+    const partyIds = [...new Set(rows.flatMap((r) => (r.partyId ? [r.partyId] : [])))];
+    if (partyIds.length) {
+      const parties = await this.prisma.party.count({ where: { id: { in: partyIds }, companyId } });
+      if (parties !== partyIds.length) throw new BadRequestException('A customer or supplier on this voucher is not in this company');
+    }
     return rows;
   }
 }

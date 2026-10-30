@@ -6,9 +6,10 @@ import { useSession } from '@/lib/session';
 
 const TYPES: Account['type'][] = ['ASSET', 'LIABILITY', 'EQUITY', 'INCOME', 'EXPENSE'];
 const TYPE_LABEL: Record<string, string> = { ASSET: 'Asset', LIABILITY: 'Liability', EQUITY: 'Equity', INCOME: 'Income', EXPENSE: 'Expense' };
+const CONTROL_LABEL: Record<string, string> = { AR: 'Debtors Control', AP: 'Creditors Control' };
 
 export default function Accounts() {
-  const { company, canPrepare } = useSession();
+  const { company, canPrepare, can } = useSession();
   const [accounts, setAccounts] = useState<Account[] | null>(null);
   const [filter, setFilter] = useState('');
   const [form, setForm] = useState({ code: '', description: '', type: 'EXPENSE' as Account['type'], isPostable: true });
@@ -30,6 +31,19 @@ export default function Accounts() {
       await api(`/companies/${company.code}/accounts`, { method: 'POST', body: form });
       setNotice(`Account ${form.code} added`);
       setForm({ ...form, code: '', description: '' });
+      load();
+    } catch (err) {
+      setError(errorText(err));
+    }
+  }
+
+  // A control account's lines must name a customer (AR) or supplier (AP); the server refuses a change that posted rows contradict
+  async function setControl(a: Account, subledger: string) {
+    setError('');
+    setNotice('');
+    try {
+      await api(`/companies/${company.code}/accounts/${a.id}`, { method: 'PATCH', body: { subledger: subledger || null } });
+      setNotice(subledger ? `${a.code} is now ${CONTROL_LABEL[subledger]}` : `${a.code} is a plain account again`);
       load();
     } catch (err) {
       setError(errorText(err));
@@ -85,6 +99,7 @@ export default function Accounts() {
               <th>Description</th>
               <th>Type</th>
               <th>Use</th>
+              <th>Control account</th>
             </tr>
           </thead>
           <tbody>
@@ -94,6 +109,17 @@ export default function Accounts() {
                 <td>{a.description}</td>
                 <td>{TYPE_LABEL[a.type] ?? a.type}</td>
                 <td className="muted">{a.isPostable ? 'Takes postings' : 'Header'}</td>
+                <td>
+                  {can('FINANCE_MANAGER') && a.isPostable ? (
+                    <select value={a.subledger ?? ''} onChange={(e) => setControl(a, e.target.value)} aria-label={`Control account setting for ${a.code}`}>
+                      <option value="">No</option>
+                      <option value="AR">Debtors Control (customers)</option>
+                      <option value="AP">Creditors Control (suppliers)</option>
+                    </select>
+                  ) : (
+                    <span className="muted">{a.subledger ? CONTROL_LABEL[a.subledger] : ''}</span>
+                  )}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -26,7 +26,7 @@ describe('MFI ERP API', () => {
   const ds: Record<string, number> = {};
   const mds: Record<string, number> = {};
 
-  const api = (method: 'get' | 'post' | 'put' | 'delete', path: string, who = 'accountant') =>
+  const api = (method: 'get' | 'post' | 'put' | 'patch' | 'delete', path: string, who = 'accountant') =>
     request(app.getHttpServer())[method](`/api${path}`).set('Authorization', `Bearer ${tokens[who]}`);
 
   /** Drafts, submits and fully approves a voucher; returns its final state */
@@ -66,6 +66,7 @@ describe('MFI ERP API', () => {
     await prisma.approvalRule.deleteMany();
     await prisma.intercompanyLink.deleteMany();
     await prisma.ledgerEntry.deleteMany();
+    await prisma.party.deleteMany();
     await prisma.postingBatch.updateMany({ data: { reversesId: null, intercompanyOfId: null } });
     await prisma.postingBatch.deleteMany();
     await prisma.numberSequence.deleteMany();
@@ -314,6 +315,90 @@ describe('MFI ERP API', () => {
 
     const tb = await api('get', '/companies/MFI-DS/trial-balance?from=2026-01-01&to=2026-12-31', 'viewer').expect(200);
     expect(tb.body.totalDebit).toBe(tb.body.totalCredit);
+  });
+
+  it('keeps customer and supplier balances on the control accounts, and ages them', async () => {
+    const debtors = (await api('post', '/companies/MFI-DS/accounts').send({ code: '42000', description: 'Debtors Control', type: 'ASSET', subledger: 'AR' }).expect(201)).body;
+    const creditors = (await api('post', '/companies/MFI-DS/accounts').send({ code: '22000', description: 'Creditors Control', type: 'LIABILITY' }).expect(201)).body;
+    await api('patch', `/companies/MFI-DS/accounts/${creditors.id}`).send({ subledger: 'AP' }).expect(403);
+    await api('patch', `/companies/MFI-DS/accounts/${creditors.id}`, 'manager').send({ subledger: 'AP' }).expect(200);
+
+    await api('post', '/companies/MFI-DS/parties', 'viewer').send({ kind: 'CUSTOMER', code: 'C001', name: 'Acme Ltd' }).expect(403);
+    const acme = (await api('post', '/companies/MFI-DS/parties').send({ kind: 'CUSTOMER', code: 'C001', name: 'Acme Ltd', termsDays: 30, creditLimit: '80000' }).expect(201)).body;
+    await api('post', '/companies/MFI-DS/parties').send({ kind: 'CUSTOMER', code: 'C001', name: 'Again' }).expect(409);
+    const kplc = (await api('post', '/companies/MFI-DS/parties').send({ kind: 'SUPPLIER', code: 'S001', name: 'Kenya Power', termsDays: 14 }).expect(201)).body;
+
+    const sale = (date: string, amount: string, ref: string) => ({
+      txDate: date,
+      description: `Invoice ${ref}`,
+      reference: ref,
+      lines: [
+        { accountId: debtors.id, partyId: acme.id, debit: amount },
+        { accountId: ds['4000'], credit: amount },
+      ],
+    });
+
+    // The control account rules are checked when a voucher is submitted
+    for (const [lines, message] of [
+      [[{ accountId: debtors.id, debit: '10' }, { accountId: ds['4000'], credit: '10' }], 'choose the customer'],
+      [[{ accountId: debtors.id, partyId: kplc.id, debit: '10' }, { accountId: ds['4000'], credit: '10' }], 'not a customer'],
+      [[{ accountId: ds['1100'], partyId: acme.id, debit: '10' }, { accountId: ds['4000'], credit: '10' }], 'Debtors or Creditors Control'],
+    ] as const) {
+      const draft = await api('post', '/companies/MFI-DS/vouchers').send({ txDate: '2026-02-10', description: 'Bad', lines }).expect(201);
+      const res = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(400);
+      expect(res.body.message).toContain(message);
+    }
+
+    await postVoucher(sale('2026-02-10', '100000', 'INV-1'));
+    await postVoucher(sale('2026-04-01', '50000', 'INV-2'));
+    await postVoucher({
+      txDate: '2026-04-10',
+      description: 'Receipt from Acme',
+      lines: [
+        { accountId: ds['1100'], debit: '60000' },
+        { accountId: debtors.id, partyId: acme.id, credit: '60000' },
+      ],
+    });
+    await postVoucher({
+      txDate: '2026-03-01',
+      description: 'KPLC bill',
+      lines: [
+        { accountId: ds['5000'], debit: '20000' },
+        { accountId: creditors.id, partyId: kplc.id, credit: '20000' },
+      ],
+    });
+
+    // The receipt clears the oldest invoice first: 40,000 of INV-1 is 49 days overdue, INV-2 is not yet due
+    const ar = await api('get', '/companies/MFI-DS/reports/aged?kind=CUSTOMER&asAt=2026-04-30', 'viewer').expect(200);
+    expect(ar.body.rows).toEqual([
+      expect.objectContaining({ code: 'C001', current: '50000.00', days31to60: '40000.00', balance: '90000.00', overLimit: true }),
+    ]);
+    expect(ar.body).toMatchObject({ total: '90000.00', controlBalance: '90000.00', difference: '0.00' });
+
+    const ap = await api('get', '/companies/MFI-DS/reports/aged?kind=SUPPLIER&asAt=2026-04-30').expect(200);
+    expect(ap.body.rows).toEqual([expect.objectContaining({ code: 'S001', days31to60: '20000.00', balance: '20000.00' })]);
+    expect(ap.body.difference).toBe('0.00');
+
+    const st = await api('get', `/companies/MFI-DS/reports/statement?party=${acme.id}&from=2026-04-01&to=2026-04-30`).expect(200);
+    expect(st.body).toMatchObject({ opening: '100000.00', closing: '90000.00' });
+    expect(st.body.rows.map((r: { balance: string }) => r.balance)).toEqual(['150000.00', '90000.00']);
+    expect(st.body.rows[0].dueDate).toBe('2026-05-01');
+    expect(st.body.openItems.map((o: { reference: string; open: string }) => [o.reference, o.open])).toEqual([
+      ['INV-1', '40000.00'],
+      ['INV-2', '50000.00'],
+    ]);
+
+    const gl = await api('get', '/companies/MFI-DS/reports/general-ledger?from=2026-04-01&to=2026-04-30&account=42000').expect(200);
+    expect(gl.body.accounts).toHaveLength(1);
+    expect(gl.body.accounts[0]).toMatchObject({ code: '42000', opening: '100000.00', debit: '50000.00', credit: '60000.00', closing: '90000.00' });
+    expect(gl.body.accounts[0].rows[1]).toMatchObject({ party: 'C001 · Acme Ltd', credit: '60000.00', balance: '90000.00' });
+    const all = await api('get', '/companies/MFI-DS/reports/general-ledger?from=2026-01-01&to=2026-12-31').expect(200);
+    expect(all.body.totalDebit).toBe(all.body.totalCredit);
+    expect(all.body.accounts.find((a: { code: string }) => a.code === '1000')).toBeUndefined();
+
+    // Control accounts and posted balances stay consistent
+    await api('patch', `/companies/MFI-DS/accounts/${debtors.id}`, 'manager').send({ subledger: null }).expect(409);
+    await api('patch', `/companies/MFI-DS/accounts/${ds['1100']}`, 'manager').send({ subledger: 'AR' }).expect(409);
   });
 
   it('keeps companies apart', async () => {

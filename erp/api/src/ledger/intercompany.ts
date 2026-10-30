@@ -43,6 +43,7 @@ export function planIntercompany(companyId: number, lines: IntercompanyLineInput
       throw new IntercompanyError(`${label}: the intercompany current accounts for this pair of companies are not set up`);
     }
 
+    if (rest.partyId) throw new IntercompanyError(`${label}: an intercompany line cannot name a customer or supplier`);
     own.push({ ...rest, accountId: ownCurrent });
     const mirror = partners.get(partnerCompanyId) ?? [];
     mirror.push({ ...rest, accountId: partnerAccountId });

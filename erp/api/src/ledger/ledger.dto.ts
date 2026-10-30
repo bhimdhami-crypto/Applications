@@ -1,5 +1,5 @@
 import { IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Length, MaxLength } from 'class-validator';
-import { ACCOUNT_TYPES, AccountType } from '../common/constants';
+import { ACCOUNT_TYPES, AccountType, SUBLEDGERS, Subledger } from '../common/constants';
 
 export class CreateAccountDto {
   @IsString()
@@ -25,6 +25,27 @@ export class CreateAccountDto {
   @IsString()
   @MaxLength(50)
   costCentre?: string;
+
+  /** AR for Debtors Control, AP for Creditors Control */
+  @IsOptional()
+  @IsIn(SUBLEDGERS)
+  subledger?: Subledger;
+}
+
+export class UpdateAccountDto {
+  @IsOptional()
+  @IsString()
+  @Length(1, 200)
+  description?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  isActive?: boolean;
+
+  /** AR, AP, or null to make it a plain account again */
+  @IsOptional()
+  @IsIn([...SUBLEDGERS, null])
+  subledger?: Subledger | null;
 }
 
 export class DateRangeQuery {

@@ -1,6 +1,7 @@
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
 import { mapAccounts } from './accounts';
+import { mapParties } from './parties';
 import { ColumnInfo, quoteName, stageable, typeDeclaration } from './columns';
 import { assertReadOnly } from './connections';
 import { stagingTableDdl } from './stage';
@@ -109,5 +110,36 @@ describe('account-types.json', () => {
     const { mapped, unknown } = mapAccounts(rows, typeMap);
     expect(unknown.size).toBe(0);
     expect(mapped).toHaveLength(seen.length);
+  });
+});
+
+describe('mapParties', () => {
+  const row = (DCLink: number, Account: string | null, extra = {}) => ({
+    DCLink,
+    Account,
+    Name: `Name ${DCLink}`,
+    CurrencyCode: null,
+    Credit_Limit: null,
+    Tax_Number: null,
+    EMail: null,
+    ...extra,
+  });
+
+  it('maps Evolution clients and vendors, leaving home currency empty', () => {
+    const { mapped, problems } = mapParties(
+      [row(1, ' C001 ', { CurrencyCode: 'KES', Credit_Limit: 150000, Tax_Number: 'P051234567X ' }), row(2, 'S-UAE', { CurrencyCode: 'aed', Credit_Limit: 0 })],
+      'KES',
+    );
+    expect(problems).toEqual([]);
+    expect(mapped).toEqual([
+      { sourceLinkId: 1, code: 'C001', name: 'Name 1', currencyCode: null, creditLimit: '150000.00', taxNumber: 'P051234567X', email: null },
+      { sourceLinkId: 2, code: 'S-UAE', name: 'Name 2', currencyCode: 'AED', creditLimit: null, taxNumber: null, email: null },
+    ]);
+  });
+
+  it('reports rows with no code or a repeated code instead of loading them', () => {
+    const { mapped, problems } = mapParties([row(1, ''), row(2, 'A1'), row(3, 'a1')], 'KES');
+    expect(mapped.map((p) => p.code)).toEqual(['A1']);
+    expect(problems).toHaveLength(2);
   });
 });

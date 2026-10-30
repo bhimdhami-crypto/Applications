@@ -63,6 +63,16 @@ export class VoucherLineDto {
   @IsOptional()
   @IsInt()
   partnerAccountId?: number;
+
+  /** Customer or supplier: required on a Debtors or Creditors Control line */
+  @IsOptional()
+  @IsInt()
+  partyId?: number;
+
+  /** Overrides the due date from the party's payment terms */
+  @IsOptional()
+  @IsDateString({ strict: true })
+  dueDate?: string;
 }
 
 export class SaveVoucherDto {

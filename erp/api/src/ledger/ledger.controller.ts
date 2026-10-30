@@ -1,6 +1,6 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Controller, Get, Param, ParseIntPipe, Patch, Post, Query } from '@nestjs/common';
 import { AuthUser, CurrentUser, Roles } from '../auth/decorators';
-import { CreateAccountDto, DateRangeQuery } from './ledger.dto';
+import { CreateAccountDto, DateRangeQuery, UpdateAccountDto } from './ledger.dto';
 import { LedgerService } from './ledger.service';
 
 @Controller('companies/:company')
@@ -16,6 +16,17 @@ export class LedgerController {
   @Roles('FINANCE_MANAGER', 'ACCOUNTANT')
   createAccount(@Param('company') company: string, @CurrentUser() user: AuthUser, @Body() dto: CreateAccountDto) {
     return this.ledger.createAccount(company, user, dto);
+  }
+
+  @Patch('accounts/:id')
+  @Roles('FINANCE_MANAGER')
+  updateAccount(
+    @Param('company') company: string,
+    @Param('id', ParseIntPipe) id: number,
+    @CurrentUser() user: AuthUser,
+    @Body() dto: UpdateAccountDto,
+  ) {
+    return this.ledger.updateAccount(company, id, user, dto);
   }
 
   @Get('journals')
