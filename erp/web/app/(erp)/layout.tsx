@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, BookOpen, CheckSquare, Clock, FileText, History, ListChecks, LogOut, Mail, Notebook, Scale, Truck, Users } from 'lucide-react';
+import { Archive, BookOpen, CheckSquare, Clock, FileText, History, Landmark, ListChecks, LogOut, Mail, Notebook, Scale, Truck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -34,6 +34,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         { href: '/approvals', label: 'Approvals', icon: CheckSquare, count: pending },
         { href: '/vouchers', label: 'Vouchers', icon: FileText },
         { href: '/archive', label: 'Archive', icon: Archive },
+        { href: '/bank', label: 'Bank reconciliation', icon: Landmark },
       ],
     },
     {

@@ -8,5 +8,6 @@ import { VouchersService } from './vouchers.service';
   imports: [LedgerModule],
   controllers: [VouchersController],
   providers: [VouchersService, ArchiveService],
+  exports: [VouchersService],
 })
 export class VouchersModule {}

@@ -278,12 +278,124 @@ export interface HistoryPage {
   next: string | null;
 }
 
+export interface BankAccountRow {
+  id: number;
+  name: string;
+  bankName: string | null;
+  accountNumber: string | null;
+  currencyCode: string;
+  reconcileFrom: string;
+  isActive: boolean;
+  glAccount: { id: number; code: string; description: string };
+  ledgerBalance: string;
+  statementBalance: string | null;
+  statementDate: string | null;
+  lastStatementTo: string | null;
+  unmatchedLines: number;
+  unmatchedEntries: number;
+  lastReconciliation: { asAt: string; difference: string; reviewedAt: string | null } | null;
+}
+
+export interface StatementLayout {
+  headerRow: number;
+  date: string;
+  description: string;
+  reference?: string | null;
+  amount?: string | null;
+  moneyOut?: string | null;
+  moneyIn?: string | null;
+  balance?: string | null;
+  dateFormat: string;
+}
+
+export interface BankLine {
+  id: number;
+  txDate: string;
+  description: string;
+  reference: string | null;
+  amount: string;
+  balance: string | null;
+  matchId: number | null;
+}
+
+export interface BankEntry {
+  id: string;
+  txDate: string;
+  auditNo: string;
+  description: string;
+  reference: string | null;
+  amount: string;
+}
+
+export interface BankWorkspace {
+  account: {
+    id: number;
+    name: string;
+    bankName: string | null;
+    accountNumber: string | null;
+    currencyCode: string;
+    reconcileFrom: string;
+    glAccount: { id: number; code: string; description: string };
+    csvLayout: StatementLayout | null;
+  };
+  lockedTo: string | null;
+  lines: BankLine[];
+  entries: BankEntry[];
+  matches: Array<{ id: number; method: string; matchedBy: string; matchedAt: string; lines: BankLine[]; entries: BankEntry[] }>;
+}
+
+export interface StatementPreview {
+  headings: string[];
+  rows: string[][];
+  layout: StatementLayout | null;
+  problems: string[];
+  needsOpeningBalance: boolean;
+  lines: Array<{ row: number; txDate: string; description: string; reference: string | null; amount: string; balance: string | null }>;
+  lineCount: number;
+  newLines: number;
+  skipped: number;
+}
+
+export interface BankReconciliationView {
+  asAt: string;
+  statementDate: string | null;
+  statementBalance: string | null;
+  depositsInTransit: string;
+  unpresentedPayments: string;
+  bankMoneyIn: string;
+  bankMoneyOut: string;
+  adjustedBalance: string;
+  ledgerBalance: string;
+  difference: string;
+  outstandingEntries: BankEntry[];
+  outstandingLines: BankLine[];
+}
+
+export interface SavedReconciliation {
+  id: number;
+  asAt: string;
+  statementBalance: string;
+  ledgerBalance: string;
+  difference: string;
+  note: string | null;
+  preparedAt: string;
+  reviewedAt: string | null;
+  preparedById: number;
+  preparedBy: { name: string };
+  reviewedBy: { name: string } | null;
+}
+
 export async function download(company: string, attachment: { id: number; fileName: string }) {
-  const res = await send(`/companies/${company}/archive/${attachment.id}/download`);
+  return downloadFrom(`/companies/${company}/archive/${attachment.id}/download`, attachment.fileName);
+}
+
+/** Fetches a file with the sign-in token and hands it to the browser as a download */
+export async function downloadFrom(path: string, fileName: string) {
+  const res = await send(path);
   const url = URL.createObjectURL(await res.blob());
   const a = document.createElement('a');
   a.href = url;
-  a.download = attachment.fileName;
+  a.download = fileName;
   a.click();
   setTimeout(() => URL.revokeObjectURL(url), 10_000);
 }
