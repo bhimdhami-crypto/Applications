@@ -407,6 +407,56 @@ describe('MFI ERP API', () => {
     await api('post', '/companies/MFI-TS/vouchers').send(journal('1')).expect(400);
   });
 
+  it('lets an administrator change the approval matrix without disturbing vouchers already on their way', async () => {
+    const before = await api('get', '/companies/MFI-DS/approval-matrix', 'viewer').expect(200);
+    const journals = before.body.documentTypes.find((d: { documentType: string }) => d.documentType === 'JOURNAL');
+    expect(journals.bands).toHaveLength(3);
+    expect(journals.problems).toEqual([]);
+    expect(journals.warnings).toEqual([]);
+
+    // On its way under the old matrix: 600,000 needs the finance manager, then a director
+    const inFlight = await api('post', '/companies/MFI-DS/vouchers').send(journal('600000')).expect(201);
+    await api('post', `/companies/MFI-DS/vouchers/${inFlight.body.voucherNo}/submit`).send({}).expect(200);
+
+    const FM = { name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' };
+    const DIRECTOR = { name: 'Director approval', approverRole: 'DIRECTOR' };
+    const top = journals.bands[2];
+    const bands = [
+      { name: 'Journals under KES 1,000,000', sopReference: 'SOP-FIN-004', minAmount: '0', maxAmount: '1000000', stages: [FM] },
+      { name: 'Journals from KES 1,000,000', sopReference: 'SOP-FIN-004', minAmount: '1000000', maxAmount: '5000000', stages: [FM, DIRECTOR] },
+      // Unchanged, so the rule is kept as it is
+      { name: top.name, sopReference: top.sopReference, minAmount: top.minAmount, maxAmount: null, stages: top.stages.map(({ name, approverRole }: typeof FM) => ({ name, approverRole })) },
+    ];
+    const reason = 'Board resolution 14/2026';
+    await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'manager').send({ bands, reason }).expect(403);
+    await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin').send({ bands }).expect(400);
+    await api('put', '/companies/MFI-DS/approval-matrix/PAYMENT', 'admin').send({ bands, reason }).expect(400);
+    const gap = await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin')
+      .send({ bands: [{ ...bands[0], maxAmount: '900000' }, ...bands.slice(1)], reason })
+      .expect(400);
+    expect(gap.body.message).toContain('Amounts from 900000 to 1000000 have no approval route');
+
+    const saved = await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin').send({ bands, reason }).expect(200);
+    expect(saved.body).toMatchObject({ created: 2, retired: 2, kept: 1 });
+    expect(saved.body.matrix.history.map((r: { retiredBy: string }) => r.retiredBy)).toEqual(['Administrator', 'Administrator']);
+    const again = await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin').send({ bands, reason }).expect(200);
+    expect(again.body).toMatchObject({ created: 0, retired: 0, kept: 3 });
+
+    // The voucher already submitted finishes the route it started on
+    await api('post', `/companies/MFI-DS/vouchers/${inFlight.body.voucherNo}/approve`, 'manager').send({}).expect(200);
+    const done = await api('post', `/companies/MFI-DS/vouchers/${inFlight.body.voucherNo}/approve`, 'director').send({}).expect(200);
+    expect(done.body.status).toBe('POSTED');
+
+    // A new one follows the new matrix
+    const fresh = await api('post', '/companies/MFI-DS/vouchers').send(journal('600000')).expect(201);
+    const submitted = await api('post', `/companies/MFI-DS/vouchers/${fresh.body.voucherNo}/submit`).send({}).expect(200);
+    expect(submitted.body.rule).toMatchObject({ name: 'Journals under KES 1,000,000', sopReference: 'SOP-FIN-004' });
+    expect(submitted.body.rule.stages).toHaveLength(1);
+
+    const logged = await prisma.auditLog.findFirstOrThrow({ where: { action: 'approval.matrix_changed' } });
+    expect(JSON.parse(logged.detail!).reason).toBe(reason);
+  });
+
   it('keeps an audit trail of every step', async () => {
     const actions = await prisma.auditLog.groupBy({ by: ['action'], _count: true });
     const seen = actions.map((a) => a.action);

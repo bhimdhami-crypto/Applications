@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
+import { ApprovalsModule } from './approvals/approvals.module';
 import { AuditModule } from './audit/audit.module';
 import { AuthModule } from './auth/auth.module';
 import { CompaniesModule } from './companies/companies.module';
@@ -22,6 +23,7 @@ import { VouchersModule } from './vouchers/vouchers.module';
     VouchersModule,
     PartiesModule,
     ReportsModule,
+    ApprovalsModule,
   ],
 })
 export class AppModule {}

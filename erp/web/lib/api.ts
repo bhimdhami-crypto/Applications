@@ -256,3 +256,31 @@ export async function download(company: string, attachment: { id: number; fileNa
 export function errorText(e: unknown) {
   return e instanceof Error ? e.message : String(e);
 }
+
+export interface RuleStage {
+  stageNo?: number;
+  name: string;
+  approverRole: Role;
+}
+
+export interface RuleBand {
+  id: number;
+  name: string;
+  sopReference: string | null;
+  minAmount: string;
+  maxAmount: string | null;
+  stages: RuleStage[];
+  createdAt: string;
+  createdBy: string | null;
+  retiredAt: string | null;
+  retiredBy: string | null;
+  /** Vouchers submitted under this rule and still waiting */
+  waiting: number;
+}
+
+export interface ApprovalMatrix {
+  currency: string;
+  usersByRole: Record<string, number>;
+  documentTypes: { documentType: string; label: string; bands: RuleBand[]; problems: string[]; warnings: string[] }[];
+  history: (RuleBand & { documentType: string })[];
+}

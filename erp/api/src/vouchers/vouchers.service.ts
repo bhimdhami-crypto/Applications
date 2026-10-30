@@ -10,7 +10,7 @@ import { IntercompanyError, IntercompanyLineInput, LinkMap, linkKey, planInterco
 import { LedgerService, Tx, toDate } from '../ledger/ledger.service';
 import { PostingRuleError, PreparedLine, prepareLines } from '../ledger/posting-rules';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateApprovalRuleDto, SaveVoucherDto, VoucherLineDto } from './vouchers.dto';
+import { SaveVoucherDto, VoucherLineDto } from './vouchers.dto';
 
 const EDITABLE = ['DRAFT', 'REJECTED'];
 
@@ -333,37 +333,6 @@ export class VouchersService {
         return stage && !approvalBlocker(stage, user, v, v.actions);
       })
       .map(({ actions, rule, ...v }) => ({ ...v, stage: rule?.stages.find((s) => s.stageNo === v.currentStage)?.name, sopReference: rule?.sopReference }));
-  }
-
-  async rules(companyCode: string) {
-    const company = await this.companies.byCode(companyCode);
-    return this.prisma.approvalRule.findMany({
-      where: { companyId: company.id },
-      orderBy: [{ documentType: 'asc' }, { minAmount: 'asc' }],
-      include: { stages: { orderBy: { stageNo: 'asc' } } },
-    });
-  }
-
-  async createRule(companyCode: string, user: AuthUser, dto: CreateApprovalRuleDto) {
-    const company = await this.companies.byCode(companyCode);
-    if (!dto.stages.length) throw new BadRequestException('An approval rule needs at least one stage');
-    if (dto.maxAmount && toUnits(dto.maxAmount) <= toUnits(dto.minAmount)) {
-      throw new BadRequestException('maxAmount must be above minAmount');
-    }
-    const rule = await this.prisma.approvalRule.create({
-      data: {
-        companyId: company.id,
-        documentType: dto.documentType,
-        name: dto.name,
-        sopReference: dto.sopReference,
-        minAmount: dto.minAmount,
-        maxAmount: dto.maxAmount,
-        stages: { create: dto.stages.map((s, i) => ({ stageNo: i + 1, name: s.name, approverRole: s.approverRole })) },
-      },
-      include: { stages: true },
-    });
-    await this.audit.record(user.id, 'approval.rule_created', 'ApprovalRule', rule.id, dto);
-    return rule;
   }
 
   private async load(companyCode: string, voucherNo: string) {

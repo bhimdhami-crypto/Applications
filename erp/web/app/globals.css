@@ -212,3 +212,16 @@ td.overdue { color: var(--danger); }
   .print-only { display: block; }
   body { background: #fff; color: #000; }
 }
+
+/* Approval rules */
+.bands { display: grid; gap: 10px; }
+.band { border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 14px; display: grid; gap: 8px; }
+.band.edit { background: var(--surface-2); }
+.band-range { display: flex; gap: 12px; align-items: baseline; flex-wrap: wrap; }
+.band-range .field { display: inline-grid; grid-auto-flow: column; align-items: center; gap: 8px; }
+.band-meta { font-size: 12px; }
+.stage-list { display: grid; gap: 6px; }
+.stage-row { display: grid; grid-template-columns: auto auto 1fr 190px auto; gap: 8px; align-items: center; }
+.stage-no { font-weight: 600; color: var(--text-3); width: 16px; text-align: center; }
+.warning { background: var(--warning-soft); color: var(--warning); border-radius: 6px; padding: 8px 12px; margin-top: 10px; font-size: 14px; }
+@media (max-width: 640px) { .stage-row { grid-template-columns: auto 1fr; } }

@@ -1,6 +1,6 @@
 'use client';
 
-import { Archive, BookOpen, CheckSquare, Clock, FileText, LogOut, Notebook, Scale, Truck, Users } from 'lucide-react';
+import { Archive, BookOpen, CheckSquare, Clock, FileText, ListChecks, LogOut, Notebook, Scale, Truck, Users } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
@@ -51,6 +51,7 @@ function Shell({ children }: { children: React.ReactNode }) {
         { href: '/customers', label: 'Customers', icon: Users },
         { href: '/suppliers', label: 'Suppliers', icon: Truck },
         { href: '/accounts', label: 'Chart of accounts', icon: BookOpen },
+        { href: '/approval-rules', label: 'Approval rules', icon: ListChecks },
       ],
     },
   ];
