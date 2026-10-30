@@ -112,7 +112,7 @@ export class ArchiveService {
           take: 500,
         })
       : [];
-    return this.prisma.attachment.findMany({
+    const hits = await this.prisma.attachment.findMany({
       where: {
         companyId: company.id,
         uploadedAt: { gte: from ? new Date(from) : undefined, lte: to ? new Date(`${to}T23:59:59.999Z`) : undefined },
@@ -130,5 +130,11 @@ export class ArchiveService {
       take: 200,
       select: { id: true, entityType: true, entityId: true, fileName: true, contentType: true, size: true, description: true, uploadedAt: true },
     });
+    // Each hit names its voucher, so the archive screen can open it
+    const ids = [...new Set(hits.filter((h) => h.entityType === 'VOUCHER').map((h) => h.entityId))];
+    const numbers = new Map(
+      (await this.prisma.voucher.findMany({ where: { id: { in: ids } }, select: { id: true, voucherNo: true } })).map((v) => [v.id, v.voucherNo]),
+    );
+    return hits.map((h) => ({ ...h, voucherNo: h.entityType === 'VOUCHER' ? (numbers.get(h.entityId) ?? null) : null }));
   }
 }
