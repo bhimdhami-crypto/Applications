@@ -12,11 +12,11 @@ const CURRENCIES = [
   { code: 'AED', name: 'UAE dirham', decimals: 2 },
 ];
 
-// The codes match the Evolution databases the migration reads, so they stay as they are
+// sourceDatabase is the Evolution company database the migration tool reads for each company
 const COMPANIES = [
-  { code: 'MFI-DS', name: 'Mindspace AI' },
-  { code: 'MFI-MDS', name: 'Mindspace Technology' },
-  { code: 'MFI-TS', name: 'Mindspace Super Intelligence' },
+  { code: 'MS-AI', name: 'Mindspace AI', sourceDatabase: 'MFI-DS' },
+  { code: 'MS-TS', name: 'Mindspace Technology', sourceDatabase: 'MFI-MDS' },
+  { code: 'MS-SI', name: 'Mindspace Super Intelligence', sourceDatabase: 'MFI-TS' },
 ];
 
 const TAX_CODES = [
@@ -71,8 +71,13 @@ export async function seed(prisma: PrismaClient) {
       create: { ...c, homeCurrency: 'KES' },
       update: {},
     });
-    // Databases seeded before the names were chosen still carry the code as the name
-    if (company.name === c.code) await prisma.company.update({ where: { id: company.id }, data: { name: c.name } });
+    // Databases seeded before the names and links were chosen carry the old code as the name and no source
+    if (!company.sourceDatabase || company.name === c.sourceDatabase) {
+      await prisma.company.update({
+        where: { id: company.id },
+        data: { sourceDatabase: company.sourceDatabase ?? c.sourceDatabase, name: company.name === c.sourceDatabase ? c.name : undefined },
+      });
+    }
     for (const year of YEARS) {
       for (const p of periodsFor(year)) {
         await prisma.fiscalPeriod.upsert({

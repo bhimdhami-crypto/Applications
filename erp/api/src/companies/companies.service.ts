@@ -6,7 +6,8 @@ export class CompaniesService {
   constructor(private readonly prisma: PrismaService) {}
 
   list() {
-    return this.prisma.company.findMany({ where: { isActive: true }, orderBy: { code: 'asc' } });
+    // In the order they were set up, so the main company comes first
+    return this.prisma.company.findMany({ where: { isActive: true }, orderBy: { id: 'asc' } });
   }
 
   /** The company named in the URL, with its home currency, or 404 */

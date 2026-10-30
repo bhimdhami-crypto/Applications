@@ -57,7 +57,7 @@ export class DateRangeQuery {
 }
 
 export class CreateIntercompanyLinkDto {
-  /** The sister company, e.g. MFI-MDS */
+  /** The sister company, e.g. MS-TS */
   @IsString()
   partnerCode: string;
 

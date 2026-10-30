@@ -10,12 +10,14 @@ datasource db {
 }
 
 model Company {
-  id           Int      @id @default(autoincrement())
-  code         String   @unique @db.NVarChar(20) // MFI-DS, MFI-MDS, MFI-TS
-  name         String   @db.NVarChar(200)
-  homeCurrency String   @db.Char(3)
-  isActive     Boolean  @default(true)
-  createdAt    DateTime @default(now())
+  id             Int      @id @default(autoincrement())
+  code           String   @unique @db.NVarChar(20) // MS-AI, MS-TS, MS-SI
+  name           String   @db.NVarChar(200)
+  /// The Sage Evolution database the migration reads for this company (MFI-DS, MFI-MDS, MFI-TS)
+  sourceDatabase String?  @db.NVarChar(128)
+  homeCurrency   String   @db.Char(3)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
 
   currency     Currency           @relation(fields: [homeCurrency], references: [code], onDelete: NoAction, onUpdate: NoAction)
   periods      FiscalPeriod[]

@@ -1,6 +1,6 @@
 # Mindspace ERP
 
-Web ERP for the Mindspace companies on **SQL Server Express**: general ledger first, then receivables, payables, inventory, and sales and purchase orders. It is built to replace Sage Evolution 200 one module at a time, and it migrates their own data from the Evolution company databases. The company codes keep the Evolution database names: MFI-DS is Mindspace AI, MFI-MDS is Mindspace Technology and MFI-TS is Mindspace Super Intelligence.
+Web ERP for the Mindspace companies on **SQL Server Express**: general ledger first, then receivables, payables, inventory, and sales and purchase orders. It is built to replace Sage Evolution 200 one module at a time, and it migrates their own data from the Evolution company databases. The companies are MS-AI Mindspace AI, MS-TS Mindspace Technology and MS-SI Mindspace Super Intelligence, read from the Evolution databases MFI-DS, MFI-MDS and MFI-TS respectively (each company's `sourceDatabase`).
 
 Phase 0 (the foundation) is done and phase 1 is under way: the web screens, and the general ledger, debtors and creditors reports. See the [plan](https://claude.ai/artifact/FzcWuJUY41BAEHUJoc6fat) for all phases.
 
@@ -44,7 +44,7 @@ cp .env.example api/.env          # then edit the passwords and connection strin
 npm install
 # create the empty database once, e.g. in SSMS: CREATE DATABASE mfierp
 npm run db:migrate
-npm run db:seed                   # currencies, MFI-DS/MFI-MDS/MFI-TS, fiscal periods, VAT codes, starting approval rules, admin
+npm run db:seed                   # currencies, MS-AI/MS-TS/MS-SI, fiscal periods, VAT codes, starting approval rules, admin
 npm run dev:api                   # http://localhost:4100/api
 npm run dev:web                   # http://localhost:3100, in a second terminal
 ```
@@ -93,7 +93,7 @@ Roles: `ADMIN`, `DIRECTOR`, `FINANCE_MANAGER`, `ACCOUNTANT`, `VIEWER`. Paths bel
 | `GET /api/me/email-alerts`, `PUT /api/me/email-alerts` | signed in | My approval emails on or off |
 | `GET /api/email/outbox?status=`, `POST /api/email/test`, `POST /api/email/outbox/:id/retry` | admin | Every email with its status; send a test; send one again |
 
-Example voucher (a USD line, a KES line, and an intercompany line charging MFI-MDS's rent):
+Example voucher (a USD line, a KES line, and an intercompany line charging MS-TS's rent):
 
 ```json
 {
@@ -102,7 +102,7 @@ Example voucher (a USD line, a KES line, and an intercompany line charging MFI-M
   "lines": [
     { "accountId": 12, "currencyCode": "USD", "exchangeRate": "129.5", "foreignAmount": "1000" },
     { "accountId": 40, "credit": "129500" },
-    { "debit": "80000", "partnerCompany": "MFI-MDS", "partnerAccountId": 310 },
+    { "debit": "80000", "partnerCompany": "MS-TS", "partnerAccountId": 310 },
     { "accountId": 11, "credit": "80000" }
   ]
 }
@@ -116,7 +116,7 @@ The ETL reads Evolution with SELECT statements only. Give it a SQL login with **
 
 1. In SSMS, run `etl/sql/01-profile.sql` on each company database: table sizes and the total against the 10 GB Express limit.
 2. Copy Evolution tables into the ERP database's `stg_evo` schema:
-   `npm run etl -- stage MFI-DS` (or name tables: `npm run etl -- stage MFI-DS Accounts,PostGL`)
+   `npm run etl -- stage MFI-DS`, naming the Evolution database (or name tables: `npm run etl -- stage MFI-DS Accounts,PostGL`)
 3. Run `etl/sql/04-account-types.sql` in SSMS, and record in `etl/account-types.json` which `iAccountType` number is an asset, liability, equity, income or expense account. The tool never guesses: unmapped numbers stop it and are listed with examples.
 4. Load the chart of accounts: `npm run etl -- accounts MFI-DS`. Safe to re-run; accounts are matched on `AccountLink`. Main accounts listed in `etl/excluded-accounts.json` (39000 MFI ROUTING ACCOUNT) and their sub-accounts are not migrated. When balances and history are loaded (phase 1), each 39000 line goes to 42000 Debtors Control if its counterparty is a client, or 22000 Creditors Control if it is a supplier.
 
