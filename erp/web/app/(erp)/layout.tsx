@@ -63,7 +63,7 @@ function Shell({ children }: { children: React.ReactNode }) {
     <div className="shell">
       <aside className="sidebar">
         <div className="brand">
-          MFI <span>ERP</span>
+          Mindspace <span>ERP</span>
         </div>
         {groups.map((g) => (
           <div key={g.title} style={{ display: 'contents' }}>

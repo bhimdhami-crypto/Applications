@@ -1,4 +1,4 @@
-// MFI ERP data model: companies, users, periods, currencies, tax, projects, the general ledger, customers and suppliers.
+// Mindspace ERP data model: companies, users, periods, currencies, tax, projects, the general ledger, customers and suppliers.
 // SQL Server has no native enums in Prisma, so closed sets are strings checked in code (see src/common/constants.ts).
 generator client {
   provider = "prisma-client-js"

@@ -1,4 +1,4 @@
-// MFI ERP migration tool. Reads Sage Evolution company databases (SELECT only) and loads the ERP database.
+// Mindspace ERP migration tool. Reads Sage Evolution company databases (SELECT only) and loads the ERP database.
 //   npm run etl -- profile MFI-DS             row counts of the tables we migrate
 //   npm run etl -- stage MFI-DS [PostGL,...]  copy Evolution tables into stg_evo (all tables if none named)
 //   npm run etl -- accounts MFI-DS            map stg_evo.Accounts into the ERP chart of accounts

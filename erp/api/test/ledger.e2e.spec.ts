@@ -23,7 +23,7 @@ import { setupApp } from '../src/setup-app';
 const PASSWORD = 'Test#Erp2026';
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj << >> endobj\n%%EOF\n');
 
-describe('MFI ERP API', () => {
+describe('Mindspace ERP API', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   const tokens: Record<string, string> = {};

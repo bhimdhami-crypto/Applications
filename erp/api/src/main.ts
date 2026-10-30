@@ -8,6 +8,6 @@ async function bootstrap() {
   setupApp(app, process.env.WEB_ORIGIN);
   const port = Number(process.env.PORT ?? 4100);
   await app.listen(port);
-  new Logger('Bootstrap').log(`MFI ERP API listening on port ${port}`);
+  new Logger('Bootstrap').log(`Mindspace ERP API listening on port ${port}`);
 }
 bootstrap();

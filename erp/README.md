@@ -1,4 +1,4 @@
-# MFI ERP
+# Mindspace ERP
 
 Web ERP for MFI on **SQL Server Express**: general ledger first, then receivables, payables, inventory, and sales and purchase orders. It is built to replace Sage Evolution 200 one module at a time, and it migrates MFI's own data from the Evolution company databases (MFI-DS, MFI-MDS, MFI-TS).
 

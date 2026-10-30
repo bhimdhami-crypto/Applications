@@ -36,7 +36,7 @@ export default function SignIn() {
     <main className="login">
       <form className="card" onSubmit={submit}>
         <div>
-          <h1>MFI ERP</h1>
+          <h1>Mindspace ERP</h1>
           <div className="muted">Sign in with your work email</div>
         </div>
         {error && <div className="error">{error}</div>}

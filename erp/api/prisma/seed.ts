@@ -1,4 +1,4 @@
-// Reference data for a fresh MFI ERP database: currencies, the three companies, fiscal periods, VAT codes,
+// Reference data for a fresh Mindspace ERP database: currencies, the three companies, fiscal periods, VAT codes,
 // starting approval rules and an admin.
 // The chart of accounts is not seeded: it comes from Sage Evolution through the ETL (erp/etl).
 import { PrismaClient } from '@prisma/client';
