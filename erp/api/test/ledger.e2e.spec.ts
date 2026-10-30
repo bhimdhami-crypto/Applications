@@ -277,6 +277,7 @@ describe('MFI ERP API', () => {
     expect(invoice).toBeDefined();
     const byVoucher = await api('get', `/companies/MFI-DS/archive?q=${res.body.voucherNo}`).expect(200);
     expect(byVoucher.body).toHaveLength(2);
+    expect(byVoucher.body.every((f: { voucherNo: string }) => f.voucherNo === res.body.voucherNo)).toBe(true);
     const file = await api('get', `/companies/MFI-DS/archive/${invoice.id}/download`, 'viewer')
       .buffer(true)
       .parse((r, done) => {
