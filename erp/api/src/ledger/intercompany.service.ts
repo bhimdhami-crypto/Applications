@@ -35,7 +35,15 @@ export class IntercompanyService {
       const link = await this.prisma.intercompanyLink.create({
         data: { companyId: company.id, partnerCompanyId: partner.id, accountId: account.id },
       });
-      await this.audit.record(user.id, 'ic.link_created', 'IntercompanyLink', link.id, { company: company.code, partner: partner.code, account: account.code });
+      await this.audit.record({
+        userId: user.id,
+        companyId: company.id,
+        action: 'ic.link_created',
+        entity: 'IntercompanyLink',
+        entityId: link.id,
+        label: `${company.code} to ${partner.code} via ${account.code}`,
+        detail: { company: company.code, partner: partner.code, account: account.code },
+      });
       return link;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {

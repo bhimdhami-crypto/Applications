@@ -17,10 +17,10 @@ export class AuthService {
     const user = await this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     const ok = user?.isActive && (await bcrypt.compare(password, user.passwordHash));
     if (!user || !ok) {
-      await this.audit.record(user?.id ?? null, 'auth.login_failed', 'User', user?.id, { email });
+      await this.audit.record({ userId: user?.id ?? null, action: 'auth.login_failed', entity: 'User', entityId: user?.id, label: email, detail: { email } });
       throw new UnauthorizedException('Email or password is incorrect');
     }
-    await this.audit.record(user.id, 'auth.login', 'User', user.id);
+    await this.audit.record({ userId: user.id, action: 'auth.login', entity: 'User', entityId: user.id, label: user.email });
     const accessToken = await this.jwt.signAsync({ sub: user.id });
     return { accessToken, user: { id: user.id, email: user.email, name: user.name, role: user.role } };
   }

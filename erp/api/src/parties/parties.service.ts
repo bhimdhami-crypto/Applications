@@ -1,10 +1,25 @@
 import { ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { fieldChanges } from '../audit/changes';
 import { AuthUser } from '../auth/decorators';
 import { CompaniesService } from '../companies/companies.service';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatePartyDto, UpdatePartyDto } from './parties.dto';
+
+const PARTY_FIELDS = {
+  name: 'Name',
+  currencyCode: 'Currency',
+  termsDays: 'Terms (days)',
+  creditLimit: 'Credit limit',
+  taxNumber: 'Tax number',
+  email: 'Email',
+  phone: 'Phone',
+  isActive: 'Active',
+} as const;
+
+const partyLabel = (p: { kind: string; code: string; name: string }) =>
+  `${p.kind === 'CUSTOMER' ? 'Customer' : 'Supplier'} ${p.code} ${p.name}`;
 
 /** Customers and suppliers. Code and kind are fixed once created, since posted rows refer to them. */
 @Injectable()
@@ -26,7 +41,7 @@ export class PartiesService {
       const party = await this.prisma.party.create({
         data: { ...dto, code: dto.code.trim(), currencyCode: dto.currencyCode?.toUpperCase(), companyId: company.id },
       });
-      await this.audit.record(user.id, 'party.created', 'Party', party.id, dto);
+      await this.audit.record({ userId: user.id, companyId: company.id, action: 'party.created', entity: 'Party', entityId: party.id, label: partyLabel(party), detail: dto });
       return party;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -47,8 +62,19 @@ export class PartiesService {
       where: { id },
       data: { ...dto, currencyCode: dto.currencyCode?.toUpperCase() },
     });
-    // Terms and credit limits matter for audit, so keep before and after
-    await this.audit.record(user.id, 'party.updated', 'Party', id, { before: party, after: dto });
+    // Terms and credit limits matter for audit, so keep what each changed field held before
+    const changes = fieldChanges(party, updated, PARTY_FIELDS);
+    if (changes.length) {
+      await this.audit.record({
+        userId: user.id,
+        companyId: company.id,
+        action: 'party.updated',
+        entity: 'Party',
+        entityId: id,
+        label: partyLabel(updated),
+        detail: { changes },
+      });
+    }
     return updated;
   }
 }

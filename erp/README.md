@@ -29,6 +29,7 @@ The app is original work. Evolution is studied only from the outside:
 - **Posted rows are never changed.** Mistakes are corrected with a reversing voucher, which is approved like any other. A database CHECK keeps every ledger row one-sided and non-negative.
 - **Exact money.** Amounts are `DECIMAL(19,4)` and the engine adds them as integers of 0.0001, so float rounding never unbalances a journal. Foreign lines store the foreign amount and rate; the KES amount is rate × foreign amount, rounded once.
 - **Customer and supplier balances live on the control accounts.** An account marked as Debtors Control (`AR`) or Creditors Control (`AP`) takes only lines that name a customer or supplier, and no other account takes them. Every row there carries its party and a due date (the document date plus the party's payment terms, unless the line gives one), so aged debtors and creditors come straight from the ledger and always add up to the control accounts; the reports show the check. Payments and credits clear the oldest amounts first.
+- **Change history.** Every change is logged with who made it and when, and an edit keeps each changed field's old and new value: a voucher's date, description and lines before and after, a customer's terms or credit limit, an account's control setting. Each voucher, customer, supplier and account shows its own history; finance managers, directors and administrators see the company's whole trail on the Change history screen, filter it by record, person, dates or voucher number, and export it to CSV. Administrators also see every sign-in and failed attempt. The log is append-only: a database trigger refuses updates and deletes (only a database whose name ends in `_test` may be cleared, for the automated tests).
 - **Traceable migration.** Migrated accounts keep Evolution's `AccountLink`, and customers and suppliers their `DCLink`, in `sourceLinkId`.
 
 ## Quick start
@@ -79,6 +80,9 @@ Roles: `ADMIN`, `DIRECTOR`, `FINANCE_MANAGER`, `ACCOUNTANT`, `VIEWER`. Paths bel
 | `GET /journals?from=&to=`, `GET /journals/:auditNo` | signed in | Posted journals |
 | `POST /journals/:auditNo/reverse` | finance | Draft a reversing voucher |
 | `GET /trial-balance?from=&to=` | signed in | Trial balance |
+| `GET /history?entity=&userId=&from=&to=&q=&before=` | finance manager, director, admin | The company's change history, newest first, 100 at a time |
+| `GET /history/:entity/:id` | signed in | One voucher's, customer's, supplier's or account's history |
+| `GET /api/sign-ins?from=&to=&before=` | admin | Sign-ins and failed attempts in every company |
 
 Example voucher (a USD line, a KES line, and an intercompany line charging MFI-MDS's rent):
 

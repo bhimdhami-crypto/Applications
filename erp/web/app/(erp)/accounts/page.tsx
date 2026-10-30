@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { HistoryButton } from '@/components/RecordHistory';
 import { Account, api, errorText } from '@/lib/api';
 import { useSession } from '@/lib/session';
 
@@ -100,6 +101,7 @@ export default function Accounts() {
               <th>Type</th>
               <th>Use</th>
               <th>Control account</th>
+              <th />
             </tr>
           </thead>
           <tbody>
@@ -119,6 +121,9 @@ export default function Accounts() {
                   ) : (
                     <span className="muted">{a.subledger ? CONTROL_LABEL[a.subledger] : ''}</span>
                   )}
+                </td>
+                <td style={{ textAlign: 'right' }}>
+                  <HistoryButton entity="GlAccount" id={a.id} title={`${a.code} ${a.description}`} />
                 </td>
               </tr>
             ))}

@@ -32,6 +32,7 @@ model Company {
   voucherIc VoucherLine[]      @relation("LinePartner")
   files     Attachment[]
   parties   Party[]
+  auditLog  AuditLog[]
 }
 
 model User {
@@ -230,18 +231,23 @@ model NumberSequence {
   @@id([companyId, name])
 }
 
+/// Append-only: a trigger refuses updates and deletes outside test databases
 model AuditLog {
-  id       BigInt   @id @default(autoincrement())
-  userId   Int?
-  action   String   @db.NVarChar(50)
-  entity   String   @db.NVarChar(50)
-  entityId String?  @db.NVarChar(50)
-  detail   String?  @db.NVarChar(Max)
-  at       DateTime @default(now())
+  id        BigInt   @id @default(autoincrement())
+  userId    Int?
+  companyId Int?
+  action    String   @db.NVarChar(50)
+  entity    String   @db.NVarChar(50)
+  entityId  String?  @db.NVarChar(50)
+  label     String?  @db.NVarChar(100)
+  detail    String?  @db.NVarChar(Max)
+  at        DateTime @default(now())
 
-  user User? @relation(fields: [userId], references: [id])
+  user    User?    @relation(fields: [userId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@index([entity, entityId])
+  @@index([companyId, at])
   @@index([at])
 }
 

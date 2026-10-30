@@ -1,6 +1,7 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { AuditService } from '../audit/audit.service';
+import { fieldChanges } from '../audit/changes';
 import { AuthUser } from '../auth/decorators';
 import { CompaniesService } from '../companies/companies.service';
 import { PrismaService } from '../prisma/prisma.service';
@@ -61,7 +62,15 @@ export class LedgerService {
           subledger: dto.subledger,
         },
       });
-      await this.audit.record(user.id, 'gl.account_created', 'GlAccount', account.id, dto);
+      await this.audit.record({
+        userId: user.id,
+        companyId: company.id,
+        action: 'gl.account_created',
+        entity: 'GlAccount',
+        entityId: account.id,
+        label: `${account.code} ${account.description}`,
+        detail: dto,
+      });
       return account;
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') {
@@ -97,7 +106,18 @@ export class LedgerService {
       data.subledger = subledger;
     }
     const updated = await this.prisma.glAccount.update({ where: { id: accountId }, data });
-    await this.audit.record(user.id, 'gl.account_updated', 'GlAccount', accountId, dto);
+    const changes = fieldChanges(account, updated, { description: 'Description', isActive: 'Active', subledger: 'Control account' });
+    if (changes.length) {
+      await this.audit.record({
+        userId: user.id,
+        companyId: company.id,
+        action: 'gl.account_updated',
+        entity: 'GlAccount',
+        entityId: accountId,
+        label: `${updated.code} ${updated.description}`,
+        detail: { changes },
+      });
+    }
     return updated;
   }
 
@@ -213,7 +233,18 @@ export class LedgerService {
         },
       },
     });
-    await this.audit.record(userId, `gl.${header.documentType.toLowerCase()}_posted`, 'PostingBatch', batch.id, { auditNo }, tx);
+    await this.audit.record(
+      {
+        userId,
+        companyId: header.companyId,
+        action: `gl.${header.documentType.toLowerCase()}_posted`,
+        entity: 'PostingBatch',
+        entityId: batch.id,
+        label: auditNo,
+        detail: { auditNo, lines: lines.length },
+      },
+      tx,
+    );
     return batch;
   }
 

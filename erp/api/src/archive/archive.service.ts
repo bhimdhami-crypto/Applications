@@ -65,7 +65,7 @@ export class ArchiveService {
         });
       }
       await this.prisma.attachment.createMany({ data: rows });
-      await this.audit.record(user.id, 'archive.attached', 'Voucher', entityId, { files: rows.map((r) => r.fileName) });
+      await this.logVoucherFile(user, entityId, 'archive.attached', { files: rows.map((r) => r.fileName) });
       return this.forVoucher(entityId);
     } catch (e) {
       await Promise.all(written.map((k) => this.store.remove(k)));
@@ -98,7 +98,13 @@ export class ArchiveService {
     const row = await this.prisma.attachment.findUniqueOrThrow({ where: { id } });
     await this.prisma.attachment.delete({ where: { id } });
     await this.store.remove(row.storageKey);
-    await this.audit.record(user.id, 'archive.removed', 'Voucher', row.entityId, { file: row.fileName, sha256: row.sha256 });
+    await this.logVoucherFile(user, row.entityId, 'archive.removed', { file: row.fileName, sha256: row.sha256 });
+  }
+
+  /** File changes are logged against the voucher, so they show in its history */
+  private async logVoucherFile(user: AuthUser, voucherId: number, action: string, detail: object) {
+    const voucher = await this.prisma.voucher.findUniqueOrThrow({ where: { id: voucherId }, select: { companyId: true, voucherNo: true } });
+    await this.audit.record({ userId: user.id, companyId: voucher.companyId, action, entity: 'Voucher', entityId: voucherId, label: voucher.voucherNo, detail });
   }
 
   /** Finds archived files by file name, description, voucher number or reference */

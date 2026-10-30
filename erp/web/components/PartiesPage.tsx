@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
+import { HistoryButton } from '@/components/RecordHistory';
 import { Party, PartyKind, api, errorText } from '@/lib/api';
 import { cleanAmount, formatAmount } from '@/lib/money';
 import { useSession } from '@/lib/session';
@@ -146,7 +147,8 @@ export function PartiesPage({ kind }: { kind: PartyKind }) {
                 <td className="num">{p.termsDays} days</td>
                 <td className="num">{p.creditLimit ? formatAmount(p.creditLimit) : <span className="muted">None</span>}</td>
                 <td className="muted">{[p.email, p.phone].filter(Boolean).join(' · ')}</td>
-                <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right' }}>
+                <td onClick={(e) => e.stopPropagation()} style={{ textAlign: 'right', whiteSpace: 'nowrap' }}>
+                  <HistoryButton entity="Party" id={p.id} title={`${p.code} ${p.name}`} />
                   {can('FINANCE_MANAGER') && (
                     <button className="btn small ghost" onClick={() => setActive(p, !p.isActive)}>
                       {p.isActive ? 'Make inactive' : 'Make active'}
