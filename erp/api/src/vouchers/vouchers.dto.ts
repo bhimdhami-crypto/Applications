@@ -55,7 +55,7 @@ export class VoucherLineDto {
   @IsInt()
   taxCodeId?: number;
 
-  /** Intercompany: the sister company (e.g. MFI-MDS) and its account that takes this amount */
+  /** Intercompany: the sister company (e.g. MS-TS) and its account that takes this amount */
   @IsOptional()
   @IsString()
   partnerCompany?: string;

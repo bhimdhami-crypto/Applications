@@ -1,4 +1,4 @@
-// Reference data for a fresh MFI ERP database: currencies, the three companies, fiscal periods, VAT codes,
+// Reference data for a fresh Mindspace ERP database: currencies, the three companies, fiscal periods, VAT codes,
 // starting approval rules and an admin.
 // The chart of accounts is not seeded: it comes from Sage Evolution through the ETL (erp/etl).
 import { PrismaClient } from '@prisma/client';
@@ -12,11 +12,11 @@ const CURRENCIES = [
   { code: 'AED', name: 'UAE dirham', decimals: 2 },
 ];
 
-// Names are placeholders until confirmed; the codes match the Evolution databases
+// sourceDatabase is the Evolution company database the migration tool reads for each company
 const COMPANIES = [
-  { code: 'MFI-DS', name: 'MFI-DS' },
-  { code: 'MFI-MDS', name: 'MFI-MDS' },
-  { code: 'MFI-TS', name: 'MFI-TS' },
+  { code: 'MS-AI', name: 'Mindspace AI', sourceDatabase: 'MFI-DS' },
+  { code: 'MS-TS', name: 'Mindspace Technology', sourceDatabase: 'MFI-MDS' },
+  { code: 'MS-SI', name: 'Mindspace Super Intelligence', sourceDatabase: 'MFI-TS' },
 ];
 
 const TAX_CODES = [
@@ -26,18 +26,18 @@ const TAX_CODES = [
 ];
 
 /**
- * Starting approval routes, one set per company, until MFI's own SOPs are entered (POST /approval-rules).
+ * Starting approval routes, one set per company, until the companies' own SOPs are entered (POST /approval-rules).
  * Every voucher must match a rule, so journals and reversals are covered at any amount.
  */
 /**
- * Starting approval matrix, set from common internal-control practice until MFI's written SOP replaces it
+ * Starting approval matrix, set from common internal-control practice until the written SOP replaces it
  * (Bhim, 30 Oct 2026). Bands are KES, minimum inclusive, maximum exclusive. The author never approves, and
  * no one approves two stages of the same voucher, so the top band needs two different directors.
  */
 const FM = { name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' };
 const DIRECTOR = { name: 'Director approval', approverRole: 'DIRECTOR' };
 const SECOND_DIRECTOR = { name: 'Second director approval', approverRole: 'DIRECTOR' };
-const SOP = 'Assumed matrix Oct 2026, pending MFI SOP';
+const SOP = 'Assumed matrix Oct 2026, pending company SOP';
 const APPROVAL_RULES = [
   { documentType: 'JOURNAL', name: 'Journals under KES 500,000', sopReference: SOP, minAmount: 0, maxAmount: 500_000, stages: [FM] },
   { documentType: 'JOURNAL', name: 'Journals from KES 500,000 to under 5,000,000', sopReference: SOP, minAmount: 500_000, maxAmount: 5_000_000, stages: [FM, DIRECTOR] },
@@ -71,6 +71,13 @@ export async function seed(prisma: PrismaClient) {
       create: { ...c, homeCurrency: 'KES' },
       update: {},
     });
+    // Databases seeded before the names and links were chosen carry the old code as the name and no source
+    if (!company.sourceDatabase || company.name === c.sourceDatabase) {
+      await prisma.company.update({
+        where: { id: company.id },
+        data: { sourceDatabase: company.sourceDatabase ?? c.sourceDatabase, name: company.name === c.sourceDatabase ? c.name : undefined },
+      });
+    }
     for (const year of YEARS) {
       for (const p of periodsFor(year)) {
         await prisma.fiscalPeriod.upsert({

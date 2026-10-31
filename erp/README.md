@@ -1,6 +1,6 @@
-# MFI ERP
+# Mindspace ERP
 
-Web ERP for MFI on **SQL Server Express**: general ledger first, then receivables, payables, inventory, and sales and purchase orders. It is built to replace Sage Evolution 200 one module at a time, and it migrates MFI's own data from the Evolution company databases (MFI-DS, MFI-MDS, MFI-TS).
+Web ERP for the Mindspace companies on **SQL Server Express**: general ledger first, then receivables, payables, inventory, and sales and purchase orders. It is built to replace Sage Evolution 200 one module at a time, and it migrates their own data from the Evolution company databases. The companies are MS-AI Mindspace AI, MS-TS Mindspace Technology and MS-SI Mindspace Super Intelligence, read from the Evolution databases MFI-DS, MFI-MDS and MFI-TS respectively (each company's `sourceDatabase`).
 
 Phase 0 (the foundation) is done and phase 1 is under way: the web screens, and the general ledger, debtors and creditors reports. See the [plan](https://claude.ai/artifact/FzcWuJUY41BAEHUJoc6fat) for all phases.
 
@@ -15,7 +15,7 @@ Phase 0 (the foundation) is done and phase 1 is under way: the web screens, and 
 
 The app is original work. Evolution is studied only from the outside:
 
-- **Allowed:** MFI's own data and schema in SQL Server, SQL traces of what Evolution writes, Sage's public documentation, and how staff use the screens.
+- **Allowed:** the companies' own data and schema in SQL Server, SQL traces of what Evolution writes, Sage's public documentation, and how staff use the screens.
 - **Not allowed in this folder:** decompiled or disassembled Sage code, Sage DLLs, its stored procedures, screenshots or other Sage assets. Do not run decompilers (Ghidra, IDA, ILSpy, REA and similar) on Evolution: its licence forbids it.
 - **Open-source ERPs:** design ideas from ERPNext, Odoo, Dolibarr and AccountGo are welcome. Do not copy code from the GPL/LGPL/AGPL projects (ERPNext, Odoo, Dolibarr). AccountGo is MIT: code adapted from it must keep its copyright notice.
 
@@ -23,7 +23,7 @@ The app is original work. Evolution is studied only from the outside:
 
 - **One database, many companies.** Every table carries `companyId`, so group reports need no `Table.Combine`. SQL Server Express caps a database at 10 GB; if the three companies outgrow that, move to SQL Server Standard.
 - **One posting engine.** Every ledger change goes through `LedgerService.post()`: it checks the period is open, the accounts are postable and belong to the company, and debits equal credits to the cent. Header, lines and audit log are written in one serializable transaction, under a gapless audit number (`GL000001`), like Evolution's `cAuditNumber`.
-- **Nothing posts without approval.** Every transaction is a voucher: drafted, submitted, approved stage by stage under the company's approval rule (its SOP), and posted by the last approval. Rules are set per document type and amount band, The seeded starting matrix follows common internal-control practice until MFI's written SOP replaces it: journals under KES 500,000 need the finance manager; from 500,000 a director as well; from 5,000,000 a second, different director; every reversal needs the finance manager and a director whatever its size. Administrators change the matrix on the Approval rules screen: one document type at a time, bands from 0 with no gaps or overlaps, and a reason that goes in the audit trail. Rules are never edited in place; a change retires the old rule and creates a new one, so a voucher already submitted finishes the route it started on, and earlier versions stay on record. The author never approves their own voucher, and one person approves at most one stage. A rejection needs a reason and sends the voucher back to its author.
+- **Nothing posts without approval.** Every transaction is a voucher: drafted, submitted, approved stage by stage under the company's approval rule (its SOP), and posted by the last approval. Rules are set per document type and amount band, The seeded starting matrix follows common internal-control practice until the companies' written SOP replaces it: journals under KES 500,000 need the finance manager; from 500,000 a director as well; from 5,000,000 a second, different director; every reversal needs the finance manager and a director whatever its size. Administrators change the matrix on the Approval rules screen: one document type at a time, bands from 0 with no gaps or overlaps, and a reason that goes in the audit trail. Rules are never edited in place; a change retires the old rule and creates a new one, so a voucher already submitted finishes the route it started on, and earlier versions stay on record. The author never approves their own voucher, and one person approves at most one stage. A rejection needs a reason and sends the voucher back to its author.
 - **Paperless.** Files dropped on the inbox (invoice scans, statements, contracts) become a draft voucher with the files attached; more can be added at any stage. Files are checked by content, fingerprinted with SHA-256, stored on disk under `ARCHIVE_DIR` (not in SQL Server, to spare the 10 GB limit) and searchable. Once a voucher is submitted its files can no longer be removed.
 - **Intercompany in one step.** Each pair of companies has a current account on each side. A voucher line can name a sister company and its account: posting writes this company's side and a linked batch in the sister company in the same transaction, and a reconciliation report checks the two current accounts cancel out.
 - **Posted rows are never changed.** Mistakes are corrected with a reversing voucher, which is approved like any other. A database CHECK keeps every ledger row one-sided and non-negative.
@@ -44,7 +44,7 @@ cp .env.example api/.env          # then edit the passwords and connection strin
 npm install
 # create the empty database once, e.g. in SSMS: CREATE DATABASE mfierp
 npm run db:migrate
-npm run db:seed                   # currencies, MFI-DS/MFI-MDS/MFI-TS, fiscal periods, VAT codes, starting approval rules, admin
+npm run db:seed                   # currencies, MS-AI/MS-TS/MS-SI, fiscal periods, VAT codes, starting approval rules, admin
 npm run dev:api                   # http://localhost:4100/api
 npm run dev:web                   # http://localhost:3100, in a second terminal
 ```
@@ -93,7 +93,7 @@ Roles: `ADMIN`, `DIRECTOR`, `FINANCE_MANAGER`, `ACCOUNTANT`, `VIEWER`. Paths bel
 | `GET /api/me/email-alerts`, `PUT /api/me/email-alerts` | signed in | My approval emails on or off |
 | `GET /api/email/outbox?status=`, `POST /api/email/test`, `POST /api/email/outbox/:id/retry` | admin | Every email with its status; send a test; send one again |
 
-Example voucher (a USD line, a KES line, and an intercompany line charging MFI-MDS's rent):
+Example voucher (a USD line, a KES line, and an intercompany line charging MS-TS's rent):
 
 ```json
 {
@@ -102,7 +102,7 @@ Example voucher (a USD line, a KES line, and an intercompany line charging MFI-M
   "lines": [
     { "accountId": 12, "currencyCode": "USD", "exchangeRate": "129.5", "foreignAmount": "1000" },
     { "accountId": 40, "credit": "129500" },
-    { "debit": "80000", "partnerCompany": "MFI-MDS", "partnerAccountId": 310 },
+    { "debit": "80000", "partnerCompany": "MS-TS", "partnerAccountId": 310 },
     { "accountId": 11, "credit": "80000" }
   ]
 }
@@ -116,7 +116,7 @@ The ETL reads Evolution with SELECT statements only. Give it a SQL login with **
 
 1. In SSMS, run `etl/sql/01-profile.sql` on each company database: table sizes and the total against the 10 GB Express limit.
 2. Copy Evolution tables into the ERP database's `stg_evo` schema:
-   `npm run etl -- stage MFI-DS` (or name tables: `npm run etl -- stage MFI-DS Accounts,PostGL`)
+   `npm run etl -- stage MFI-DS`, naming the Evolution database (or name tables: `npm run etl -- stage MFI-DS Accounts,PostGL`)
 3. Run `etl/sql/04-account-types.sql` in SSMS, and record in `etl/account-types.json` which `iAccountType` number is an asset, liability, equity, income or expense account. The tool never guesses: unmapped numbers stop it and are listed with examples.
 4. Load the chart of accounts: `npm run etl -- accounts MFI-DS`. Safe to re-run; accounts are matched on `AccountLink`. Main accounts listed in `etl/excluded-accounts.json` (39000 MFI ROUTING ACCOUNT) and their sub-accounts are not migrated. When balances and history are loaded (phase 1), each 39000 line goes to 42000 Debtors Control if its counterparty is a client, or 22000 Creditors Control if it is a supplier.
 

@@ -17,9 +17,9 @@ export class IntercompanyError extends Error {}
 /**
  * Splits a voucher into what each company posts. An intercompany line posts in this company to its
  * current account with the partner, and in the partner company to the chosen account, balanced there
- * by the partner's current account with this company. Example, MFI-DS pays MDS's rent:
- *   MFI-DS:  Dr current account with MDS 50,000   Cr Bank 50,000
- *   MFI-MDS: Dr Rent 50,000                        Cr current account with DS 50,000
+ * by the partner's current account with this company. Example, MS-AI pays MS-TS's rent:
+ *   MS-AI:  Dr current account with MS-TS 50,000 Cr Bank 50,000
+ *   MS-TS: Dr Rent 50,000                        Cr current account with MS-AI 50,000
  * Both current accounts then agree, which the reconciliation report checks.
  */
 export function planIntercompany(companyId: number, lines: IntercompanyLineInput[], links: LinkMap) {

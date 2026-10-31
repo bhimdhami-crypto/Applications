@@ -40,7 +40,7 @@ export class MailerService implements OnModuleInit, OnModuleDestroy {
   ) {
     const host = config.get<string>('SMTP_HOST');
     const port = Number(config.get('SMTP_PORT', 587));
-    this.from = config.get('SMTP_FROM', 'MFI ERP <erp@localhost>');
+    this.from = config.get('SMTP_FROM', 'Mindspace ERP <erp@localhost>');
     if (config.get('EMAIL_TRANSPORT') === 'json') {
       // For tests and dry runs: builds each message completely but sends nothing
       this.transport = createTransport({ jsonTransport: true });

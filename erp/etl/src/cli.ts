@@ -1,4 +1,4 @@
-// MFI ERP migration tool. Reads Sage Evolution company databases (SELECT only) and loads the ERP database.
+// Mindspace ERP migration tool. Reads Sage Evolution company databases (SELECT only) and loads the ERP database.
 //   npm run etl -- profile MFI-DS             row counts of the tables we migrate
 //   npm run etl -- stage MFI-DS [PostGL,...]  copy Evolution tables into stg_evo (all tables if none named)
 //   npm run etl -- accounts MFI-DS            map stg_evo.Accounts into the ERP chart of accounts
@@ -58,9 +58,9 @@ async function accounts(company: string) {
   const erp = await connectErp();
   try {
     const companyRow = (await erp.request().input('code', sql.NVarChar(20), company).query<{ id: number }>(
-      'SELECT id FROM dbo.Company WHERE code = @code',
+      'SELECT id FROM dbo.Company WHERE sourceDatabase = @code',
     )).recordset[0];
-    if (!companyRow) throw new Error(`Company ${company} is not in the ERP database; run npm run db:seed first`);
+    if (!companyRow) throw new Error(`No ERP company is linked to the Evolution database ${company} (Company.sourceDatabase); run npm run db:seed first`);
     const rows = (await erp.request().input('code', sql.NVarChar(20), company).query<EvoAccount>(
       `SELECT AccountLink, Master_Sub_Account, Account, Description, iAccountType, SubAccOfLink, ActiveAccount
        FROM stg_evo.Accounts WHERE _company = @code`,
@@ -87,9 +87,9 @@ async function parties(company: string) {
   const erp = await connectErp();
   try {
     const companyRow = (await erp.request().input('code', sql.NVarChar(20), company).query<{ id: number; homeCurrency: string }>(
-      'SELECT id, homeCurrency FROM dbo.Company WHERE code = @code',
+      'SELECT id, homeCurrency FROM dbo.Company WHERE sourceDatabase = @code',
     )).recordset[0];
-    if (!companyRow) throw new Error(`Company ${company} is not in the ERP database; run npm run db:seed first`);
+    if (!companyRow) throw new Error(`No ERP company is linked to the Evolution database ${company} (Company.sourceDatabase); run npm run db:seed first`);
 
     // Currencies the ERP does not know are left empty rather than failing the load; they are listed below
     const select = (table: 'Client' | 'Vendor', extra: string) => `

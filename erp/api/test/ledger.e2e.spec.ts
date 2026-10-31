@@ -23,7 +23,7 @@ import { setupApp } from '../src/setup-app';
 const PASSWORD = 'Test#Erp2026';
 const PDF = Buffer.from('%PDF-1.7\n1 0 obj << >> endobj\n%%EOF\n');
 
-describe('MFI ERP API', () => {
+describe('Mindspace ERP API', () => {
   let app: INestApplication;
   let prisma: PrismaService;
   const tokens: Record<string, string> = {};
@@ -34,7 +34,7 @@ describe('MFI ERP API', () => {
     request(app.getHttpServer())[method](`/api${path}`).set('Authorization', `Bearer ${tokens[who]}`);
 
   /** Drafts, submits and fully approves a voucher; returns its final state */
-  async function postVoucher(body: object, approvers: string[] = ['manager'], company = 'MFI-DS') {
+  async function postVoucher(body: object, approvers: string[] = ['manager'], company = 'MS-AI') {
     const draft = await api('post', `/companies/${company}/vouchers`).send(body).expect(201);
     const no = draft.body.voucherNo;
     await api('post', `/companies/${company}/vouchers/${no}/submit`).send({}).expect(200);
@@ -126,7 +126,7 @@ describe('MFI ERP API', () => {
 
   it('sets up two companies with linked intercompany current accounts', async () => {
     const companies = await api('get', '/companies').expect(200);
-    expect(companies.body.map((c: { code: string }) => c.code)).toEqual(['MFI-DS', 'MFI-MDS', 'MFI-TS']);
+    expect(companies.body.map((c: { code: string }) => c.code)).toEqual(['MS-AI', 'MS-TS', 'MS-SI']);
 
     const chart = [
       { code: '1000', description: 'Assets', type: 'ASSET', isPostable: false },
@@ -137,73 +137,73 @@ describe('MFI ERP API', () => {
       { code: '5000', description: 'Rent', type: 'EXPENSE' },
     ];
     for (const a of chart) {
-      ds[a.code] = (await api('post', '/companies/MFI-DS/accounts').send(a).expect(201)).body.id;
-      mds[a.code] = (await api('post', '/companies/MFI-MDS/accounts').send(a).expect(201)).body.id;
+      ds[a.code] = (await api('post', '/companies/MS-AI/accounts').send(a).expect(201)).body.id;
+      mds[a.code] = (await api('post', '/companies/MS-TS/accounts').send(a).expect(201)).body.id;
     }
-    await api('post', '/companies/MFI-DS/accounts', 'viewer').send({ code: '9', description: 'x', type: 'ASSET' }).expect(403);
-    await api('post', '/companies/MFI-DS/accounts').send(chart[1]).expect(409);
+    await api('post', '/companies/MS-AI/accounts', 'viewer').send({ code: '9', description: 'x', type: 'ASSET' }).expect(403);
+    await api('post', '/companies/MS-AI/accounts').send(chart[1]).expect(409);
 
-    await api('post', '/companies/MFI-DS/intercompany-links').send({ partnerCode: 'MFI-MDS', accountId: ds['1900'] }).expect(403);
-    await api('post', '/companies/MFI-DS/intercompany-links', 'manager').send({ partnerCode: 'MFI-MDS', accountId: ds['1900'] }).expect(201);
-    await api('post', '/companies/MFI-MDS/intercompany-links', 'manager').send({ partnerCode: 'MFI-DS', accountId: mds['1900'] }).expect(201);
+    await api('post', '/companies/MS-AI/intercompany-links').send({ partnerCode: 'MS-TS', accountId: ds['1900'] }).expect(403);
+    await api('post', '/companies/MS-AI/intercompany-links', 'manager').send({ partnerCode: 'MS-TS', accountId: ds['1900'] }).expect(201);
+    await api('post', '/companies/MS-TS/intercompany-links', 'manager').send({ partnerCode: 'MS-AI', accountId: mds['1900'] }).expect(201);
   });
 
   it('posts nothing until a voucher is approved, and never by its author', async () => {
-    const draft = await api('post', '/companies/MFI-DS/vouchers').send(journal('50000', { reference: 'RENT-03' })).expect(201);
+    const draft = await api('post', '/companies/MS-AI/vouchers').send(journal('50000', { reference: 'RENT-03' })).expect(201);
     expect(draft.body).toMatchObject({ voucherNo: 'JV000001', status: 'DRAFT' });
     const no = draft.body.voucherNo;
 
-    const submitted = await api('post', `/companies/MFI-DS/vouchers/${no}/submit`).send({}).expect(200);
+    const submitted = await api('post', `/companies/MS-AI/vouchers/${no}/submit`).send({}).expect(200);
     expect(submitted.body).toMatchObject({ status: 'SUBMITTED', currentStage: 1 });
     expect(submitted.body.rule.stages.map((s: { approverRole: string }) => s.approverRole)).toEqual(['FINANCE_MANAGER']);
     expect(await prisma.ledgerEntry.count()).toBe(0);
 
-    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'viewer').send({}).expect(403);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'accountant').send({}).expect(403);
+    await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'viewer').send({}).expect(403);
+    await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'accountant').send({}).expect(403);
     const pending = await api('get', '/approvals/pending', 'manager').expect(200);
     expect(pending.body.map((v: { voucherNo: string }) => v.voucherNo)).toContain(no);
 
-    const posted = await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({ comment: 'Matches lease' }).expect(200);
+    const posted = await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'manager').send({ comment: 'Matches lease' }).expect(200);
     expect(posted.body).toMatchObject({ status: 'POSTED', postedBatch: { auditNo: 'GL000001' } });
     expect(posted.body.actions.map((a: { action: string }) => a.action)).toEqual(['SUBMITTED', 'APPROVED', 'POSTED']);
     expect(await prisma.ledgerEntry.count()).toBe(2);
   });
 
   it('routes a large voucher through the director as a second stage', async () => {
-    const draft = await api('post', '/companies/MFI-DS/vouchers').send(journal('2000000')).expect(201);
+    const draft = await api('post', '/companies/MS-AI/vouchers').send(journal('2000000')).expect(201);
     const no = draft.body.voucherNo;
-    await api('post', `/companies/MFI-DS/vouchers/${no}/submit`).send({}).expect(200);
-    const stage2 = await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/submit`).send({}).expect(200);
+    const stage2 = await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'manager').send({}).expect(200);
     expect(stage2.body).toMatchObject({ status: 'SUBMITTED', currentStage: 2 });
-    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({}).expect(403);
-    const done = await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'manager').send({}).expect(403);
+    const done = await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'director').send({}).expect(200);
     expect(done.body.status).toBe('POSTED');
   });
 
   it('needs two different directors from KES 5,000,000', async () => {
-    const draft = await api('post', '/companies/MFI-DS/vouchers').send(journal('5000000')).expect(201);
+    const draft = await api('post', '/companies/MS-AI/vouchers').send(journal('5000000')).expect(201);
     const no = draft.body.voucherNo;
-    const submitted = await api('post', `/companies/MFI-DS/vouchers/${no}/submit`).send({}).expect(200);
+    const submitted = await api('post', `/companies/MS-AI/vouchers/${no}/submit`).send({}).expect(200);
     expect(submitted.body.rule.stages.map((s: { approverRole: string }) => s.approverRole)).toEqual(['FINANCE_MANAGER', 'DIRECTOR', 'DIRECTOR']);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({}).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director').send({}).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director').send({}).expect(403);
-    const done = await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'director2').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'manager').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'director').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'director').send({}).expect(403);
+    const done = await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'director2').send({}).expect(200);
     expect(done.body.status).toBe('POSTED');
   });
 
   it('sends a rejected voucher back to its author, who fixes and resubmits it', async () => {
-    const draft = await api('post', '/companies/MFI-DS/vouchers').send(journal('300')).expect(201);
+    const draft = await api('post', '/companies/MS-AI/vouchers').send(journal('300')).expect(201);
     const no = draft.body.voucherNo;
-    await api('post', `/companies/MFI-DS/vouchers/${no}/submit`).send({}).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/reject`, 'manager').send({}).expect(400);
-    const rejected = await api('post', `/companies/MFI-DS/vouchers/${no}/reject`, 'manager').send({ comment: 'Wrong amount, should be 350' }).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/submit`).send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/reject`, 'manager').send({}).expect(400);
+    const rejected = await api('post', `/companies/MS-AI/vouchers/${no}/reject`, 'manager').send({ comment: 'Wrong amount, should be 350' }).expect(200);
     expect(rejected.body.status).toBe('REJECTED');
 
-    await api('put', `/companies/MFI-DS/vouchers/${no}`, 'manager').send(journal('350')).expect(403);
-    await api('put', `/companies/MFI-DS/vouchers/${no}`).send(journal('350')).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/submit`).send({}).expect(200);
-    const posted = await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({}).expect(200);
+    await api('put', `/companies/MS-AI/vouchers/${no}`, 'manager').send(journal('350')).expect(403);
+    await api('put', `/companies/MS-AI/vouchers/${no}`).send(journal('350')).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/submit`).send({}).expect(200);
+    const posted = await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'manager').send({}).expect(200);
     expect(posted.body.status).toBe('POSTED');
     expect(Number(posted.body.lines[0].debit)).toBe(350);
   });
@@ -215,19 +215,19 @@ describe('MFI ERP API', () => {
   ])('will not submit a voucher with %s', async (_, variant, message) => {
     const base = { txDate: '2026-03-21', description: 'Bad', lines: [{ debit: '10', acc: '5000' }, { credit: '10', acc: '1100' }] };
     const body = { ...base, ...variant };
-    const draft = await api('post', '/companies/MFI-DS/vouchers')
+    const draft = await api('post', '/companies/MS-AI/vouchers')
       .send({ ...body, lines: body.lines.map(({ acc, ...l }) => ({ ...l, accountId: ds[acc] })) })
       .expect(201);
-    const res = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(400);
+    const res = await api('post', `/companies/MS-AI/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(400);
     expect(res.body.message.toLowerCase()).toContain(message.toLowerCase());
-    expect((await api('get', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}`).expect(200)).body.status).toBe('DRAFT');
+    expect((await api('get', `/companies/MS-AI/vouchers/${draft.body.voucherNo}`).expect(200)).body.status).toBe('DRAFT');
   });
 
   it('refuses to submit into a closed period', async () => {
-    const company = await prisma.company.findUniqueOrThrow({ where: { code: 'MFI-DS' } });
+    const company = await prisma.company.findUniqueOrThrow({ where: { code: 'MS-AI' } });
     await prisma.fiscalPeriod.updateMany({ where: { companyId: company.id, year: 2026, number: 1 }, data: { isClosed: true } });
-    const draft = await api('post', '/companies/MFI-DS/vouchers').send(journal('1', { txDate: '2026-01-10' })).expect(201);
-    const res = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(400);
+    const draft = await api('post', '/companies/MS-AI/vouchers').send(journal('1', { txDate: '2026-01-10' })).expect(201);
+    const res = await api('post', `/companies/MS-AI/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(400);
     expect(res.body.message).toContain('closed');
   });
 
@@ -252,45 +252,45 @@ describe('MFI ERP API', () => {
       txDate: '2026-03-25',
       description: 'MDS rent paid by DS',
       lines: [
-        { debit: '80000', partnerCompany: 'MFI-MDS', partnerAccountId: mds['5000'] },
+        { debit: '80000', partnerCompany: 'MS-TS', partnerAccountId: mds['5000'] },
         { accountId: ds['1100'], credit: '80000' },
       ],
     });
     expect(posted.postedBatch.intercompanyMirror).toHaveLength(1);
 
-    const dsTb = await api('get', '/companies/MFI-DS/trial-balance?from=2026-03-25&to=2026-03-25').expect(200);
+    const dsTb = await api('get', '/companies/MS-AI/trial-balance?from=2026-03-25&to=2026-03-25').expect(200);
     expect(dsTb.body.rows.find((r: { code: string }) => r.code === '1900').balance).toBe('80000.00');
     expect(dsTb.body.rows.find((r: { code: string }) => r.code === '5000')).toBeUndefined();
 
-    const mdsTb = await api('get', '/companies/MFI-MDS/trial-balance?from=2026-01-01&to=2026-12-31').expect(200);
+    const mdsTb = await api('get', '/companies/MS-TS/trial-balance?from=2026-01-01&to=2026-12-31').expect(200);
     expect(mdsTb.body.rows.find((r: { code: string }) => r.code === '5000').balance).toBe('80000.00');
     expect(mdsTb.body.rows.find((r: { code: string }) => r.code === '1900').balance).toBe('-80000.00');
 
     const rec = await api('get', '/intercompany/reconciliation?to=2026-12-31').expect(200);
-    expect(rec.body.rows).toEqual([expect.objectContaining({ company: 'MFI-DS', partner: 'MFI-MDS', difference: '0.00', agrees: true })]);
+    expect(rec.body.rows).toEqual([expect.objectContaining({ company: 'MS-AI', partner: 'MS-TS', difference: '0.00', agrees: true })]);
 
-    await api('post', `/companies/MFI-DS/journals/${posted.postedBatch.auditNo}/reverse`).send({}).expect(409);
+    await api('post', `/companies/MS-AI/journals/${posted.postedBatch.auditNo}/reverse`).send({}).expect(409);
   });
 
   it('turns dropped files into a draft and keeps them in the archive', async () => {
-    const res = await api('post', '/companies/MFI-DS/inbox')
+    const res = await api('post', '/companies/MS-AI/inbox')
       .attach('files', PDF, 'KPLC invoice March.pdf')
       .attach('files', Buffer.from('date,amount\n2026-03-01,4500\n'), 'meter.csv')
       .expect(201);
     expect(res.body).toMatchObject({ status: 'DRAFT', description: 'KPLC invoice March.pdf, meter.csv' });
     expect(res.body.attachments.map((a: { fileName: string }) => a.fileName)).toEqual(['KPLC invoice March.pdf', 'meter.csv']);
 
-    const bad = await api('post', '/companies/MFI-DS/inbox').attach('files', Buffer.from('MZ\x90\x00'), 'invoice.pdf').expect(400);
+    const bad = await api('post', '/companies/MS-AI/inbox').attach('files', Buffer.from('MZ\x90\x00'), 'invoice.pdf').expect(400);
     expect(bad.body.message).toContain('does not match');
 
     // Found by file name, and by the voucher it belongs to
-    const found = await api('get', '/companies/MFI-DS/archive?q=KPLC').expect(200);
+    const found = await api('get', '/companies/MS-AI/archive?q=KPLC').expect(200);
     const invoice = found.body.find((f: { fileName: string }) => f.fileName === 'KPLC invoice March.pdf');
     expect(invoice).toBeDefined();
-    const byVoucher = await api('get', `/companies/MFI-DS/archive?q=${res.body.voucherNo}`).expect(200);
+    const byVoucher = await api('get', `/companies/MS-AI/archive?q=${res.body.voucherNo}`).expect(200);
     expect(byVoucher.body).toHaveLength(2);
     expect(byVoucher.body.every((f: { voucherNo: string }) => f.voucherNo === res.body.voucherNo)).toBe(true);
-    const file = await api('get', `/companies/MFI-DS/archive/${invoice.id}/download`, 'viewer')
+    const file = await api('get', `/companies/MS-AI/archive/${invoice.id}/download`, 'viewer')
       .buffer(true)
       .parse((r, done) => {
         const chunks: Buffer[] = [];
@@ -300,44 +300,44 @@ describe('MFI ERP API', () => {
       .expect(200);
     expect(file.headers['content-type']).toBe('application/pdf');
     expect(Buffer.compare(file.body, PDF)).toBe(0);
-    await api('get', `/companies/MFI-TS/archive/${invoice.id}/download`).expect(404);
+    await api('get', `/companies/MS-SI/archive/${invoice.id}/download`).expect(404);
 
     // Removable while a draft, kept for good once posted
     const no = res.body.voucherNo;
     const csv = res.body.attachments[1].id;
-    await api('delete', `/companies/MFI-DS/vouchers/${no}/attachments/${csv}`).expect(200);
-    await api('put', `/companies/MFI-DS/vouchers/${no}`).send(journal('4500', { description: 'KPLC electricity' })).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/submit`).send({}).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/approve`, 'manager').send({}).expect(200);
-    await api('delete', `/companies/MFI-DS/vouchers/${no}/attachments/${invoice.id}`).expect(409);
-    await api('post', `/companies/MFI-DS/vouchers/${no}/attachments`).attach('files', PDF, 'receipt.pdf').expect(201);
+    await api('delete', `/companies/MS-AI/vouchers/${no}/attachments/${csv}`).expect(200);
+    await api('put', `/companies/MS-AI/vouchers/${no}`).send(journal('4500', { description: 'KPLC electricity' })).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/submit`).send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${no}/approve`, 'manager').send({}).expect(200);
+    await api('delete', `/companies/MS-AI/vouchers/${no}/attachments/${invoice.id}`).expect(409);
+    await api('post', `/companies/MS-AI/vouchers/${no}/attachments`).attach('files', PDF, 'receipt.pdf').expect(201);
   });
 
   it('reverses a posted journal through approval, once', async () => {
-    const draft = await api('post', '/companies/MFI-DS/journals/GL000001/reverse').send({ txDate: '2026-03-31' }).expect(201);
+    const draft = await api('post', '/companies/MS-AI/journals/GL000001/reverse').send({ txDate: '2026-03-31' }).expect(201);
     expect(draft.body).toMatchObject({ documentType: 'REVERSAL', status: 'DRAFT' });
-    await api('post', '/companies/MFI-DS/journals/GL000001/reverse').send({}).expect(409);
-    await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(200);
-    const reviewed = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/approve`, 'manager').send({}).expect(200);
+    await api('post', '/companies/MS-AI/journals/GL000001/reverse').send({}).expect(409);
+    await api('post', `/companies/MS-AI/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(200);
+    const reviewed = await api('post', `/companies/MS-AI/vouchers/${draft.body.voucherNo}/approve`, 'manager').send({}).expect(200);
     expect(reviewed.body).toMatchObject({ status: 'SUBMITTED', currentStage: 2 });
-    const posted = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/approve`, 'director').send({}).expect(200);
+    const posted = await api('post', `/companies/MS-AI/vouchers/${draft.body.voucherNo}/approve`, 'director').send({}).expect(200);
     expect(posted.body.status).toBe('POSTED');
-    await api('post', '/companies/MFI-DS/journals/GL000001/reverse').send({}).expect(409);
+    await api('post', '/companies/MS-AI/journals/GL000001/reverse').send({}).expect(409);
 
-    const tb = await api('get', '/companies/MFI-DS/trial-balance?from=2026-01-01&to=2026-12-31', 'viewer').expect(200);
+    const tb = await api('get', '/companies/MS-AI/trial-balance?from=2026-01-01&to=2026-12-31', 'viewer').expect(200);
     expect(tb.body.totalDebit).toBe(tb.body.totalCredit);
   });
 
   it('keeps customer and supplier balances on the control accounts, and ages them', async () => {
-    const debtors = (await api('post', '/companies/MFI-DS/accounts').send({ code: '42000', description: 'Debtors Control', type: 'ASSET', subledger: 'AR' }).expect(201)).body;
-    const creditors = (await api('post', '/companies/MFI-DS/accounts').send({ code: '22000', description: 'Creditors Control', type: 'LIABILITY' }).expect(201)).body;
-    await api('patch', `/companies/MFI-DS/accounts/${creditors.id}`).send({ subledger: 'AP' }).expect(403);
-    await api('patch', `/companies/MFI-DS/accounts/${creditors.id}`, 'manager').send({ subledger: 'AP' }).expect(200);
+    const debtors = (await api('post', '/companies/MS-AI/accounts').send({ code: '42000', description: 'Debtors Control', type: 'ASSET', subledger: 'AR' }).expect(201)).body;
+    const creditors = (await api('post', '/companies/MS-AI/accounts').send({ code: '22000', description: 'Creditors Control', type: 'LIABILITY' }).expect(201)).body;
+    await api('patch', `/companies/MS-AI/accounts/${creditors.id}`).send({ subledger: 'AP' }).expect(403);
+    await api('patch', `/companies/MS-AI/accounts/${creditors.id}`, 'manager').send({ subledger: 'AP' }).expect(200);
 
-    await api('post', '/companies/MFI-DS/parties', 'viewer').send({ kind: 'CUSTOMER', code: 'C001', name: 'Acme Ltd' }).expect(403);
-    const acme = (await api('post', '/companies/MFI-DS/parties').send({ kind: 'CUSTOMER', code: 'C001', name: 'Acme Ltd', termsDays: 30, creditLimit: '80000' }).expect(201)).body;
-    await api('post', '/companies/MFI-DS/parties').send({ kind: 'CUSTOMER', code: 'C001', name: 'Again' }).expect(409);
-    const kplc = (await api('post', '/companies/MFI-DS/parties').send({ kind: 'SUPPLIER', code: 'S001', name: 'Kenya Power', termsDays: 14 }).expect(201)).body;
+    await api('post', '/companies/MS-AI/parties', 'viewer').send({ kind: 'CUSTOMER', code: 'C001', name: 'Acme Ltd' }).expect(403);
+    const acme = (await api('post', '/companies/MS-AI/parties').send({ kind: 'CUSTOMER', code: 'C001', name: 'Acme Ltd', termsDays: 30, creditLimit: '80000' }).expect(201)).body;
+    await api('post', '/companies/MS-AI/parties').send({ kind: 'CUSTOMER', code: 'C001', name: 'Again' }).expect(409);
+    const kplc = (await api('post', '/companies/MS-AI/parties').send({ kind: 'SUPPLIER', code: 'S001', name: 'Kenya Power', termsDays: 14 }).expect(201)).body;
 
     const sale = (date: string, amount: string, ref: string) => ({
       txDate: date,
@@ -355,8 +355,8 @@ describe('MFI ERP API', () => {
       [[{ accountId: debtors.id, partyId: kplc.id, debit: '10' }, { accountId: ds['4000'], credit: '10' }], 'not a customer'],
       [[{ accountId: ds['1100'], partyId: acme.id, debit: '10' }, { accountId: ds['4000'], credit: '10' }], 'Debtors or Creditors Control'],
     ] as const) {
-      const draft = await api('post', '/companies/MFI-DS/vouchers').send({ txDate: '2026-02-10', description: 'Bad', lines }).expect(201);
-      const res = await api('post', `/companies/MFI-DS/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(400);
+      const draft = await api('post', '/companies/MS-AI/vouchers').send({ txDate: '2026-02-10', description: 'Bad', lines }).expect(201);
+      const res = await api('post', `/companies/MS-AI/vouchers/${draft.body.voucherNo}/submit`).send({}).expect(400);
       expect(res.body.message).toContain(message);
     }
 
@@ -380,17 +380,17 @@ describe('MFI ERP API', () => {
     });
 
     // The receipt clears the oldest invoice first: 40,000 of INV-1 is 49 days overdue, INV-2 is not yet due
-    const ar = await api('get', '/companies/MFI-DS/reports/aged?kind=CUSTOMER&asAt=2026-04-30', 'viewer').expect(200);
+    const ar = await api('get', '/companies/MS-AI/reports/aged?kind=CUSTOMER&asAt=2026-04-30', 'viewer').expect(200);
     expect(ar.body.rows).toEqual([
       expect.objectContaining({ code: 'C001', current: '50000.00', days31to60: '40000.00', balance: '90000.00', overLimit: true }),
     ]);
     expect(ar.body).toMatchObject({ total: '90000.00', controlBalance: '90000.00', difference: '0.00' });
 
-    const ap = await api('get', '/companies/MFI-DS/reports/aged?kind=SUPPLIER&asAt=2026-04-30').expect(200);
+    const ap = await api('get', '/companies/MS-AI/reports/aged?kind=SUPPLIER&asAt=2026-04-30').expect(200);
     expect(ap.body.rows).toEqual([expect.objectContaining({ code: 'S001', days31to60: '20000.00', balance: '20000.00' })]);
     expect(ap.body.difference).toBe('0.00');
 
-    const st = await api('get', `/companies/MFI-DS/reports/statement?party=${acme.id}&from=2026-04-01&to=2026-04-30`).expect(200);
+    const st = await api('get', `/companies/MS-AI/reports/statement?party=${acme.id}&from=2026-04-01&to=2026-04-30`).expect(200);
     expect(st.body).toMatchObject({ opening: '100000.00', closing: '90000.00' });
     expect(st.body.rows.map((r: { balance: string }) => r.balance)).toEqual(['150000.00', '90000.00']);
     expect(st.body.rows[0].dueDate).toBe('2026-05-01');
@@ -399,35 +399,35 @@ describe('MFI ERP API', () => {
       ['INV-2', '50000.00'],
     ]);
 
-    const gl = await api('get', '/companies/MFI-DS/reports/general-ledger?from=2026-04-01&to=2026-04-30&account=42000').expect(200);
+    const gl = await api('get', '/companies/MS-AI/reports/general-ledger?from=2026-04-01&to=2026-04-30&account=42000').expect(200);
     expect(gl.body.accounts).toHaveLength(1);
     expect(gl.body.accounts[0]).toMatchObject({ code: '42000', opening: '100000.00', debit: '50000.00', credit: '60000.00', closing: '90000.00' });
     expect(gl.body.accounts[0].rows[1]).toMatchObject({ party: 'C001 · Acme Ltd', credit: '60000.00', balance: '90000.00' });
-    const all = await api('get', '/companies/MFI-DS/reports/general-ledger?from=2026-01-01&to=2026-12-31').expect(200);
+    const all = await api('get', '/companies/MS-AI/reports/general-ledger?from=2026-01-01&to=2026-12-31').expect(200);
     expect(all.body.totalDebit).toBe(all.body.totalCredit);
     expect(all.body.accounts.find((a: { code: string }) => a.code === '1000')).toBeUndefined();
 
     // Control accounts and posted balances stay consistent
-    await api('patch', `/companies/MFI-DS/accounts/${debtors.id}`, 'manager').send({ subledger: null }).expect(409);
-    await api('patch', `/companies/MFI-DS/accounts/${ds['1100']}`, 'manager').send({ subledger: 'AR' }).expect(409);
+    await api('patch', `/companies/MS-AI/accounts/${debtors.id}`, 'manager').send({ subledger: null }).expect(409);
+    await api('patch', `/companies/MS-AI/accounts/${ds['1100']}`, 'manager').send({ subledger: 'AR' }).expect(409);
   });
 
   it('keeps companies apart', async () => {
-    const res = await api('get', '/companies/MFI-TS/trial-balance?from=2026-01-01&to=2026-12-31').expect(200);
+    const res = await api('get', '/companies/MS-SI/trial-balance?from=2026-01-01&to=2026-12-31').expect(200);
     expect(res.body.rows).toEqual([]);
-    await api('post', '/companies/MFI-TS/vouchers').send(journal('1')).expect(400);
+    await api('post', '/companies/MS-SI/vouchers').send(journal('1')).expect(400);
   });
 
   it('lets an administrator change the approval matrix without disturbing vouchers already on their way', async () => {
-    const before = await api('get', '/companies/MFI-DS/approval-matrix', 'viewer').expect(200);
+    const before = await api('get', '/companies/MS-AI/approval-matrix', 'viewer').expect(200);
     const journals = before.body.documentTypes.find((d: { documentType: string }) => d.documentType === 'JOURNAL');
     expect(journals.bands).toHaveLength(3);
     expect(journals.problems).toEqual([]);
     expect(journals.warnings).toEqual([]);
 
     // On its way under the old matrix: 600,000 needs the finance manager, then a director
-    const inFlight = await api('post', '/companies/MFI-DS/vouchers').send(journal('600000')).expect(201);
-    await api('post', `/companies/MFI-DS/vouchers/${inFlight.body.voucherNo}/submit`).send({}).expect(200);
+    const inFlight = await api('post', '/companies/MS-AI/vouchers').send(journal('600000')).expect(201);
+    await api('post', `/companies/MS-AI/vouchers/${inFlight.body.voucherNo}/submit`).send({}).expect(200);
 
     const FM = { name: 'Finance manager review', approverRole: 'FINANCE_MANAGER' };
     const DIRECTOR = { name: 'Director approval', approverRole: 'DIRECTOR' };
@@ -439,28 +439,28 @@ describe('MFI ERP API', () => {
       { name: top.name, sopReference: top.sopReference, minAmount: top.minAmount, maxAmount: null, stages: top.stages.map(({ name, approverRole }: typeof FM) => ({ name, approverRole })) },
     ];
     const reason = 'Board resolution 14/2026';
-    await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'manager').send({ bands, reason }).expect(403);
-    await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin').send({ bands }).expect(400);
-    await api('put', '/companies/MFI-DS/approval-matrix/PAYMENT', 'admin').send({ bands, reason }).expect(400);
-    const gap = await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin')
+    await api('put', '/companies/MS-AI/approval-matrix/JOURNAL', 'manager').send({ bands, reason }).expect(403);
+    await api('put', '/companies/MS-AI/approval-matrix/JOURNAL', 'admin').send({ bands }).expect(400);
+    await api('put', '/companies/MS-AI/approval-matrix/PAYMENT', 'admin').send({ bands, reason }).expect(400);
+    const gap = await api('put', '/companies/MS-AI/approval-matrix/JOURNAL', 'admin')
       .send({ bands: [{ ...bands[0], maxAmount: '900000' }, ...bands.slice(1)], reason })
       .expect(400);
     expect(gap.body.message).toContain('Amounts from 900000 to 1000000 have no approval route');
 
-    const saved = await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin').send({ bands, reason }).expect(200);
+    const saved = await api('put', '/companies/MS-AI/approval-matrix/JOURNAL', 'admin').send({ bands, reason }).expect(200);
     expect(saved.body).toMatchObject({ created: 2, retired: 2, kept: 1 });
     expect(saved.body.matrix.history.map((r: { retiredBy: string }) => r.retiredBy)).toEqual(['Administrator', 'Administrator']);
-    const again = await api('put', '/companies/MFI-DS/approval-matrix/JOURNAL', 'admin').send({ bands, reason }).expect(200);
+    const again = await api('put', '/companies/MS-AI/approval-matrix/JOURNAL', 'admin').send({ bands, reason }).expect(200);
     expect(again.body).toMatchObject({ created: 0, retired: 0, kept: 3 });
 
     // The voucher already submitted finishes the route it started on
-    await api('post', `/companies/MFI-DS/vouchers/${inFlight.body.voucherNo}/approve`, 'manager').send({}).expect(200);
-    const done = await api('post', `/companies/MFI-DS/vouchers/${inFlight.body.voucherNo}/approve`, 'director').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${inFlight.body.voucherNo}/approve`, 'manager').send({}).expect(200);
+    const done = await api('post', `/companies/MS-AI/vouchers/${inFlight.body.voucherNo}/approve`, 'director').send({}).expect(200);
     expect(done.body.status).toBe('POSTED');
 
     // A new one follows the new matrix
-    const fresh = await api('post', '/companies/MFI-DS/vouchers').send(journal('600000')).expect(201);
-    const submitted = await api('post', `/companies/MFI-DS/vouchers/${fresh.body.voucherNo}/submit`).send({}).expect(200);
+    const fresh = await api('post', '/companies/MS-AI/vouchers').send(journal('600000')).expect(201);
+    const submitted = await api('post', `/companies/MS-AI/vouchers/${fresh.body.voucherNo}/submit`).send({}).expect(200);
     expect(submitted.body.rule).toMatchObject({ name: 'Journals under KES 1,000,000', sopReference: 'SOP-FIN-004' });
     expect(submitted.body.rule.stages).toHaveLength(1);
 
@@ -470,8 +470,8 @@ describe('MFI ERP API', () => {
 
   it('shows what changed, who changed it and when, field by field', async () => {
     // A draft edited before submission: the history keeps the old lines as well as the new
-    const draft = (await api('post', '/companies/MFI-DS/vouchers').send(journal('100')).expect(201)).body;
-    await api('put', `/companies/MFI-DS/vouchers/${draft.voucherNo}`)
+    const draft = (await api('post', '/companies/MS-AI/vouchers').send(journal('100')).expect(201)).body;
+    await api('put', `/companies/MS-AI/vouchers/${draft.voucherNo}`)
       .send({
         txDate: '2026-03-16',
         description: 'Rent for March',
@@ -482,13 +482,13 @@ describe('MFI ERP API', () => {
       })
       .expect(200);
     // Saving with nothing changed adds nothing to the history
-    await api('put', `/companies/MFI-DS/vouchers/${draft.voucherNo}`)
+    await api('put', `/companies/MS-AI/vouchers/${draft.voucherNo}`)
       .send({ txDate: '2026-03-16', description: 'Rent for March', lines: [{ accountId: ds['5000'], debit: '120.00' }, { accountId: ds['1100'], credit: '120' }] })
       .expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/approve`, 'manager').send({ comment: 'ok' }).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/approve`, 'manager').send({ comment: 'ok' }).expect(200);
 
-    const trail = (await api('get', `/companies/MFI-DS/history/Voucher/${draft.id}`, 'viewer').expect(200)).body;
+    const trail = (await api('get', `/companies/MS-AI/history/Voucher/${draft.id}`, 'viewer').expect(200)).body;
     expect(trail.map((e: { action: string }) => e.action)).toEqual(['voucher.created', 'voucher.updated', 'voucher.submitted', 'voucher.approved']);
     expect(trail[1]).toMatchObject({
       user: 'accountant',
@@ -505,9 +505,9 @@ describe('MFI ERP API', () => {
     expect(trail[3]).toMatchObject({ user: 'manager', detail: { stage: 1, comment: 'ok' } });
 
     // A customer's terms and limit, before and after
-    const acme = (await api('get', '/companies/MFI-DS/parties?kind=CUSTOMER').expect(200)).body.find((p: { code: string }) => p.code === 'C001');
-    await api('patch', `/companies/MFI-DS/parties/${acme.id}`, 'manager').send({ termsDays: 45, creditLimit: '80000.00', name: acme.name }).expect(200);
-    const partyTrail = (await api('get', `/companies/MFI-DS/history/Party/${acme.id}`).expect(200)).body;
+    const acme = (await api('get', '/companies/MS-AI/parties?kind=CUSTOMER').expect(200)).body.find((p: { code: string }) => p.code === 'C001');
+    await api('patch', `/companies/MS-AI/parties/${acme.id}`, 'manager').send({ termsDays: 45, creditLimit: '80000.00', name: acme.name }).expect(200);
+    const partyTrail = (await api('get', `/companies/MS-AI/history/Party/${acme.id}`).expect(200)).body;
     expect(partyTrail.at(-1)).toMatchObject({
       action: 'party.updated',
       label: 'Customer C001 Acme Ltd',
@@ -515,21 +515,21 @@ describe('MFI ERP API', () => {
     });
 
     // The company-wide trail is for managers, directors and administrators
-    await api('get', '/companies/MFI-DS/history').expect(403);
-    const all = (await api('get', '/companies/MFI-DS/history?limit=3', 'manager').expect(200)).body;
+    await api('get', '/companies/MS-AI/history').expect(403);
+    const all = (await api('get', '/companies/MS-AI/history?limit=3', 'manager').expect(200)).body;
     expect(all.items).toHaveLength(3);
     expect(all.items[0].action).toBe('party.updated');
-    const older = (await api('get', `/companies/MFI-DS/history?limit=3&before=${all.next}`, 'manager').expect(200)).body;
+    const older = (await api('get', `/companies/MS-AI/history?limit=3&before=${all.next}`, 'manager').expect(200)).body;
     expect(BigInt(older.items[0].id)).toBeLessThan(BigInt(all.items[2].id));
 
-    const found = (await api('get', `/companies/MFI-DS/history?q=${draft.voucherNo}`, 'director').expect(200)).body;
+    const found = (await api('get', `/companies/MS-AI/history?q=${draft.voucherNo}`, 'director').expect(200)).body;
     expect(found.items).toHaveLength(4);
     const manager = await prisma.user.findFirstOrThrow({ where: { name: 'manager' } });
-    const byManager = (await api('get', `/companies/MFI-DS/history?entity=Party&userId=${manager.id}`, 'manager').expect(200)).body;
+    const byManager = (await api('get', `/companies/MS-AI/history?entity=Party&userId=${manager.id}`, 'manager').expect(200)).body;
     expect(byManager.items.length).toBeGreaterThan(0);
     expect(byManager.items.every((e: { user: string; entity: string }) => e.user === 'manager' && e.entity === 'Party')).toBe(true);
     // Another company's trail holds none of this
-    const mdsTrail = (await api('get', `/companies/MFI-MDS/history?q=${draft.voucherNo}`, 'manager').expect(200)).body;
+    const mdsTrail = (await api('get', `/companies/MS-TS/history?q=${draft.voucherNo}`, 'manager').expect(200)).body;
     expect(mdsTrail.items).toHaveLength(0);
 
     // Sign-ins, including failed ones, are for administrators only
@@ -541,39 +541,39 @@ describe('MFI ERP API', () => {
   it('emails approvers when a voucher waits for them, and the author when it is rejected or posted', async () => {
     await prisma.emailMessage.deleteMany();
     const outbox = () => prisma.emailMessage.findMany({ orderBy: { id: 'asc' } });
-    const draft = (await api('post', '/companies/MFI-DS/vouchers').send(journal('250', { description: 'Courier' })).expect(201)).body;
-    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    const draft = (await api('post', '/companies/MS-AI/vouchers').send(journal('250', { description: 'Courier' })).expect(201)).body;
+    await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
     let mails = await outbox();
     // Only the finance manager: administrators stand in only when nobody holds the role
     expect(mails.map((m) => [m.kind, m.toEmail])).toEqual([['APPROVAL_NEEDED', 'manager@mfi-erp.test']]);
-    expect(mails[0].subject).toBe(`Approval needed: MFI-DS ${draft.voucherNo}, KES 250.00, Courier`);
+    expect(mails[0].subject).toBe(`Approval needed: MS-AI ${draft.voucherNo}, KES 250.00, Courier`);
     expect(mails[0].text).toContain(`/vouchers/${draft.voucherNo}`);
 
-    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/reject`, 'manager').send({ comment: 'Attach the waybill' }).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/reject`, 'manager').send({ comment: 'Attach the waybill' }).expect(200);
     mails = await outbox();
     expect(mails[1]).toMatchObject({ kind: 'REJECTED', toEmail: 'accountant@mfi-erp.test' });
     expect(mails[1].text).toContain('Reason: Attach the waybill');
 
-    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
-    const posted = (await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/approve`, 'manager').send({}).expect(200)).body;
+    await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    const posted = (await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/approve`, 'manager').send({}).expect(200)).body;
     mails = await outbox();
     expect(mails.slice(2).map((m) => [m.kind, m.toEmail])).toEqual([
       ['APPROVAL_NEEDED', 'manager@mfi-erp.test'],
       ['POSTED', 'accountant@mfi-erp.test'],
     ]);
-    expect(mails[3].subject).toBe(`Posted: MFI-DS ${draft.voucherNo} as ${posted.postedBatch.auditNo}`);
+    expect(mails[3].subject).toBe(`Posted: MS-AI ${draft.voucherNo} as ${posted.postedBatch.auditNo}`);
 
     // A two-stage voucher goes to the directors once the manager has approved
-    const big = (await api('post', '/companies/MFI-DS/vouchers').send(journal('2000000')).expect(201)).body;
-    await api('post', `/companies/MFI-DS/vouchers/${big.voucherNo}/submit`).send({}).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${big.voucherNo}/approve`, 'manager').send({}).expect(200);
+    const big = (await api('post', '/companies/MS-AI/vouchers').send(journal('2000000')).expect(201)).body;
+    await api('post', `/companies/MS-AI/vouchers/${big.voucherNo}/submit`).send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${big.voucherNo}/approve`, 'manager').send({}).expect(200);
     const stage2 = await prisma.emailMessage.findMany({ where: { voucherId: big.id, kind: 'APPROVAL_NEEDED' }, orderBy: { id: 'asc' } });
     expect(stage2.map((m) => m.toEmail)).toEqual(['manager@mfi-erp.test', 'director@mfi-erp.test', 'director2@mfi-erp.test']);
 
     // Anyone can turn their alerts off
     expect((await api('get', '/me/email-alerts').expect(200)).body).toEqual({ emailAlerts: true, configured: true });
     await api('put', '/me/email-alerts').send({ emailAlerts: false }).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${big.voucherNo}/approve`, 'director').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${big.voucherNo}/approve`, 'director').send({}).expect(200);
     expect(await prisma.emailMessage.count({ where: { voucherId: big.id, kind: 'POSTED' } })).toBe(0);
     await api('put', '/me/email-alerts').send({ emailAlerts: true }).expect(200);
 
@@ -587,8 +587,8 @@ describe('MFI ERP API', () => {
     expect((await api('post', '/email/test', 'admin').expect(200)).body).toMatchObject({ status: 'SENT', toEmail: 'admin@mfi-erp.test' });
 
     // Weekday mornings, one reminder per person of what has waited a day or more
-    const waiting = (await api('post', '/companies/MFI-DS/vouchers').send(journal('75', { description: 'Stationery' })).expect(201)).body;
-    await api('post', `/companies/MFI-DS/vouchers/${waiting.voucherNo}/submit`).send({}).expect(200);
+    const waiting = (await api('post', '/companies/MS-AI/vouchers').send(journal('75', { description: 'Stationery' })).expect(201)).body;
+    await api('post', `/companies/MS-AI/vouchers/${waiting.voucherNo}/submit`).send({}).expect(200);
     const morning = new Date(Date.now() + 2 * 86_400_000);
     while ([0, 6].includes(new Date(morning.getTime() + 3 * 3_600_000).getUTCDay())) morning.setTime(morning.getTime() + 86_400_000);
     morning.setUTCHours(6, 0, 0, 0); // 09:00 in Nairobi
@@ -600,11 +600,11 @@ describe('MFI ERP API', () => {
   });
 
   it('imports a bank statement, matches it to the ledger and signs off the reconciliation', async () => {
-    const bank = (await api('post', '/companies/MFI-DS/accounts').send({ code: '1120', description: 'SCB Harambee KES', type: 'ASSET' }).expect(201)).body;
+    const bank = (await api('post', '/companies/MS-AI/accounts').send({ code: '1120', description: 'SCB Harambee KES', type: 'ASSET' }).expect(201)).body;
     const setup = { glAccountId: bank.id, name: 'SCB Harambee KES', bankName: 'Standard Chartered', accountNumber: '0102030405060', reconcileFrom: '2026-03-01' };
-    await api('post', '/companies/MFI-DS/bank-accounts').send(setup).expect(403);
-    const account = (await api('post', '/companies/MFI-DS/bank-accounts', 'manager').send(setup).expect(201)).body;
-    const B = `/companies/MFI-DS/bank-accounts/${account.id}`;
+    await api('post', '/companies/MS-AI/bank-accounts').send(setup).expect(403);
+    const account = (await api('post', '/companies/MS-AI/bank-accounts', 'manager').send(setup).expect(201)).body;
+    const B = `/companies/MS-AI/bank-accounts/${account.id}`;
 
     const pay = (txDate: string, description: string, amount: string, into: boolean, reference?: string) =>
       postVoucher({
@@ -662,8 +662,8 @@ describe('MFI ERP API', () => {
     const charge = ws.lines[0];
     const draft = (await api('post', `${B}/lines/${charge.id}/voucher`).send({ contraAccountId: ds['5000'] }).expect(201)).body;
     expect(draft).toMatchObject({ txDate: expect.stringMatching(/^2026-03-31/), status: 'DRAFT', lines: [{ credit: '450' }, { debit: '450' }] });
-    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
-    await api('post', `/companies/MFI-DS/vouchers/${draft.voucherNo}/approve`, 'manager').send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/submit`).send({}).expect(200);
+    await api('post', `/companies/MS-AI/vouchers/${draft.voucherNo}/approve`, 'manager').send({}).expect(200);
     expect((await api('post', `${B}/auto-match`).expect(200)).body).toEqual({ matched: 1 });
 
     // A match can be undone and made by hand; both sides must add up to the same amount
@@ -700,9 +700,9 @@ describe('MFI ERP API', () => {
     await api('delete', `${B}/matches/${locked.id}`).expect(409);
     await api('post', `${B}/reconciliations`).send({ asAt: '2026-03-31' }).expect(409);
 
-    const listed = (await api('get', '/companies/MFI-DS/bank-accounts').expect(200)).body;
+    const listed = (await api('get', '/companies/MS-AI/bank-accounts').expect(200)).body;
     expect(listed[0]).toMatchObject({ name: 'SCB Harambee KES', statementBalance: '69741.5000', unmatchedLines: 1, unmatchedEntries: 1 });
-    const trail = (await api('get', `/companies/MFI-DS/history/BankAccount/${account.id}`).expect(200)).body;
+    const trail = (await api('get', `/companies/MS-AI/history/BankAccount/${account.id}`).expect(200)).body;
     expect(trail.map((e: { action: string }) => e.action)).toEqual(
       expect.arrayContaining(['bank.account_created', 'bank.statement_imported', 'bank.auto_matched', 'bank.unmatched', 'bank.matched', 'bank.reconciliation_reviewed']),
     );

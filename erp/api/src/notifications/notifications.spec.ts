@@ -3,7 +3,7 @@ import { nairobiClock } from './mailer.service';
 import { Candidate, stageRecipients } from './recipients';
 
 const facts = {
-  companyCode: 'MFI-DS',
+  companyCode: 'MS-AI',
   voucherNo: 'JV000014',
   description: 'Office rent <October>',
   amount: '195000',
@@ -15,7 +15,7 @@ const facts = {
 describe('approval emails', () => {
   it('names the voucher, amount and stage, and escapes what users typed', () => {
     const email = approvalNeeded(facts, { stageNo: 1, name: 'Finance manager' }, false);
-    expect(email.subject).toBe('Approval needed: MFI-DS JV000014, KES 195,000.00, Office rent <October>');
+    expect(email.subject).toBe('Approval needed: MS-AI JV000014, KES 195,000.00, Office rent <October>');
     expect(email.text).toContain('waiting at stage 1, Finance manager');
     expect(email.text).toContain(facts.link);
     expect(email.html).toContain('Office rent &lt;October&gt;');

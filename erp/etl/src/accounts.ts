@@ -103,7 +103,7 @@ WHEN NOT MATCHED THEN INSERT (companyId, code, description, type, isPostable, is
 UPDATE child SET parentId = parent.id
 FROM dbo.GlAccount child
 JOIN stg_evo.Accounts src ON src.AccountLink = child.sourceLinkId
-JOIN dbo.Company c ON c.id = child.companyId AND src._company = c.code
+JOIN dbo.Company c ON c.id = child.companyId AND src._company = c.sourceDatabase
 JOIN dbo.GlAccount parent ON parent.companyId = child.companyId AND parent.sourceLinkId = src.SubAccOfLink
 WHERE child.companyId = @companyId;`);
     await tx.commit();

@@ -35,7 +35,7 @@ function layout(heading: string, paragraphs: string[], rows: Array<[string, stri
     .join('');
   return `<!doctype html><html><body style="font-family:Segoe UI,Arial,sans-serif;font-size:14px;color:#1d2939;margin:0;padding:24px;background:#f5f6f8">
 <div style="max-width:560px;margin:0 auto;background:#fff;border:1px solid #e4e7ec;border-radius:8px;padding:24px">
-<div style="font-weight:700;margin-bottom:16px">MFI <span style="color:#1d4ed8">ERP</span></div>
+<div style="font-weight:700;margin-bottom:16px">Mindspace <span style="color:#1d4ed8">ERP</span></div>
 <h2 style="font-size:18px;margin:0 0 12px">${escapeHtml(heading)}</h2>
 ${paragraphs.map((p) => `<p style="margin:0 0 12px">${escapeHtml(p)}</p>`).join('')}
 <table style="border-collapse:collapse;margin:8px 0 18px">${table}</table>
@@ -117,6 +117,6 @@ export function digest(name: string, items: WaitingItem[], inboxLink: string): E
 }
 
 export function test(name: string, link: string): Email {
-  const lines = [`Hello ${name}. This is a test from MFI ERP: email alerts are working.`];
-  return { subject: 'MFI ERP test email', text: textBody(lines, [], link), html: layout('Email is working', lines, [], link, 'Open MFI ERP') };
+  const lines = [`Hello ${name}. This is a test from Mindspace ERP: email alerts are working.`];
+  return { subject: 'Mindspace ERP test email', text: textBody(lines, [], link), html: layout('Email is working', lines, [], link, 'Open Mindspace ERP') };
 }

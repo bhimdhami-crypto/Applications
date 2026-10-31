@@ -1,7 +1,7 @@
 import { IntercompanyError, linkKey, planIntercompany } from './intercompany';
 import { prepareLines } from './posting-rules';
 
-// Company 1 = MFI-DS, company 2 = MFI-MDS. DS's current account with MDS is 100, MDS's with DS is 200.
+// Company 1 = MS-AI, company 2 = MS-TS. DS's current account with MDS is 100, MDS's with DS is 200.
 const links = new Map([
   [linkKey(1, 2), 100],
   [linkKey(2, 1), 200],
