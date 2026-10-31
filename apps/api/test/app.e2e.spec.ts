@@ -57,7 +57,7 @@ describe('Mindspace HR API', () => {
     mail = app.get(MailService);
 
     await prisma.$executeRawUnsafe(
-      'TRUNCATE "ContentReport", "PostComment", "PostLike", "CommunityPost", "ChatMessage", "ConversationMember", "Conversation", "PolicyAcknowledgement", "LibraryItem", "AttendanceSession", "WorkLog", "LoanRepayment", "Loan", "BenefitEnrolment", "BenefitPlan", "GiftVoucher", "LeaveRequest", "LeaveAdjustment", "PublicHoliday", "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
+      'TRUNCATE "Candidate", "JobOpening", "Goal", "PerformanceReview", "ReviewCycle", "ContentReport", "PostComment", "PostLike", "CommunityPost", "ChatMessage", "ConversationMember", "Conversation", "PolicyAcknowledgement", "LibraryItem", "AttendanceSession", "WorkLog", "LoanRepayment", "Loan", "BenefitEnrolment", "BenefitPlan", "GiftVoucher", "LeaveRequest", "LeaveAdjustment", "PublicHoliday", "Payslip", "PayrollRun", "EmployeeDocument", "NextOfKin", "Employee", "LoginChallenge", "User", "Company", "AuditLog" CASCADE',
     );
     process.env.SEED_ADMIN_PASSWORD = ADMIN_PASSWORD;
     process.env.SEED_USER_PASSWORD = USER_PASSWORD;
@@ -86,7 +86,31 @@ describe('Mindspace HR API', () => {
         .post('/api/auth/login')
         .send({ email: 'tester@mindspace-ai.test', password: USER_PASSWORD })
         .expect(200);
+      expect(login.body.demoCode).toBeUndefined();
       await request(app.getHttpServer()).post('/api/auth/verify').send({ challengeId: login.body.challengeId, code: '000000' }).expect(401);
+    });
+
+    it('lists the test accounts and returns the code only in demo mode', async () => {
+      const off = await request(app.getHttpServer()).get('/api/auth/demo').expect(200);
+      expect(off.body).toEqual({ demo: false });
+      process.env.DEMO_MODE = 'true';
+      try {
+        const on = await request(app.getHttpServer()).get('/api/auth/demo').expect(200);
+        expect(on.body.accounts).toContainEqual(expect.objectContaining({ email: 'admin@mindspace-ai.test', password: ADMIN_PASSWORD }));
+        expect(on.body.accounts).toContainEqual(expect.objectContaining({ email: 'tester@mindspace-ai.test', password: USER_PASSWORD }));
+        const login = await request(app.getHttpServer())
+          .post('/api/auth/login')
+          .send({ email: 'manager@mindspace-ai.test', password: USER_PASSWORD })
+          .expect(200);
+        expect(login.body.demoCode).toMatch(/^\d{6}$/);
+        const verify = await request(app.getHttpServer())
+          .post('/api/auth/verify')
+          .send({ challengeId: login.body.challengeId, code: login.body.demoCode })
+          .expect(200);
+        expect(verify.body.user.email).toBe('manager@mindspace-ai.test');
+      } finally {
+        delete process.env.DEMO_MODE;
+      }
     });
 
     it('refuses requests without a token', async () => {
@@ -798,6 +822,142 @@ describe('Mindspace HR API', () => {
       expect(csv.headers['content-type']).toContain('text/csv');
       expect(csv.text).toContain('Faith Njeri');
       await api('get', `/activity/report?month=${today.slice(0, 7)}`, 'manager').expect(403);
+    });
+  });
+
+  describe('workforce analytics, organisation, recruitment, performance and audit', () => {
+    it('shows workforce figures to HR and payroll only', async () => {
+      const res = await api('get', '/analytics/workforce', 'hr').expect(200);
+      expect(res.body.totals.headcount).toBeGreaterThan(0);
+      expect(res.body.byCompany.find((c: { code: string }) => c.code === 'MSA-KE').headcount).toBeGreaterThan(0);
+      expect(res.body.monthly).toHaveLength(12);
+      // Counts only: no names or pay of individuals
+      expect(JSON.stringify(res.body)).not.toContain('Kamau');
+      await api('get', '/analytics/workforce', 'payroll').expect(200);
+      await api('get', '/analytics/workforce', 'manager').expect(403);
+      await api('get', '/analytics/workforce', 'developer').expect(403);
+    });
+
+    it('lets anyone see their own reporting line but not other companies', async () => {
+      const mine = await api('get', '/organisation/chart', 'developer').expect(200);
+      expect(mine.body.root.firstName).toBe('Kevin');
+      expect(mine.body.chain.map((n: { firstName: string }) => n.firstName)).toContain('Amina');
+      expect(mine.body.root).not.toHaveProperty('monthlyBasic');
+      expect(mine.body.root).not.toHaveProperty('nationalIdNumber');
+      const amina = mine.body.chain.find((n: { firstName: string }) => n.firstName === 'Amina');
+      const team = await api('get', `/organisation/chart?employeeId=${amina.id}`, 'tester').expect(200);
+      expect(team.body.reports.length).toBeGreaterThanOrEqual(2);
+      const entities = await api('get', '/organisation/entities', 'developer').expect(200);
+      expect(entities.body.length).toBeGreaterThanOrEqual(9);
+      const nz = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-NZ' } });
+      await api('get', `/organisation/departments?companyId=${nz.id}`, 'developer').expect(403);
+      await api('get', `/organisation/departments?companyId=${nz.id}`, 'hr').expect(200);
+      const outsider = await prisma.employee.create({
+        data: { employeeNo: 'MSA-NZ-T09999', firstName: 'Aroha', lastName: 'Ngata', jobTitle: 'Analyst', department: 'Data', hireDate: new Date('2025-01-06'), monthlyBasic: 8000, companyId: nz.id },
+      });
+      await api('get', `/organisation/chart?employeeId=${outsider.id}`, 'developer').expect(403);
+      await api('get', `/organisation/chart?employeeId=${outsider.id}`, 'hr').expect(200);
+    });
+
+    it('runs an opening from candidate to hired employee', async () => {
+      const kenya = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-KE' } });
+      const amina = await prisma.employee.findFirstOrThrow({ where: { workEmail: 'manager@mindspace-ai.test' } });
+      await api('post', '/recruitment/openings', 'manager').send({ companyId: kenya.id, title: 'Data Engineer', department: 'Engineering' }).expect(403);
+      await api('post', '/recruitment/openings', 'hr').send({ companyId: kenya.id, title: 'Data Engineer', department: 'Engineering', salaryMin: 300000, salaryMax: 200000 }).expect(400);
+      const opening = await api('post', '/recruitment/openings', 'hr')
+        .send({ companyId: kenya.id, title: 'Data Engineer', department: 'Engineering', workLocation: 'HYBRID', positions: 1, hiringManagerId: amina.id, salaryMin: 200000, salaryMax: 300000 })
+        .expect(201);
+      expect(opening.body.reference).toMatch(/^REQ-KE-\d{4}$/);
+
+      // The hiring manager sees and works the opening; other staff cannot
+      const listed = await api('get', '/recruitment/openings', 'manager').expect(200);
+      expect(listed.body.map((o: { id: string }) => o.id)).toContain(opening.body.id);
+      await api('get', '/recruitment/openings', 'developer').expect(403);
+      const referral = await api('post', `/recruitment/openings/${opening.body.id}/candidates`, 'manager')
+        .send({ firstName: 'Njoki', lastName: 'Mwangi', email: 'njoki.mwangi@example.com' })
+        .expect(201);
+      expect(referral.body.source).toBe('Referral');
+      await api('post', `/recruitment/openings/${opening.body.id}/candidates`, 'hr').send({ firstName: 'Njoki', lastName: 'Mwangi', email: 'NJOKI.MWANGI@example.com' }).expect(409);
+
+      const id = referral.body.id;
+      await api('patch', `/recruitment/candidates/${id}`, 'manager').send({ stage: 'HIRED' }).expect(400);
+      await api('post', `/recruitment/candidates/${id}/hire`, 'hr').send({ hireDate: '2026-11-02', monthlyBasic: 250000 }).expect(400);
+      for (const stage of ['SCREENING', 'INTERVIEW', 'OFFER']) await api('patch', `/recruitment/candidates/${id}`, 'manager').send({ stage, rating: 4 }).expect(200);
+      await api('post', `/recruitment/candidates/${id}/hire`, 'manager').send({ hireDate: '2026-11-02', monthlyBasic: 250000 }).expect(403);
+      const hired = await api('post', `/recruitment/candidates/${id}/hire`, 'hr')
+        .send({ hireDate: '2026-11-02', monthlyBasic: 250000, workEmail: 'njoki.mwangi@mindspace-ai.test' })
+        .expect(201);
+      expect(hired.body.filled).toBe(true);
+      const employee = await prisma.employee.findUniqueOrThrow({ where: { id: hired.body.employee.id }, include: { user: true } });
+      expect(employee.managerId).toBe(amina.id);
+      expect(employee.jobTitle).toBe('Data Engineer');
+      expect(employee.user?.role).toBe('EMPLOYEE');
+      expect(mail.outbox.some((m) => m.to === 'njoki.mwangi@mindspace-ai.test' && m.subject.includes('Welcome'))).toBe(true);
+      const after = await api('get', `/recruitment/openings/${opening.body.id}`, 'hr').expect(200);
+      expect(after.body.status).toBe('FILLED');
+      await api('post', `/recruitment/openings/${opening.body.id}/candidates`, 'hr').send({ firstName: 'Late', lastName: 'Applicant', email: 'late@example.com' }).expect(400);
+    });
+
+    it('runs a review cycle: self review, then the manager, never yourself', async () => {
+      const kenya = await prisma.company.findUniqueOrThrow({ where: { code: 'MSA-KE' } });
+      // Close the example cycle from the seed so a new one can open
+      for (const c of (await api('get', '/performance/cycles', 'hr').expect(200)).body) {
+        if (c.status === 'OPEN' && c.companyId === kenya.id) await api('post', `/performance/cycles/${c.id}/close`, 'hr').expect(201);
+      }
+      const body = { name: 'E2E year-end review', companyId: kenya.id, periodStart: '2026-07-01', periodEnd: '2026-12-31', selfDueOn: '2026-12-15', managerDueOn: '2027-01-15' };
+      await api('post', '/performance/cycles', 'manager').send(body).expect(403);
+      await api('post', '/performance/cycles', 'hr').send({ ...body, managerDueOn: '2026-12-01' }).expect(400);
+      const cycle = await api('post', '/performance/cycles', 'hr').send(body).expect(201);
+      expect(cycle.body.reviews).toBeGreaterThanOrEqual(6);
+      await api('post', '/performance/cycles', 'hr').send(body).expect(400);
+      expect(mail.outbox.some((m) => m.to === 'tester@mindspace-ai.test' && m.subject.includes('E2E year-end review'))).toBe(true);
+
+      const tester = (await api('get', '/performance/reviews/mine', 'tester').expect(200)).body.own.find((r: { cycleId: string }) => r.cycleId === cycle.body.id);
+      expect(tester.status).toBe('SELF_REVIEW');
+      await api('post', `/performance/reviews/${tester.id}/manager`, 'manager').send({ rating: 4, comments: 'Strong quarter overall.' }).expect(400);
+      await api('post', `/performance/reviews/${tester.id}/self`, 'developer').send({ rating: 5, comments: 'Not my review at all' }).expect(403);
+      await api('post', `/performance/reviews/${tester.id}/self`, 'tester').send({ rating: 4, comments: 'Automated the leave regression suite.' }).expect(201);
+      await api('post', `/performance/reviews/${tester.id}/self`, 'tester').send({ rating: 5, comments: 'Trying to send it again' }).expect(400);
+      await api('post', `/performance/reviews/${tester.id}/manager`, 'tester').send({ rating: 5, comments: 'Rating myself highly here' }).expect(403);
+      await api('post', `/performance/reviews/${tester.id}/manager`, 'developer').send({ rating: 1, comments: 'A colleague, not the manager' }).expect(403);
+      const toGive = (await api('get', '/performance/reviews/mine', 'manager').expect(200)).body.toGive;
+      expect(toGive.map((r: { id: string }) => r.id)).toContain(tester.id);
+      const done = await api('post', `/performance/reviews/${tester.id}/manager`, 'manager').send({ rating: 4, comments: 'Reliable and thorough testing.' }).expect(201);
+      expect(done.body.status).toBe('COMPLETED');
+      expect(mail.outbox.some((m) => m.to === 'tester@mindspace-ai.test' && m.subject.includes('review is complete'))).toBe(true);
+
+      const all = await api('get', `/performance/cycles/${cycle.body.id}/reviews`, 'hr').expect(200);
+      expect(all.body.length).toBe(cycle.body.reviews);
+      const managers = await api('get', `/performance/cycles/${cycle.body.id}/reviews`, 'manager').expect(200);
+      expect(managers.body.every((r: { reviewer: { firstName: string } | null }) => r.reviewer?.firstName === 'Amina')).toBe(true);
+      await api('get', `/performance/cycles/${cycle.body.id}/reviews`, 'developer').expect(403);
+      const listed = (await api('get', '/performance/cycles', 'hr').expect(200)).body.find((c: { id: string }) => c.id === cycle.body.id);
+      expect(listed.progress.completed).toBe(1);
+      expect(listed.ratings.find((r: { rating: number }) => r.rating === 4).count).toBe(1);
+    });
+
+    it('keeps goals to the employee, their manager and HR', async () => {
+      const goal = await api('post', '/performance/goals', 'tester').send({ title: 'Automate payslip checks', weight: 50 }).expect(201);
+      await api('patch', `/performance/goals/${goal.body.id}`, 'tester').send({ progress: 100 }).expect(200);
+      const mine = await api('get', '/performance/goals', 'tester').expect(200);
+      expect(mine.body.goals.find((g: { id: string }) => g.id === goal.body.id).status).toBe('COMPLETED');
+      const tester = await prisma.employee.findFirstOrThrow({ where: { workEmail: 'tester@mindspace-ai.test' } });
+      await api('get', `/performance/goals?employeeId=${tester.id}`, 'manager').expect(200);
+      await api('get', `/performance/goals?employeeId=${tester.id}`, 'hr').expect(200);
+      await api('get', `/performance/goals?employeeId=${tester.id}`, 'developer').expect(403);
+      await api('patch', `/performance/goals/${goal.body.id}`, 'developer').send({ progress: 0 }).expect(403);
+      await api('post', '/performance/goals', 'manager').send({ employeeId: tester.id, title: 'Mentor the new QA hire', weight: 20 }).expect(201);
+      await api('delete', `/performance/goals/${goal.body.id}`, 'tester').expect(200);
+    });
+
+    it('shows the audit trail to the administrator only', async () => {
+      const res = await api('get', '/audit?q=recruitment.hire', 'admin').expect(200);
+      expect(res.body.total).toBeGreaterThanOrEqual(1);
+      expect(res.body.items[0].actor.email).toBe('hr@mindspace-ai.test');
+      const byActor = await api('get', '/audit?actor=manager@&pageSize=10', 'admin').expect(200);
+      expect(byActor.body.items.every((i: { actor: { email: string } }) => i.actor.email === 'manager@mindspace-ai.test')).toBe(true);
+      await api('get', '/audit', 'hr').expect(403);
+      await api('get', '/audit', 'payroll').expect(403);
     });
   });
 });

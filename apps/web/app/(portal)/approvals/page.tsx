@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useState } from 'react';
 import { api, apiBlob, ApprovalItem, formatDate, money, trail } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { PageHeader } from '@/components/ui';
 
 export default function MoneyApprovalsPage() {
   const { can } = useSession();
@@ -62,8 +63,7 @@ export default function MoneyApprovalsPage() {
 
   return (
     <>
-      <h1>Loan and benefit approvals</h1>
-      <p className="muted">Salary advances, staff loans, IOUs, meal and gym enrolments and gift vouchers waiting for you. Each step is approved by a different person.</p>
+      <PageHeader title="Loan and benefit approvals" sub={<>Salary advances, staff loans, IOUs, meal and gym enrolments and gift vouchers waiting for you. Each step is approved by a different person.</>} />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
       <div className="card table-wrap">
@@ -93,12 +93,12 @@ export default function MoneyApprovalsPage() {
                   <input placeholder="Note (optional)" value={notes[r.id] ?? ''} onChange={(e) => setNotes({ ...notes, [r.id]: e.target.value })} />
                   <div>
                     <button className="small" disabled={!!busy} onClick={() => decide(r, true)}>{r.title === 'IOU settlement' ? 'Confirm' : 'Approve'}</button>{' '}
-                    <button className="danger small" disabled={!!busy} onClick={() => decide(r, false)}>{r.title === 'IOU settlement' ? 'Send back' : 'Decline'}</button>
+                    <button className="secondary danger small" disabled={!!busy} onClick={() => decide(r, false)}>{r.title === 'IOU settlement' ? 'Send back' : 'Decline'}</button>
                   </div>
                 </td>
               </tr>
             ))}
-            {rows && rows.length === 0 && <tr><td colSpan={5} className="muted">Nothing is waiting for you.</td></tr>}
+            {rows && rows.length === 0 && <tr><td colSpan={5} className="empty">Nothing is waiting for you.</td></tr>}
           </tbody>
         </table>
       </div>

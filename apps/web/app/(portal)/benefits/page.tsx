@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api, BenefitPlan, benefitStatus, Enrolment, LOCATION_LABEL, money, OCCASION_LABEL, Voucher, VoucherOccasion } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { Settings2 } from 'lucide-react';
+import { PageHeader } from '@/components/ui';
 
 interface Mine {
   currency: string;
@@ -133,11 +135,11 @@ export default function BenefitsPage() {
 
   return (
     <>
-      <div className="section-head">
-        <h1>Benefits</h1>
-        {can('HR', 'PAYROLL', 'FINANCE') && <Link href="/benefits/manage">Manage benefit options</Link>}
-      </div>
-      <p className="muted">Benefits in kind are taxed according to your country&apos;s rules and shown on your payslip.</p>
+      <PageHeader
+        title="Benefits"
+        sub="Meal vouchers, gym membership and gift vouchers. Benefits in kind are taxed according to your country's rules and shown on your payslip."
+        actions={can('HR', 'PAYROLL', 'FINANCE') && <Link className="button secondary" href="/benefits/manage"><Settings2 size={16} /> Manage benefit options</Link>}
+      />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
 
@@ -199,7 +201,7 @@ export default function BenefitsPage() {
                     <td className="actions">{e.canEnd && <button className="secondary small" onClick={() => end(e)}>{e.status === 'PENDING' || !e.endsAtLabel ? 'Withdraw' : 'End'}</button>}</td>
                   </tr>
                 ))}
-                {mine && mine.enrolments.length === 0 && <tr><td colSpan={6} className="muted">No meal or gym benefits yet.</td></tr>}
+                {mine && mine.enrolments.length === 0 && <tr><td colSpan={6} className="empty">No meal or gym benefits yet.</td></tr>}
               </tbody>
             </table>
           </div>

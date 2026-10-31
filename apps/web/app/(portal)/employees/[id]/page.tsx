@@ -3,7 +3,9 @@
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { Briefcase, CalendarDays, Camera, FileText, Network, Target, Upload, UserRound, Users } from 'lucide-react';
 import { Avatar } from '@/components/Avatar';
+import { Empty, StatusBadge } from '@/components/ui';
 import {
   api,
   downloadFile,
@@ -19,6 +21,7 @@ import {
 } from '@/lib/api';
 
 type Section = 'job' | 'personal' | 'kin' | null;
+type Tab = 'overview' | 'kin' | 'documents';
 
 const BLANK_KIN: NextOfKin = { name: '', relationship: '', phone: '', email: '', isEmergencyContact: true, isBeneficiary: false };
 
@@ -40,6 +43,7 @@ export default function ProfilePage() {
   const [docs, setDocs] = useState<HrDocument[]>([]);
   const [docTypes, setDocTypes] = useState<string[]>([]);
   const [editing, setEditing] = useState<Section>(null);
+  const [tab, setTab] = useState<Tab>('overview');
   const [form, setForm] = useState<Record<string, string>>({});
   const [kin, setKin] = useState<NextOfKin[]>([]);
   const [photoVersion, setPhotoVersion] = useState(0);
@@ -211,7 +215,7 @@ export default function ProfilePage() {
     }, 'Document deleted.');
   }
 
-  if (!p) return error ? <div className="notice error">{error}</div> : <div className="loading">Loading…</div>;
+  if (!p) return error ? <div className="notice error">{error}</div> : <div className="loading"><span className="spinner" /> Loading profile…</div>;
 
   const name = `${p.firstName} ${p.lastName}`;
   const isSelf = p.access === 'SELF';
@@ -219,37 +223,59 @@ export default function ProfilePage() {
 
   return (
     <>
-      {isSelf ? (
-        <p className="muted">My profile</p>
-      ) : (
-        <p className="muted"><Link href="/employees">{p.access === 'MANAGER' ? 'My team' : 'Employees'}</Link> / {name}</p>
+      {!isSelf && (
+        <Link className="back-link" href="/employees" style={{ display: 'inline-flex', marginBottom: '0.75rem', fontSize: '0.82rem', color: 'var(--text-3)' }}>
+          ← {p.access === 'MANAGER' ? 'My team' : 'Employees'}
+        </Link>
       )}
-      <div className="card profile-head">
-        <Avatar employeeId={p.id} name={name} hasPhoto={p.hasPhoto} size={96} version={photoVersion} />
-        <div style={{ flex: 1 }}>
-          <h1>{name}</h1>
-          <div>{p.jobTitle} · {p.department}</div>
-          <div className="muted">
-            {p.employeeNo} · {p.company.name} · <span className={`badge ${p.status}`}>{p.status}</span>
+      <div className="card profile-hero">
+        <div className="cover" />
+        <div className="profile-head">
+          <Avatar employeeId={p.id} name={name} hasPhoto={p.hasPhoto} size={96} version={photoVersion} />
+          <div>
+            <h1>{name}</h1>
+            <div style={{ color: 'var(--text-2)' }}>{p.jobTitle} · {p.department}</div>
+            <div className="actions" style={{ marginTop: '0.5rem', gap: '0.4rem' }}>
+              <StatusBadge status={p.status} label={p.status === 'ACTIVE' ? 'Active' : 'Left'} />
+              <span className="tag">{p.employeeNo}</span>
+              <span className="tag"><span className="cc" style={{ width: 22, height: 16, fontSize: '0.6rem', borderRadius: 3 }}>{p.company.countryCode}</span>{p.company.name}</span>
+              {p.grade && <span className="tag">Grade {p.grade}</span>}
+            </div>
+          </div>
+          <div className="actions">
+            <Link className="button secondary" href={isSelf ? '/leave' : `/leave?employeeId=${p.id}`}><CalendarDays size={16} /> Leave</Link>
+            <Link className="button secondary" href={`/organisation?employeeId=${p.id}`}><Network size={16} /> Reporting line</Link>
+            {(isSelf || p.access === 'MANAGER' || p.can.editJob) && (
+              <Link className="button secondary" href={isSelf ? '/performance' : `/performance?employeeId=${p.id}`}><Target size={16} /> Goals</Link>
+            )}
+            {p.can.editPersonal && (
+              <>
+                <input ref={photoInput} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={uploadPhoto} />
+                <button className="secondary" onClick={() => photoInput.current?.click()}>
+                  <Camera size={16} /> {p.hasPhoto ? 'Change photo' : 'Add photo'}
+                </button>
+              </>
+            )}
           </div>
         </div>
-        <Link className="button secondary" href={isSelf ? '/leave' : `/leave?employeeId=${p.id}`}>Leave</Link>
-        {p.can.editPersonal && (
-          <>
-            <input ref={photoInput} type="file" accept="image/png,image/jpeg,image/webp" style={{ display: 'none' }} onChange={uploadPhoto} />
-            <button className="secondary" onClick={() => photoInput.current?.click()}>
-              {p.hasPhoto ? 'Change photo' : 'Add photo'}
-            </button>
-          </>
-        )}
       </div>
+
+      {personal && (
+        <nav className="tabs" aria-label="Profile sections">
+          <button className={tab === 'overview' ? 'active' : ''} onClick={() => setTab('overview')}><UserRound size={15} /> Overview</button>
+          <button className={tab === 'kin' ? 'active' : ''} onClick={() => setTab('kin')}><Users size={15} /> Next of kin ({p.nextOfKin?.length ?? 0})</button>
+          {p.can.viewDocuments && (
+            <button className={tab === 'documents' ? 'active' : ''} onClick={() => setTab('documents')}><FileText size={15} /> Documents ({docs.length})</button>
+          )}
+        </nav>
+      )}
 
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
 
-      <section className="card">
+      {tab === 'overview' && <section className="card">
         <div className="section-head">
-          <h2>Job</h2>
+          <h2><span className="actions" style={{ gap: '0.5rem' }}><Briefcase size={18} className="muted" /> Job</span></h2>
           {p.can.editJob && editing !== 'job' && <button className="secondary small" onClick={() => startEdit('job')}>Edit</button>}
         </div>
         {editing === 'job' ? (
@@ -278,7 +304,10 @@ export default function ProfilePage() {
                 </>
               )}
             </div>
-            <button type="submit">Save</button> <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button>
+            <div className="form-actions">
+              <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button>
+              <button type="submit">Save changes</button>
+            </div>
           </form>
         ) : (
           <dl className="fields">
@@ -295,12 +324,12 @@ export default function ProfilePage() {
             {p.monthlyAllowances !== undefined && <Field label="Monthly allowances" value={money(p.monthlyAllowances, p.company.currency)} />}
           </dl>
         )}
-      </section>
+      </section>}
 
-      {personal && (
+      {personal && tab === 'overview' && (
         <section className="card">
           <div className="section-head">
-            <h2>Personal details and IDs</h2>
+            <h2><span className="actions" style={{ gap: '0.5rem' }}><UserRound size={18} className="muted" /> Personal details and IDs</span></h2>
             {p.can.editPersonal && editing !== 'personal' && <button className="secondary small" onClick={() => startEdit('personal')}>Edit</button>}
           </div>
           {editing === 'personal' ? (
@@ -336,7 +365,10 @@ export default function ProfilePage() {
                 )}
               </div>
               {!p.can.editJob && <p className="muted">To correct your ID numbers, date of birth or education, upload the document below and HR will update it.</p>}
-              <button type="submit">Save</button> <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button>
+              <div className="form-actions">
+                <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button>
+                <button type="submit">Save changes</button>
+              </div>
             </form>
           ) : (
             <dl className="fields">
@@ -357,7 +389,7 @@ export default function ProfilePage() {
         </section>
       )}
 
-      {personal && (
+      {personal && tab === 'kin' && (
         <section className="card">
           <div className="section-head">
             <h2>Next of kin</h2>
@@ -376,13 +408,14 @@ export default function ProfilePage() {
                   <div className="checks">
                     <label><input type="checkbox" checked={k.isEmergencyContact} onChange={(e) => setKinField(i, 'isEmergencyContact', e.target.checked)} /> Emergency contact</label>
                     <label><input type="checkbox" checked={k.isBeneficiary} onChange={(e) => setKinField(i, 'isBeneficiary', e.target.checked)} /> Beneficiary</label>
-                    <button type="button" className="danger small" onClick={() => setKin(kin.filter((_, j) => j !== i))}>Remove</button>
+                    <button type="button" className="secondary danger small" onClick={() => setKin(kin.filter((_, j) => j !== i))}>Remove</button>
                   </div>
                 </div>
               ))}
               {kin.length < 5 && <button type="button" className="secondary small" onClick={() => setKin([...kin, { ...BLANK_KIN }])}>Add another person</button>}
-              <div style={{ marginTop: '1rem' }}>
-                <button type="submit">Save</button> <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button>
+              <div className="form-actions">
+                <button type="button" className="secondary" onClick={() => setEditing(null)}>Cancel</button>
+                <button type="submit">Save changes</button>
               </div>
             </form>
           ) : p.nextOfKin?.length ? (
@@ -403,14 +436,17 @@ export default function ProfilePage() {
               </table>
             </div>
           ) : (
-            <p className="muted">No next of kin recorded{isSelf ? '. Please add someone we can call in an emergency.' : '.'}</p>
+            <Empty icon={Users} title="No next of kin recorded">{isSelf ? 'Please add someone we can call in an emergency.' : 'Ask the employee to add an emergency contact.'}</Empty>
           )}
         </section>
       )}
 
-      {p.can.viewDocuments && (
+      {p.can.viewDocuments && tab === 'documents' && (
         <section className="card">
-          <h2>Documents</h2>
+          <div className="section-head">
+            <h2>Documents</h2>
+            <span className="muted small">{docs.filter((d) => d.status === 'PENDING').length} waiting for HR · {docs.filter((d) => d.status === 'EXPIRED').length} expired</span>
+          </div>
           <div className="table-wrap">
             <table>
               <thead>
@@ -421,7 +457,7 @@ export default function ProfilePage() {
                   <tr key={d.id}>
                     <td>
                       {d.type}
-                      {d.hrOnly && <span className="badge" style={{ marginLeft: '0.4rem' }}>HR only</span>}
+                      {d.hrOnly && <span className="badge violet plain" style={{ marginLeft: '0.4rem' }}>HR only</span>}
                       {(d.issuedDate || d.expiryDate) && (
                         <div className="muted small">
                           {[d.issuedDate && `Issued ${formatDate(d.issuedDate)}`, d.expiryDate && `expires ${formatDate(d.expiryDate)}`].filter(Boolean).join(', ')}
@@ -438,26 +474,26 @@ export default function ProfilePage() {
                       )}
                       {d.sizeBytes !== null && <span className="muted"> · {sizeLabel(d.sizeBytes)}</span>}
                     </td>
-                    <td><span className={`badge ${d.status}`}>{d.status}</span></td>
+                    <td><StatusBadge status={d.status} /></td>
                     {p.can.verifyDocuments && (
                       <td className="actions">
                         <>
                           {(d.status === 'PENDING' || d.status === 'REJECTED') && <button className="secondary small" onClick={() => setStatus(d, 'VERIFIED')}>Verify</button>}{' '}
                           {d.status === 'PENDING' && <button className="secondary small" onClick={() => setStatus(d, 'REJECTED')}>Reject</button>}{' '}
-                          <button className="danger small" onClick={() => removeDoc(d)}>Delete</button>
+                          <button className="secondary danger small" onClick={() => removeDoc(d)}>Delete</button>
                         </>
                       </td>
                     )}
                   </tr>
                 ))}
-                {docs.length === 0 && <tr><td colSpan={4} className="muted">No documents on file.</td></tr>}
+                {docs.length === 0 && <tr><td colSpan={4}><Empty icon={FileText} title="No documents on file">Upload contracts, IDs and certificates below.</Empty></td></tr>}
               </tbody>
             </table>
           </div>
 
           {p.can.uploadDocuments && (
-            <form onSubmit={uploadDocument} style={{ marginTop: '1rem' }}>
-              <h3>Upload a document</h3>
+            <form onSubmit={uploadDocument} className="inline-form" style={{ marginTop: '1.25rem', display: 'block' }}>
+              <h3 className="actions" style={{ gap: '0.5rem' }}><Upload size={16} /> Upload a document</h3>
               <div className="form-grid">
                 <label>
                   Document
@@ -475,7 +511,7 @@ export default function ProfilePage() {
                   <label><input type="checkbox" checked={upload.hrOnly} onChange={(e) => setUpload({ ...upload, hrOnly: e.target.checked })} /> Visible to HR only</label>
                 </div>
               )}
-              <button type="submit">Upload</button>
+              <button type="submit" style={{ marginTop: '0.75rem' }}><Upload size={16} /> Upload</button>
             </form>
           )}
         </section>

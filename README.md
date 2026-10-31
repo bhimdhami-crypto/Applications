@@ -1,22 +1,42 @@
-# Mindspace HR Portal
+# Mindspace HR ERP
 
-HR and payroll portal for **Mindspace Artificial Intelligence Inc.** and its subsidiaries in Kenya, Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand.
+> Designed and created by **Bhim Dhami** · © 2026 Bhim Dhami. All rights reserved. See [LICENSE](LICENSE).
 
-Done so far:
+HR, payroll and people-operations platform for **Mindspace Artificial Intelligence Inc.** and its subsidiaries in Kenya, Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand: one portal for 12,000+ staff, eight payroll rule sets and eight currencies.
 
-- **Milestone 1:** secure sign-in, employee records, and the month-end payroll run with payslips. Kenya was the first country with payroll rules.
-- **Milestone 2:** staff profiles with photos, contact details, IDs, education, next of kin and HR documents, plus an import of 12,408 sample staff.
-- **Milestone 3:** leave requests and approvals, balances, a team leave calendar and public holidays for all eight countries. Unpaid leave comes off pay.
-- **Milestone 4:** salary advances, staff loans and IOUs with their approvals and payroll recovery; meal vouchers, gym memberships and gift vouchers, taxed as benefits on the payslip.
-- **Milestone 5:** payroll rules for Uganda, Tanzania, South Africa, Egypt, Nigeria, Mexico and New Zealand, so every subsidiary can run month-end payroll.
-- **Milestone 6:** the policies and forms library with read confirmations, staff chat, a community page for news, photos and videos with moderation, and a daily activity tracker.
+![Admin dashboard](docs/screenshots/02-admin-dashboard.png)
+
+> **New:** [`erp/`](erp/README.md) holds the MFI finance ERP on SQL Server Express (general ledger, then AR, AP, inventory and orders), a separate app with its own install.
+
+## Modules
+
+| Area | Module | What it covers |
+|---|---|---|
+| Overview | **Dashboard** | Role-aware home: key figures, every subsidiary's payroll month on a draft, approved, finalised track, and one list of everything waiting for you |
+| | **Workforce analytics** | Headcount, joiners and leavers, attrition, tenure, age, grade, contract, gender and location, per company or group-wide, with CSV export |
+| Core HR | **Employees and staff profiles** | Records, job and pay, IDs, education, next of kin, photos and HR documents with verification |
+| | **Organisation** | Legal entities, departments with their heads, and an interactive reporting-line chart |
+| | **Recruitment** | Job openings with pay ranges, a candidate pipeline board, interview scores, and one-click hire that creates the employee and login |
+| | **Performance** | Weighted goals, review cycles with self and manager reviews, rating distribution and progress tracking |
+| Time | **Leave** | Requests, two-step approvals, balances, carry-over, team calendar and public holidays for eight countries |
+| | **My day and team attendance** | Clock in and out, work notes, corrections, monthly attendance report |
+| Pay | **Payroll** | Month-end runs per company with statutory rules for eight countries, payroll register with CSV export, approval and finalisation |
+| | **Payslips** | Printable payslips with earnings, deductions, employer contributions and benefits in kind |
+| | **Advances, loans and IOUs** | Requests with live repayment quotes, three-step approvals, payroll recovery and the loan book |
+| | **Benefits** | Meal vouchers, gym plans and gift vouchers, taxed on the payslip |
+| Workplace | **Policies and forms** | 22 policies and 20 forms with read confirmations per version |
+| | **Chat, community and moderation** | Direct and group chat, a company feed with media, reporting and moderation |
+| Control | **Audit trail** | Read-only log of sign-ins, changes and approvals, filterable by action, person, record and date |
 
 | Part | Stack |
 |---|---|
-| `apps/api` | NestJS 11, Prisma 6, PostgreSQL 16 |
-| `apps/web` | Next.js 15, React 19 |
+| `apps/api` | NestJS 11, Prisma 6, PostgreSQL 16, helmet security headers, health check at `/api/health` |
+| `apps/web` | Next.js 15 (App Router), React 19, IBM Plex Sans, Lucide icons, light and dark themes |
 | Email in development | Mailpit (catches every email locally) |
 | CAPTCHA | Cloudflare Turnstile (free) |
+| Deployment | Docker images for the API and the website (`docker/Dockerfile`, `docker-compose.prod.yml`) |
+
+Milestones delivered: secure sign-in, employee records and payroll (1); staff profiles and 12,408 sample staff (2); leave (3); advances, loans and benefits (4); payroll for all eight countries (5); policies, chat, community and the activity tracker (6); **HR ERP release (7): the new interface, workforce analytics, organisation, recruitment, performance, audit trail and production packaging.**
 
 ## Quick start
 
@@ -28,8 +48,8 @@ cp .env.example apps/api/.env
 cp apps/web/.env.example apps/web/.env.local
 npm install
 npm run db:migrate
-npm run db:seed                      # companies, the seven test accounts, benefit options, policies and sample chats
-npm run db:import-sample             # optional: 12,408 sample staff with documents and photos
+npm run db:seed                      # companies, the seven test accounts, benefit options, policies, sample chats, job openings and a review cycle
+npm run db:import-sample             # optional: 12,408 sample staff with documents, photos and reporting lines
 npm run dev:api                      # http://localhost:4000/api
 npm run dev:web                      # http://localhost:3000
 ```
@@ -44,12 +64,12 @@ All emails use the reserved `.test` domain, so nothing can ever reach a real per
 
 | Email | Password | Role | What they can do |
 |---|---|---|---|
-| admin@mindspace-ai.test | `Admin#Mindspace2026` | Administrator | Everything: add and delete employees, give any role, approve and finalize payroll |
-| hr@mindspace-ai.test | `Test#Mindspace2026` | HR | Add and edit employees (employee or manager role only) |
-| payroll@mindspace-ai.test | `Test#Mindspace2026` | Payroll | Create and recalculate payroll drafts |
-| manager@mindspace-ai.test | `Test#Mindspace2026` | Manager | See their own team (no pay figures) |
-| developer@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips (fully remote) |
-| tester@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips |
+| admin@mindspace-ai.test | `Admin#Mindspace2026` | Administrator | Everything: add and delete employees, give any role, approve and finalize payroll, read the audit trail |
+| hr@mindspace-ai.test | `Test#Mindspace2026` | HR | Add and edit employees (employee or manager role only), workforce analytics, recruitment and hiring, review cycles |
+| payroll@mindspace-ai.test | `Test#Mindspace2026` | Payroll | Create and recalculate payroll drafts, workforce analytics |
+| manager@mindspace-ai.test | `Test#Mindspace2026` | Manager | See their own team (no pay figures), hire for their openings, review their team and set goals |
+| developer@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips, goals and self review (fully remote) |
+| tester@mindspace-ai.test | `Test#Mindspace2026` | Employee | Own profile and payslips, goals and self review |
 | finance@mindspace-ai.test | `Test#Mindspace2026` | Finance | Approve advances, loans and IOUs; confirm IOU settlements; the loan book |
 
 Change the passwords with `SEED_ADMIN_PASSWORD` and `SEED_USER_PASSWORD` before seeding anything other than a laptop. The seed refuses to run with `NODE_ENV=production` unless both are set.
@@ -152,6 +172,60 @@ Under **My day**, staff clock in (in the office, remote, or at a client or on si
 - **Team activity:** managers see their direct reports for any day; HR and Payroll see a whole company, plus a monthly report of days present, hours worked and hours noted, with a CSV download.
 - Each company's times use its own time zone.
 
+## The interface
+
+- **Navigation** is grouped by job to be done (Overview, My workspace, People, Approvals, Payroll and finance, Workplace, Administration) and shows only what your role can use. Groups collapse, and the whole menu folds down to icons; both choices are remembered per browser. On a phone the menu slides in from the left.
+- **Top bar:** where you are, a people search (press <kbd>/</kbd> to jump to it; HR, payroll and managers), the current pay period, a bell that totals everything waiting for you, and your account menu with the theme switch (light, dark or follow the device).
+- **Design system:** one stylesheet (`apps/web/app/globals.css`) built on colour tokens: white and light-grey surfaces, dark-grey text (no pure black) and orange. Bright orange `#FF6600` marks accents, active items, progress and charts; buttons use a deeper orange `#C94A00` with white text and links use `#C24E00`, so text stays readable (WCAG AA). Blue marks approved or in-progress states, so it is never confused with the brand orange. Dark mode uses charcoal greys rather than black. Change the theme in one place, the `:root` block. Shared building blocks (page header, key-figure tiles, status badges, empty states, bar, column, stacked and donut charts) live in `apps/web/components/ui.tsx`. Charts are plain SVG and CSS, so there is no chart library to load.
+- **Printing:** payslips and reports print without the menus. Use **Print or save as PDF** on a payslip.
+
+## Workforce analytics
+
+Under **Workforce analytics** (HR, payroll and admins). Pick a company or see the whole group.
+
+- Active headcount, people managers, joiners and leavers in the last 12 months, the attrition rate (leavers over the average of headcount now and a year ago), average tenure and age, staff on leave today and open positions.
+- Joiners and leavers by month; headcount by department, grade, contract, gender and work location; length of service and age bands; why people left.
+- A table per company with turnover and the latest payroll status and totals. Pay is never added up across companies, because each pays in its own currency.
+- **Export CSV** downloads every breakdown. The API only returns counts, never names or individual pay.
+
+## Organisation
+
+Everyone can open **Organisation**.
+
+- **Entities:** each subsidiary with its headcount, departments, currency and whether its payroll rules are signed off.
+- **Reporting line:** your managers above you and your direct reports below. Click anyone to move the chart to them. Staff see their own company; HR, payroll and admins see every company and start from **Departments**, which lists each department with its heads.
+- Only names, job titles, departments and grades are shown. Profiles open for HR, payroll and admins, for yourself, and for a manager's own direct reports.
+- `npm run db:import-sample` also gives the sample staff reporting lines (the most senior person in each department leads it, managers and leads report to them, and everyone else is shared across the leads). Run `npm run db:sample-reporting-lines` to add them to sample staff imported before this release; it only fills in missing managers.
+
+## Recruitment
+
+HR runs **Recruitment**; a hiring manager sees the openings they hire for.
+
+| | HR and admins | Hiring manager |
+|---|---|---|
+| Create, edit, hold, reopen or close openings | Yes | No |
+| See an opening, its candidates and pay range | All openings | Their own openings |
+| Add candidates | Yes | Yes (recorded as referrals) |
+| Move candidates, score interviews (1 to 5), add notes | Yes | Yes |
+| Hire | Yes | No |
+
+- Each opening gets a reference such as `REQ-KE-0007`, a company, department, location, contract, grade, number of positions, optional monthly pay range and closing date.
+- The board shows Applied, Screening, Interview, Offer and Hired. Candidates who are not progressing or withdrew are kept on record and can be reconsidered. The same email cannot apply twice to one opening.
+- **Hire** (only from Offer) creates the employee in the opening's company with its job title, department, location, contract and grade, reporting to the hiring manager, with a portal login and the usual welcome email. When every position is filled, the opening is marked filled.
+
+## Performance
+
+- **Goals:** everyone keeps their own goals with a weight and a due date and updates progress; a goal at 100% is marked complete. Managers see and set goals for their direct reports, HR for anyone. The weighted progress shows at the top.
+- **Review cycles:** HR opens a cycle for a company (one open cycle per company at a time). Everyone in that company with a portal login gets a review, with their current manager as reviewer, and an email.
+- **Self review, then the manager:** the employee rates themself 1 to 5 with comments; their manager is emailed, reads it and gives the final rating and comments; the employee is emailed when it is complete. HR completes reviews for people without a manager. Nobody can complete their own manager review, and closed cycles accept nothing.
+- **Review cycles** shows each cycle's progress and the spread of final ratings; HR and managers can list the reviews in it.
+
+Ratings: 1 below expectations, 2 partly meets, 3 meets, 4 exceeds, 5 exceptional.
+
+## Audit trail
+
+Admins see **Audit trail**: every sign-in, record change, approval, payroll action, hire and review the portal records, newest first, with who did it and the details. Filter by action (for example `payroll.` or `recruitment.hire`), record type, person and dates. Entries cannot be changed or deleted from the portal.
+
 ## How sign-in works
 
 1. Email, password and a Turnstile CAPTCHA.
@@ -190,6 +264,43 @@ Some figures are assumptions to check: South Africa uses the 2025/26 tables unti
 
 **All eight rule sets are marked unverified.** A payroll adviser in each country must sign them off before real pay. Until then the portal shows a warning on every run.
 
+## Legal, disclaimer and credits
+
+- **`/legal`** is a public page (readable before signing in) with the **Disclaimer** (no professional advice, accuracy, official records, no warranty and limitation of liability, third-party services), **Terms of use** (authorised use, accounts, confidentiality, accurate information, acceptable use, monitoring, changes, governing policies and law), **Privacy notice** (what is held, why, who can see it, retention, rights, cookies and storage) and **Copyright and credits**.
+- Every page has a footer with the copyright line, "Designed and created by Bhim Dhami" and links to each section. The sign-in page asks people to accept the terms, and payslips carry a computer-generated notice.
+- Names, dates and contact addresses are set once in `apps/web/lib/legal.ts`. The wording is a professional starting point; have it reviewed by the company's legal and data protection advisers in each country before go-live.
+- The software is proprietary: see [LICENSE](LICENSE).
+
+## Production deployment
+
+`docker/Dockerfile` builds two small images from the repository root: `api` (runs any pending migrations, then starts; health check on `/api/health`) and `web` (the Next.js standalone server). `docker-compose.prod.yml` runs them with PostgreSQL and Mailpit:
+
+```bash
+cp .env.example .env.prod     # set JWT_SECRET, POSTGRES_PASSWORD, SMTP, CAPTCHA keys and WEB_ORIGIN
+docker compose -f docker-compose.prod.yml --env-file .env.prod up -d --build
+DATABASE_URL=postgresql://hr:<password>@localhost:5432/hrportal npm run db:seed   # once, from a checkout
+```
+
+- The website forwards `/api` to the API, so only port 3000 needs to be public. Put it behind HTTPS (a load balancer or reverse proxy).
+- `API_PROXY_TARGET` and `NEXT_PUBLIC_TURNSTILE_SITE_KEY` are fixed when the website image is built (build arguments).
+- Uploaded files live in the `storage` volume; back it up with the database, or move to object storage.
+- Set `PAYROLL_AUTODRAFT=false` on all but one API instance if you run several.
+
+### Public demo on Vercel
+
+The API and website can also run as two Vercel projects with a free Neon Postgres database, in **demo mode**
+(`DEMO_MODE=true`: the sign-in page lists the test accounts and the sign-in code is filled in for you) and with
+uploaded files kept in the database (`STORAGE_DRIVER=database`). Step-by-step setup: [docs/deploy-vercel.md](docs/deploy-vercel.md).
+
+## Security
+
+- Two-step sign-in (password, CAPTCHA and an emailed code), sessions that end with the browser tab, accounts and roles re-checked on every request.
+- Every API route needs a signed-in user unless marked public (sign-in and the health check). Each module checks the role and, where it matters, the relationship (your manager, your hiring manager, your approver).
+- Security headers on the API (helmet) and the website (no framing, no MIME sniffing, HSTS, strict referrer, no camera, microphone or location access).
+- Uploads are checked by file content, not name. File storage keys never leave the server.
+- Personal and pay data is limited by role as described above; analytics and the organisation chart return counts and names only.
+- An append-only audit trail for administrators.
+
 ## Tests
 
 ```bash
@@ -197,44 +308,29 @@ npm run db:test:setup   # migrates the hrportal_test database (created by docker
 npm test                # payroll rule unit tests for all eight countries + full API flow
 ```
 
-The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, leave from request to payslip, and advances, loans, IOUs and benefits from request to repayment, and policies, chat, the community page, moderation and the activity tracker. It wipes its database, so it only runs against a database whose name ends in `_test`.
+The API test signs in through the email code, checks every role boundary, adds and deletes an employee, runs payroll from draft to finalized, and checks profile access, uploads, the sample import, leave from request to payslip, advances, loans, IOUs and benefits from request to repayment, policies, chat, the community page, moderation and the activity tracker, and the HR ERP modules: workforce analytics, the organisation chart's company boundary, recruitment from referral to hired employee, a full review cycle (including that nobody reviews themself), goals and the audit trail. It wipes its database, so it only runs against a database whose name ends in `_test`.
 
 ## Screenshots
 
 | | |
 |---|---|
-| ![Sign in](docs/screenshots/01-sign-in.png) | ![Payroll draft](docs/screenshots/02-payroll-draft.png) |
-| ![Admin home](docs/screenshots/03-admin-home.png) | ![Payslip](docs/screenshots/05-payslip.png) |
-| ![Staff list](docs/screenshots/06-staff-list.png) | ![Manager view of a profile](docs/screenshots/08-manager-view.png) |
+| ![Sign in](docs/screenshots/01-sign-in.png) | ![Dashboard in dark mode](docs/screenshots/03-admin-dashboard-dark.png) |
+| ![Employees](docs/screenshots/05-employees.png) | ![Staff profile](docs/screenshots/06-staff-profile.png) |
+| ![Organisation chart](docs/screenshots/07-organisation-chart.png) | ![Recruitment](docs/screenshots/08-recruitment.png) |
+| ![Candidate pipeline](docs/screenshots/09-candidate-pipeline.png) | ![Review cycles](docs/screenshots/11-review-cycles.png) |
+| ![Payroll runs](docs/screenshots/12-payroll-runs.png) | ![Payroll run](docs/screenshots/13-payroll-run.png) |
+| ![Employee dashboard](docs/screenshots/15-employee-dashboard.png) | ![My leave](docs/screenshots/16-my-leave.png) |
+| ![Leave approvals](docs/screenshots/17-leave-approvals.png) | ![Advances and loans](docs/screenshots/18-advances-and-loans.png) |
+| ![Policies](docs/screenshots/19-policies.png) | ![Chat in dark mode](docs/screenshots/20-chat.png) |
+| ![Audit trail](docs/screenshots/21-audit-trail.png) | ![Dashboard on a phone](docs/screenshots/22-mobile-dashboard.png) |
+| ![Disclaimer, terms and privacy](docs/screenshots/23-legal-disclaimer.png) | |
 
-![Staff profile](docs/screenshots/07-staff-profile.png)
-
-| | |
-|---|---|
-| ![My leave](docs/screenshots/09-my-leave.png) | ![Leave approvals](docs/screenshots/11-leave-approvals.png) |
-
-![Leave calendar](docs/screenshots/10-leave-calendar.png)
-
-| | |
-|---|---|
-| ![Advances and loans](docs/screenshots/12-advances-and-loans.png) | ![Loan and benefit approvals](docs/screenshots/13-loan-approvals.png) |
-| ![Benefits](docs/screenshots/14-benefits.png) | ![Payslip with deductions and benefits](docs/screenshots/15-payslip-benefits.png) |
-
-![Loan book](docs/screenshots/16-loan-book.png)
-
-![Payroll runs for every country](docs/screenshots/17-payroll-all-countries.png)
+![Workforce analytics](docs/screenshots/04-workforce-analytics.png)
 
 | | |
 |---|---|
-| ![South Africa payslip](docs/screenshots/18-payslip-south-africa.png) | ![New Zealand payslip](docs/screenshots/19-payslip-new-zealand.png) |
+| ![Performance](docs/screenshots/10-performance.png) | ![Payslip](docs/screenshots/14-payslip.png) |
 
-| | |
-|---|---|
-| ![Policies and forms](docs/screenshots/20-policies.png) | ![Community page](docs/screenshots/22-community.png) |
+---
 
-![Chat](docs/screenshots/21-chat.png)
-
-| | |
-|---|---|
-| ![My day](docs/screenshots/23-my-day.png) | ![Team activity](docs/screenshots/24-team-activity.png) |
-| ![Moderation](docs/screenshots/25-moderation.png) | ![Chat on a phone](docs/screenshots/26-chat-mobile.png) |
+© 2026 Bhim Dhami. All rights reserved. Designed and created by Bhim Dhami. Mindspace and the Mindspace logo belong to Mindspace Artificial Intelligence Inc.

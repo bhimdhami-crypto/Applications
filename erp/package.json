@@ -1,0 +1,25 @@
+{
+  "name": "mfi-erp",
+  "private": true,
+  "description": "Web ERP for MFI on SQL Server Express: general ledger, receivables, payables, inventory and orders, with migration from Sage Evolution data",
+  "author": "Bhim Dhami",
+  "license": "UNLICENSED",
+  "workspaces": [
+    "api",
+    "etl",
+    "web"
+  ],
+  "scripts": {
+    "dev:api": "npm run start:dev -w api",
+    "db:migrate": "npm run prisma:migrate -w api",
+    "db:seed": "npm run prisma:seed -w api",
+    "etl": "npm run etl -w etl --",
+    "test": "npm test -w api && npm test -w etl",
+    "typecheck": "npm run typecheck -w api && npm run typecheck -w etl && npm run typecheck -w web",
+    "build": "npm run build -w api && npm run build -w etl && npm run build -w web",
+    "dev:web": "npm run dev -w web"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

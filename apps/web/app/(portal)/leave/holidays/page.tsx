@@ -3,6 +3,7 @@
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api, COUNTRY_NAME, formatDate, Holiday } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { PageHeader } from '@/components/ui';
 
 const thisYear = new Date().getFullYear();
 
@@ -50,7 +51,10 @@ export default function HolidaysPage() {
 
   return (
     <>
-      <h1>Public holidays</h1>
+      <PageHeader
+        title="Public holidays"
+        sub={<>These days are not counted as leave. Dates marked “estimated” depend on the moon sighting{isHr ? ', so check them against the official gazette each year and correct them here.' : ' and may move by a day.'}</>}
+      />
       <div className="toolbar">
         <label>
           Country
@@ -65,9 +69,6 @@ export default function HolidaysPage() {
           </select>
         </label>
       </div>
-      <p className="muted">
-        These days are not counted as leave. Dates marked “estimated” depend on the moon sighting{isHr ? ', so check them against the official gazette each year and correct them here.' : ' and may move by a day.'}
-      </p>
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
       <div className="card table-wrap">
@@ -79,20 +80,20 @@ export default function HolidaysPage() {
                 <td>{formatDate(h.date)}</td>
                 <td>{new Date(h.date).toLocaleDateString('en-GB', { weekday: 'long', timeZone: 'UTC' })}</td>
                 <td>{h.name}</td>
-                {isHr && <td className="actions"><button className="danger small" onClick={() => remove(h)}>Remove</button></td>}
+                {isHr && <td className="actions"><button className="secondary danger small" onClick={() => remove(h)}>Remove</button></td>}
               </tr>
             ))}
-            {list && list.length === 0 && <tr><td colSpan={4} className="muted">No holidays listed.</td></tr>}
+            {list && list.length === 0 && <tr><td colSpan={4} className="empty">No holidays listed.</td></tr>}
           </tbody>
         </table>
         {isHr && (
-          <form onSubmit={add} style={{ marginTop: '1rem' }}>
+          <form onSubmit={add} className="inline-form" style={{ display: 'block' }}>
             <h3>Add a holiday in {COUNTRY_NAME[countryCode]}</h3>
-            <div className="form-grid">
+            <div className="form-grid" style={{ alignItems: 'end' }}>
               <label>Date<input type="date" required value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></label>
               <label>Name<input required value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} /></label>
+              <label><button type="submit" style={{ width: '100%' }}>Add holiday</button></label>
             </div>
-            <button type="submit">Add holiday</button>
           </form>
         )}
       </div>

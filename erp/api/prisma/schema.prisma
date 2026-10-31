@@ -1,0 +1,611 @@
+// Mindspace ERP data model: companies, users, periods, currencies, tax, projects, the general ledger, customers and suppliers.
+// SQL Server has no native enums in Prisma, so closed sets are strings checked in code (see src/common/constants.ts).
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model Company {
+  id             Int      @id @default(autoincrement())
+  code           String   @unique @db.NVarChar(20) // MS-AI, MS-TS, MS-SI
+  name           String   @db.NVarChar(200)
+  /// The Sage Evolution database the migration reads for this company (MFI-DS, MFI-MDS, MFI-TS)
+  sourceDatabase String?  @db.NVarChar(128)
+  homeCurrency   String   @db.Char(3)
+  isActive       Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  currency     Currency           @relation(fields: [homeCurrency], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  periods      FiscalPeriod[]
+  taxCodes     TaxCode[]
+  projects     Project[]
+  accounts     GlAccount[]
+  batches      PostingBatch[]
+  entries      LedgerEntry[]
+  sequences    NumberSequence[]
+  vouchers     Voucher[]
+  rules        ApprovalRule[]
+  icLinks      IntercompanyLink[] @relation("IcOwner")
+  icPartner    IntercompanyLink[] @relation("IcPartner")
+  voucherIc    VoucherLine[]      @relation("LinePartner")
+  files        Attachment[]
+  parties      Party[]
+  auditLog     AuditLog[]
+  bankAccounts BankAccount[]
+}
+
+model User {
+  id           Int      @id @default(autoincrement())
+  email        String   @unique @db.NVarChar(200)
+  name         String   @db.NVarChar(200)
+  passwordHash String   @db.NVarChar(100)
+  role         String   @db.NVarChar(20) // ADMIN, DIRECTOR, FINANCE_MANAGER, ACCOUNTANT, VIEWER
+  isActive     Boolean  @default(true)
+  /// Email when something waits for this person's approval, and when their own vouchers are rejected or posted
+  emailAlerts  Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  batches  PostingBatch[]
+  emails   EmailMessage[]
+  auditLog AuditLog[]
+  vouchers Voucher[]
+  actions  ApprovalAction[]
+  files    Attachment[]
+
+  rulesCreated   ApprovalRule[]       @relation("RuleCreatedBy")
+  rulesRetired   ApprovalRule[]       @relation("RuleRetiredBy")
+  bankStatements BankStatement[]
+  bankMatches    BankMatch[]
+  reconsPrepared BankReconciliation[] @relation("ReconPreparedBy")
+  reconsReviewed BankReconciliation[] @relation("ReconReviewedBy")
+}
+
+model Currency {
+  code     String @id @db.Char(3) // ISO 4217: KES, USD, AED
+  name     String @db.NVarChar(100)
+  decimals Int    @default(2)
+
+  companies    Company[]
+  rates        ExchangeRate[]
+  entries      LedgerEntry[]
+  parties      Party[]
+  bankAccounts BankAccount[]
+}
+
+/// Units of home currency per one unit of foreign currency, per day
+model ExchangeRate {
+  id           Int      @id @default(autoincrement())
+  currencyCode String   @db.Char(3)
+  rateDate     DateTime @db.Date
+  rate         Decimal  @db.Decimal(19, 6)
+
+  currency Currency @relation(fields: [currencyCode], references: [code])
+
+  @@unique([currencyCode, rateDate])
+}
+
+model FiscalPeriod {
+  id        Int      @id @default(autoincrement())
+  companyId Int
+  year      Int // fiscal year label, e.g. 2027 for Jul 2026 to Jun 2027
+  number    Int // 1 to 12 (13 for year-end adjustments)
+  startDate DateTime @db.Date
+  endDate   DateTime @db.Date
+  isClosed  Boolean  @default(false)
+
+  company Company        @relation(fields: [companyId], references: [id])
+  batches PostingBatch[]
+  entries LedgerEntry[]
+
+  @@unique([companyId, year, number])
+  @@index([companyId, startDate])
+}
+
+model TaxCode {
+  id          Int     @id @default(autoincrement())
+  companyId   Int
+  code        String  @db.NVarChar(20)
+  description String  @db.NVarChar(200)
+  rate        Decimal @db.Decimal(9, 4) // percent, 16.0000 for standard VAT
+  isActive    Boolean @default(true)
+
+  company Company       @relation(fields: [companyId], references: [id])
+  entries LedgerEntry[]
+
+  @@unique([companyId, code])
+}
+
+model Project {
+  id        Int     @id @default(autoincrement())
+  companyId Int
+  code      String  @db.NVarChar(30)
+  name      String  @db.NVarChar(200)
+  isActive  Boolean @default(true)
+
+  company Company       @relation(fields: [companyId], references: [id])
+  entries LedgerEntry[]
+
+  @@unique([companyId, code])
+}
+
+model GlAccount {
+  id           Int     @id @default(autoincrement())
+  companyId    Int
+  code         String  @db.NVarChar(50)
+  description  String  @db.NVarChar(200)
+  type         String  @db.NVarChar(20) // ASSET, LIABILITY, EQUITY, INCOME, EXPENSE
+  parentId     Int?
+  isPostable   Boolean @default(true) // false for header accounts that only group others
+  isActive     Boolean @default(true)
+  costCentre   String? @db.NVarChar(50)
+  sector       String? @db.NVarChar(50)
+  reportGroup  String? @db.NVarChar(100)
+  /// AR on Debtors Control, AP on Creditors Control: every line posted there names a customer or supplier
+  subledger    String? @db.NVarChar(2)
+  /// Accounts.AccountLink in Sage Evolution, kept so migrated history can be traced back
+  sourceLinkId Int?
+
+  company     Company            @relation(fields: [companyId], references: [id])
+  parent      GlAccount?         @relation("AccountTree", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children    GlAccount[]        @relation("AccountTree")
+  entries     LedgerEntry[]
+  lines       VoucherLine[]      @relation("LineAccount")
+  icLines     VoucherLine[]      @relation("LinePartnerAccount")
+  icLinks     IntercompanyLink[]
+  bankAccount BankAccount?
+
+  @@unique([companyId, code])
+  @@index([companyId, sourceLinkId])
+}
+
+/// One posted document: every ledger row it writes shares the batch and its audit number, and the rows balance
+model PostingBatch {
+  id               Int      @id @default(autoincrement())
+  companyId        Int
+  auditNo          String   @db.NVarChar(20)
+  source           String   @db.NVarChar(10) // GL, AR, AP, ST, IC
+  documentType     String   @db.NVarChar(20) // JOURNAL, REVERSAL, INTERCOMPANY, OPENING, MIGRATED
+  reference        String?  @db.NVarChar(50)
+  description      String   @db.NVarChar(400)
+  txDate           DateTime @db.Date
+  periodId         Int
+  postedById       Int
+  postedAt         DateTime @default(now())
+  reversesId       Int?     @unique
+  /// Set on the partner company's batch of an intercompany posting: the originating batch
+  intercompanyOfId Int?
+
+  company            Company        @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  period             FiscalPeriod   @relation(fields: [periodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  postedBy           User           @relation(fields: [postedById], references: [id])
+  reverses           PostingBatch?  @relation("Reversal", fields: [reversesId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reversedBy         PostingBatch?  @relation("Reversal")
+  intercompanyOf     PostingBatch?  @relation("Intercompany", fields: [intercompanyOfId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  intercompanyMirror PostingBatch[] @relation("Intercompany")
+  entries            LedgerEntry[]
+  voucher            Voucher?
+
+  @@unique([companyId, auditNo])
+  @@index([companyId, txDate])
+}
+
+/// A general ledger row. Rows are never updated or deleted once posted; corrections are reversing batches.
+model LedgerEntry {
+  id            BigInt    @id @default(autoincrement())
+  batchId       Int
+  companyId     Int
+  lineNo        Int
+  accountId     Int
+  txDate        DateTime  @db.Date
+  periodId      Int
+  debit         Decimal   @default(0) @db.Decimal(19, 4)
+  credit        Decimal   @default(0) @db.Decimal(19, 4)
+  currencyCode  String    @db.Char(3)
+  exchangeRate  Decimal   @default(1) @db.Decimal(19, 6)
+  foreignDebit  Decimal   @default(0) @db.Decimal(19, 4)
+  foreignCredit Decimal   @default(0) @db.Decimal(19, 4)
+  description   String?   @db.NVarChar(400)
+  projectId     Int?
+  taxCodeId     Int?
+  /// The customer or supplier, on lines posted to a Debtors or Creditors Control account
+  partyId       Int?
+  /// When the amount falls due, from the party's payment terms; ageing counts from here
+  dueDate       DateTime? @db.Date
+
+  batch     PostingBatch    @relation(fields: [batchId], references: [id])
+  company   Company         @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account   GlAccount       @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  period    FiscalPeriod    @relation(fields: [periodId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currency  Currency        @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  project   Project?        @relation(fields: [projectId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  taxCode   TaxCode?        @relation(fields: [taxCodeId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  party     Party?          @relation(fields: [partyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  bankMatch BankMatchEntry?
+
+  @@unique([batchId, lineNo])
+  @@index([companyId, accountId, txDate])
+  @@index([partyId, txDate])
+  @@index([companyId, periodId])
+}
+
+/// Next number per company and series, taken inside the posting transaction so numbers have no gaps
+model NumberSequence {
+  companyId Int
+  name      String @db.NVarChar(20)
+  prefix    String @db.NVarChar(10)
+  next      Int    @default(1)
+
+  company Company @relation(fields: [companyId], references: [id])
+
+  @@id([companyId, name])
+}
+
+/// Append-only: a trigger refuses updates and deletes outside test databases
+model AuditLog {
+  id        BigInt   @id @default(autoincrement())
+  userId    Int?
+  companyId Int?
+  action    String   @db.NVarChar(50)
+  entity    String   @db.NVarChar(50)
+  entityId  String?  @db.NVarChar(50)
+  label     String?  @db.NVarChar(100)
+  detail    String?  @db.NVarChar(Max)
+  at        DateTime @default(now())
+
+  user    User?    @relation(fields: [userId], references: [id])
+  company Company? @relation(fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([entity, entityId])
+  @@index([companyId, at])
+  @@index([at])
+}
+
+/**
+ * A transaction on its way to the ledger. It is drafted (by hand, or by dropping files into the inbox),
+ * submitted, approved stage by stage under the company's approval rule (its SOP), and only then posted.
+ */
+model Voucher {
+  id              Int       @id @default(autoincrement())
+  companyId       Int
+  voucherNo       String    @db.NVarChar(20)
+  documentType    String    @db.NVarChar(20) // JOURNAL, REVERSAL
+  status          String    @db.NVarChar(20) // DRAFT, SUBMITTED, REJECTED, POSTED, CANCELLED
+  txDate          DateTime  @db.Date
+  description     String    @db.NVarChar(400)
+  reference       String?   @db.NVarChar(50)
+  /// Total debits in home currency, worked out at submission; the approval rule is chosen by it
+  totalAmount     Decimal?  @db.Decimal(19, 4)
+  ruleId          Int?
+  currentStage    Int?
+  createdById     Int
+  createdAt       DateTime  @default(now())
+  submittedAt     DateTime?
+  /// For a REVERSAL voucher: the batch it reverses
+  reversesBatchId Int?
+  postedBatchId   Int?      @unique
+
+  company     Company          @relation(fields: [companyId], references: [id])
+  rule        ApprovalRule?    @relation(fields: [ruleId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  createdBy   User             @relation(fields: [createdById], references: [id])
+  postedBatch PostingBatch?    @relation(fields: [postedBatchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lines       VoucherLine[]
+  actions     ApprovalAction[]
+  emails      EmailMessage[]
+
+  @@unique([companyId, voucherNo])
+  @@index([companyId, status])
+}
+
+model VoucherLine {
+  id               Int       @id @default(autoincrement())
+  voucherId        Int
+  lineNo           Int
+  accountId        Int
+  debit            Decimal?  @db.Decimal(19, 4)
+  credit           Decimal?  @db.Decimal(19, 4)
+  currencyCode     String?   @db.Char(3)
+  exchangeRate     Decimal?  @db.Decimal(19, 6)
+  foreignAmount    Decimal?  @db.Decimal(19, 4)
+  description      String?   @db.NVarChar(400)
+  projectId        Int?
+  taxCodeId        Int?
+  /// Intercompany: the other company this line is for, and the account there that takes the cost or income
+  partnerCompanyId Int?
+  partnerAccountId Int?
+  /// The customer or supplier, required on a Debtors or Creditors Control line
+  partyId          Int?
+  /// Overrides the due date worked out from the party's payment terms
+  dueDate          DateTime? @db.Date
+
+  voucher        Voucher    @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  account        GlAccount  @relation("LineAccount", fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  partnerCompany Company?   @relation("LinePartner", fields: [partnerCompanyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  partnerAccount GlAccount? @relation("LinePartnerAccount", fields: [partnerAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  party          Party?     @relation(fields: [partyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([voucherId, lineNo])
+}
+
+/// A standard operating procedure for one document type and amount band: who approves, in which order
+model ApprovalRule {
+  id           Int       @id @default(autoincrement())
+  companyId    Int
+  documentType String    @db.NVarChar(20)
+  name         String    @db.NVarChar(200)
+  sopReference String?   @db.NVarChar(50) // e.g. SOP-FIN-004
+  minAmount    Decimal   @default(0) @db.Decimal(19, 4)
+  /// Exclusive upper bound; empty means no limit
+  maxAmount    Decimal?  @db.Decimal(19, 4)
+  isActive     Boolean   @default(true)
+  /// Rules are never edited: a change retires the old rule and creates a new one, so vouchers already
+  /// on their way keep the route they started on, and the history shows who changed what and when
+  createdAt    DateTime  @default(now())
+  createdById  Int?
+  retiredAt    DateTime?
+  retiredById  Int?
+
+  company   Company             @relation(fields: [companyId], references: [id])
+  createdBy User?               @relation("RuleCreatedBy", fields: [createdById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  retiredBy User?               @relation("RuleRetiredBy", fields: [retiredById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  stages    ApprovalRuleStage[]
+  vouchers  Voucher[]
+
+  @@index([companyId, documentType])
+}
+
+model ApprovalRuleStage {
+  id           Int    @id @default(autoincrement())
+  ruleId       Int
+  stageNo      Int
+  name         String @db.NVarChar(100) // e.g. "Finance manager review"
+  approverRole String @db.NVarChar(20)
+
+  rule ApprovalRule @relation(fields: [ruleId], references: [id], onDelete: Cascade)
+
+  @@unique([ruleId, stageNo])
+}
+
+/// Every step a voucher took: submitted, approved at a stage, rejected, recalled, posted
+model ApprovalAction {
+  id        Int      @id @default(autoincrement())
+  voucherId Int
+  stageNo   Int?
+  action    String   @db.NVarChar(20) // SUBMITTED, APPROVED, REJECTED, RECALLED, POSTED
+  userId    Int
+  comment   String?  @db.NVarChar(1000)
+  at        DateTime @default(now())
+
+  voucher Voucher @relation(fields: [voucherId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([voucherId])
+}
+
+/// A company's current account with a sister company. Each pair has one link each way.
+model IntercompanyLink {
+  id               Int @id @default(autoincrement())
+  companyId        Int
+  partnerCompanyId Int
+  accountId        Int
+
+  company        Company   @relation("IcOwner", fields: [companyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  partnerCompany Company   @relation("IcPartner", fields: [partnerCompanyId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  account        GlAccount @relation(fields: [accountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([companyId, partnerCompanyId])
+}
+
+/// A file in the document archive (invoice scan, contract, bank statement), attached to a voucher
+model Attachment {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  entityType   String   @db.NVarChar(20) // VOUCHER
+  entityId     Int
+  fileName     String   @db.NVarChar(260)
+  contentType  String   @db.NVarChar(100)
+  size         Int
+  sha256       String   @db.Char(64)
+  storageKey   String   @db.NVarChar(400)
+  description  String?  @db.NVarChar(400)
+  uploadedById Int
+  uploadedAt   DateTime @default(now())
+
+  company    Company @relation(fields: [companyId], references: [id])
+  uploadedBy User    @relation(fields: [uploadedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([companyId, entityType, entityId])
+  @@index([companyId, uploadedAt])
+  @@index([sha256])
+}
+
+/// A customer (Client in Evolution) or supplier (Vendor). Their balances live on the control accounts,
+/// split by the party on each ledger row.
+model Party {
+  id           Int      @id @default(autoincrement())
+  companyId    Int
+  kind         String   @db.NVarChar(10) // CUSTOMER, SUPPLIER
+  code         String   @db.NVarChar(50)
+  name         String   @db.NVarChar(200)
+  currencyCode String?  @db.Char(3)
+  /// Days after the document date that an amount falls due
+  termsDays    Int      @default(30)
+  creditLimit  Decimal? @db.Decimal(19, 4)
+  taxNumber    String?  @db.NVarChar(50)
+  email        String?  @db.NVarChar(200)
+  phone        String?  @db.NVarChar(50)
+  isActive     Boolean  @default(true)
+  /// Client.DCLink or Vendor.DCLink in Sage Evolution
+  sourceLinkId Int?
+  createdAt    DateTime @default(now())
+
+  company  Company       @relation(fields: [companyId], references: [id])
+  currency Currency?     @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  entries  LedgerEntry[]
+  lines    VoucherLine[]
+
+  @@unique([companyId, kind, code])
+  @@index([companyId, kind, sourceLinkId])
+}
+
+/**
+ * Outgoing email, written in the same transaction as the approval step that causes it, then sent by a
+ * background worker with retries. Kept afterwards as a record of who was told what, and when.
+ */
+model EmailMessage {
+  id            Int       @id @default(autoincrement())
+  kind          String    @db.NVarChar(30) // APPROVAL_NEEDED, REJECTED, POSTED, DIGEST, TEST
+  userId        Int?
+  toEmail       String    @db.NVarChar(200)
+  subject       String    @db.NVarChar(300)
+  text          String    @db.NVarChar(Max)
+  html          String    @db.NVarChar(Max)
+  voucherId     Int?
+  status        String    @default("PENDING") @db.NVarChar(10) // PENDING, SENT, FAILED, SKIPPED
+  attempts      Int       @default(0)
+  nextAttemptAt DateTime  @default(now())
+  lastError     String?   @db.NVarChar(1000)
+  createdAt     DateTime  @default(now())
+  sentAt        DateTime?
+
+  user    User?    @relation(fields: [userId], references: [id])
+  voucher Voucher? @relation(fields: [voucherId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@index([status, nextAttemptAt])
+  @@index([userId, kind, createdAt])
+}
+
+/**
+ * A bank account the company reconciles: its ledger account, and the bank's own details
+ */
+model BankAccount {
+  id            Int      @id @default(autoincrement())
+  companyId     Int
+  glAccountId   Int      @unique
+  name          String   @db.NVarChar(100)
+  bankName      String?  @db.NVarChar(100)
+  accountNumber String?  @db.NVarChar(50)
+  currencyCode  String   @db.Char(3)
+  /// Ledger rows before this date were reconciled before the ERP (in Evolution) and are left out
+  reconcileFrom DateTime @db.Date
+  /// The CSV layout of the last import (JSON), offered again next time
+  csvLayout     String?  @db.NVarChar(Max)
+  isActive      Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  company         Company              @relation(fields: [companyId], references: [id])
+  glAccount       GlAccount            @relation(fields: [glAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  currency        Currency             @relation(fields: [currencyCode], references: [code], onDelete: NoAction, onUpdate: NoAction)
+  statements      BankStatement[]
+  lines           BankStatementLine[]
+  matches         BankMatch[]
+  reconciliations BankReconciliation[]
+
+  @@unique([companyId, name])
+}
+
+/**
+ * One imported statement file, kept on disk in the archive
+ */
+model BankStatement {
+  id            Int      @id @default(autoincrement())
+  bankAccountId Int
+  fileName      String   @db.NVarChar(260)
+  sha256        String   @db.Char(64)
+  storageKey    String   @db.NVarChar(400)
+  fromDate      DateTime @db.Date
+  toDate        DateTime @db.Date
+  lineCount     Int
+  /// Lines already imported from an earlier, overlapping statement
+  skipped       Int
+  importedById  Int
+  importedAt    DateTime @default(now())
+
+  bankAccount BankAccount         @relation(fields: [bankAccountId], references: [id])
+  importedBy  User                @relation(fields: [importedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lines       BankStatementLine[]
+
+  @@unique([bankAccountId, sha256])
+}
+
+/// Money in is positive, money out negative, in the bank account's currency
+model BankStatementLine {
+  id            Int      @id @default(autoincrement())
+  statementId   Int
+  bankAccountId Int
+  lineNo        Int
+  txDate        DateTime @db.Date
+  description   String   @db.NVarChar(400)
+  reference     String?  @db.NVarChar(100)
+  amount        Decimal  @db.Decimal(19, 4)
+  balance       Decimal? @db.Decimal(19, 4)
+  /// Same date, amount, text and balance (and the count of such lines before it): an overlap with an earlier file
+  fingerprint   String   @db.Char(64)
+  matchId       Int?
+
+  statement   BankStatement @relation(fields: [statementId], references: [id])
+  bankAccount BankAccount   @relation(fields: [bankAccountId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  match       BankMatch?    @relation(fields: [matchId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([bankAccountId, fingerprint])
+  @@index([bankAccountId, txDate])
+  @@index([matchId])
+}
+
+/**
+ * Statement lines and ledger rows ticked off against each other. Both sides add up to the same amount:
+ * one cheque to one line, or one deposit slip in the ledger to several lines, and so on.
+ */
+model BankMatch {
+  id            Int      @id @default(autoincrement())
+  bankAccountId Int
+  method        String   @db.NVarChar(10) // AUTO, MANUAL
+  matchedById   Int
+  matchedAt     DateTime @default(now())
+
+  bankAccount BankAccount         @relation(fields: [bankAccountId], references: [id])
+  matchedBy   User                @relation(fields: [matchedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lines       BankStatementLine[]
+  entries     BankMatchEntry[]
+}
+
+/// A ledger row can be matched once; posted rows themselves are never changed
+model BankMatchEntry {
+  id            Int    @id @default(autoincrement())
+  matchId       Int
+  ledgerEntryId BigInt @unique
+
+  match       BankMatch   @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  ledgerEntry LedgerEntry @relation(fields: [ledgerEntryId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+}
+
+/**
+ * A signed-off reconciliation: the figures as they stood, who prepared them and who reviewed them.
+ * Once reviewed, matches on or before its date can no longer be undone.
+ */
+model BankReconciliation {
+  id                  Int       @id @default(autoincrement())
+  bankAccountId       Int
+  asAt                DateTime  @db.Date
+  statementBalance    Decimal   @db.Decimal(19, 4)
+  depositsInTransit   Decimal   @db.Decimal(19, 4)
+  unpresentedPayments Decimal   @db.Decimal(19, 4)
+  bankMoneyIn         Decimal   @db.Decimal(19, 4)
+  bankMoneyOut        Decimal   @db.Decimal(19, 4)
+  ledgerBalance       Decimal   @db.Decimal(19, 4)
+  difference          Decimal   @db.Decimal(19, 4)
+  note                String?   @db.NVarChar(1000)
+  preparedById        Int
+  preparedAt          DateTime  @default(now())
+  reviewedById        Int?
+  reviewedAt          DateTime?
+
+  bankAccount BankAccount @relation(fields: [bankAccountId], references: [id])
+  preparedBy  User        @relation("ReconPreparedBy", fields: [preparedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  reviewedBy  User?       @relation("ReconReviewedBy", fields: [reviewedById], references: [id], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([bankAccountId, asAt])
+}

@@ -127,6 +127,8 @@ model Company {
   employees    Employee[]
   payrollRuns  PayrollRun[]
   benefitPlans BenefitPlan[]
+  jobOpenings  JobOpening[]
+  reviewCycles ReviewCycle[]
   createdAt    DateTime      @default(now())
 }
 
@@ -218,12 +220,18 @@ model Employee {
   acknowledgements     PolicyAcknowledgement[]
   attendance           AttendanceSession[]
   workLogs             WorkLog[]
+  hiringFor            JobOpening[]            @relation("HiringManager")
+  hiredFrom            Candidate[]             @relation("HiredAs")
+  reviews              PerformanceReview[]     @relation("Reviewee")
+  reviewsToGive        PerformanceReview[]     @relation("Reviewer")
+  goals                Goal[]
   /// Set when an admin deletes the employee. Records are kept for legal retention.
   deletedAt            DateTime?
   createdAt            DateTime                @default(now())
   updatedAt            DateTime                @updatedAt
 
   @@index([companyId, status])
+  @@index([managerId])
 }
 
 model PayrollRun {
@@ -281,6 +289,7 @@ model AuditLog {
   createdAt DateTime @default(now())
 
   @@index([entity, entityId])
+  @@index([createdAt])
 }
 
 model NextOfKin {
@@ -734,4 +743,172 @@ model WorkLog {
   updatedAt   DateTime @updatedAt
 
   @@index([employeeId, date])
+}
+
+// ---------------------------------------------------------------------------
+// Recruitment: job openings (requisitions) and the candidates applying to them
+// ---------------------------------------------------------------------------
+
+enum OpeningStatus {
+  OPEN
+  ON_HOLD
+  FILLED
+  CLOSED
+}
+
+enum CandidateStage {
+  APPLIED
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+  WITHDRAWN
+}
+
+model JobOpening {
+  id              String         @id @default(cuid())
+  /// Human reference, e.g. REQ-KE-0007
+  reference       String         @unique
+  companyId       String
+  company         Company        @relation(fields: [companyId], references: [id])
+  title           String
+  department      String
+  workLocation    WorkLocation   @default(ON_SITE)
+  employmentType  EmploymentType @default(PERMANENT)
+  grade           String?
+  city            String?
+  /// How many people this opening will hire
+  positions       Int            @default(1)
+  hiringManagerId String?
+  hiringManager   Employee?      @relation("HiringManager", fields: [hiringManagerId], references: [id])
+  /// Monthly pay range in the company's currency, shown to HR and the hiring manager only
+  salaryMin       Decimal?       @db.Decimal(14, 2)
+  salaryMax       Decimal?       @db.Decimal(14, 2)
+  description     String?
+  status          OpeningStatus  @default(OPEN)
+  closesOn        DateTime?      @db.Date
+  createdById     String
+  candidates      Candidate[]
+  createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
+
+  @@index([companyId, status])
+}
+
+model Candidate {
+  id             String         @id @default(cuid())
+  openingId      String
+  opening        JobOpening     @relation(fields: [openingId], references: [id], onDelete: Cascade)
+  firstName      String
+  lastName       String
+  email          String
+  phone          String?
+  /// Where the application came from: referral, careers site, LinkedIn, agency…
+  source         String         @default("Careers site")
+  stage          CandidateStage @default(APPLIED)
+  /// Interview panel score, 1 to 5
+  rating         Int?
+  notes          String?
+  /// Set once the candidate is hired and an employee record exists
+  employeeId     String?        @unique
+  employee       Employee?      @relation("HiredAs", fields: [employeeId], references: [id])
+  stageChangedAt DateTime       @default(now())
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  @@unique([openingId, email])
+  @@index([openingId, stage])
+}
+
+// ---------------------------------------------------------------------------
+// Performance: review cycles, reviews and goals
+// ---------------------------------------------------------------------------
+
+enum CycleStatus {
+  OPEN
+  CLOSED
+}
+
+enum ReviewStatus {
+  SELF_REVIEW
+  MANAGER_REVIEW
+  COMPLETED
+}
+
+enum GoalStatus {
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+model ReviewCycle {
+  id           String              @id @default(cuid())
+  name         String
+  companyId    String
+  company      Company             @relation(fields: [companyId], references: [id])
+  periodStart  DateTime            @db.Date
+  periodEnd    DateTime            @db.Date
+  selfDueOn    DateTime            @db.Date
+  managerDueOn DateTime            @db.Date
+  status       CycleStatus         @default(OPEN)
+  createdById  String
+  reviews      PerformanceReview[]
+  goals        Goal[]
+  createdAt    DateTime            @default(now())
+  closedAt     DateTime?
+
+  @@index([companyId, status])
+}
+
+model PerformanceReview {
+  id              String       @id @default(cuid())
+  cycleId         String
+  cycle           ReviewCycle  @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  employeeId      String
+  employee        Employee     @relation("Reviewee", fields: [employeeId], references: [id])
+  /// The manager at the time the cycle opened; HR completes reviews with no manager
+  reviewerId      String?
+  reviewer        Employee?    @relation("Reviewer", fields: [reviewerId], references: [id])
+  status          ReviewStatus @default(SELF_REVIEW)
+  /// Ratings run 1 (below expectations) to 5 (exceptional)
+  selfRating      Int?
+  selfComments    String?
+  managerRating   Int?
+  managerComments String?
+  selfSubmittedAt DateTime?
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+
+  @@unique([cycleId, employeeId])
+  @@index([reviewerId, status])
+}
+
+model Goal {
+  id          String       @id @default(cuid())
+  employeeId  String
+  employee    Employee     @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  cycleId     String?
+  cycle       ReviewCycle? @relation(fields: [cycleId], references: [id], onDelete: SetNull)
+  title       String
+  description String?
+  /// Share of the employee's goals, in percent
+  weight      Int          @default(0)
+  /// 0 to 100
+  progress    Int          @default(0)
+  status      GoalStatus   @default(IN_PROGRESS)
+  dueOn       DateTime?    @db.Date
+  createdById String
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([employeeId, status])
+}
+
+/// Uploaded files when STORAGE_DRIVER=database (hosts with no lasting disk, such as Vercel)
+model StoredFile {
+  key       String   @id
+  data      Bytes
+  createdAt DateTime @default(now())
 }

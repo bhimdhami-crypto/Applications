@@ -5,6 +5,7 @@ import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { api, initials, openFile, Post, PostComment, whenLabel } from '@/lib/api';
 import { useSession } from '@/lib/session';
 import { useBlobUrl } from '@/lib/use-blob-url';
+import { PageHeader } from '@/components/ui';
 
 const MAX_FILES = 4;
 const ACCEPT = 'image/png,image/jpeg,image/webp,video/mp4,application/pdf';
@@ -140,8 +141,7 @@ export default function CommunityPage() {
 
   return (
     <>
-      <h1>Community</h1>
-      <p className="muted">Share team news, wins, events and things you learned with colleagues in all eight countries. Please follow the <Link href="/policies">community guidelines (POL-20)</Link>.</p>
+      <PageHeader title="Community" sub={<>Share team news, wins, events and things you learned with colleagues in all eight countries. Please follow the <Link href="/policies">community guidelines (POL-20)</Link>.</>} />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
 

@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import { api, ChatMessage, Conversation, initials, Person, whenLabel } from '@/lib/api';
+import { PageHeader } from '@/components/ui';
 
 const POLL_MS = 4000;
 
@@ -166,8 +167,7 @@ export default function ChatPage() {
 
   return (
     <>
-      <h1>Chat</h1>
-      <p className="muted small">Chats are company records. Keep them professional and keep client data, source code and passwords out of them (<Link href="/policies">POL-20</Link>).</p>
+      <PageHeader title="Chat" sub={<>Chats are company records. Keep them professional and keep client data, source code and passwords out of them (<Link href="/policies">POL-20</Link>).</>} />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
       <div className={`chat ${activeId ? 'has-active' : ''}`}>

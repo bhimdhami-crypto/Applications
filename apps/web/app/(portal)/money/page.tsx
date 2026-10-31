@@ -3,6 +3,7 @@
 import { FormEvent, Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import { api, formatDate, Loan, LoanKind, LoanOptions, LoanProduct, LoanQuote, loanStatus, money } from '@/lib/api';
 import { LoanDetails } from '@/lib/loan-details';
+import { PageHeader } from '@/components/ui';
 
 interface LoanList {
   employee: { id: string; name: string; currency: string };
@@ -116,8 +117,7 @@ export default function MoneyPage() {
 
   return (
     <>
-      <h1>Advances and loans</h1>
-      <p className="muted">Salary advances, staff loans and IOUs under the Staff Advances, Loans and IOUs policy (POL-22). Only you, Payroll, Finance and your approvers can see them.</p>
+      <PageHeader title="Advances and loans" sub={<>Salary advances, staff loans and IOUs under the Staff Advances, Loans and IOUs policy (POL-22). Only you, Payroll, Finance and your approvers can see them.</>} />
       {notice && <div className="notice ok">{notice}</div>}
       {error && <div className="notice error">{error}</div>}
 
@@ -249,7 +249,7 @@ export default function MoneyPage() {
                   )}
                 </Fragment>
               ))}
-              {data && data.loans.length === 0 && <tr><td colSpan={6} className="muted">No advances, loans or IOUs yet.</td></tr>}
+              {data && data.loans.length === 0 && <tr><td colSpan={6} className="empty">No advances, loans or IOUs yet.</td></tr>}
             </tbody>
           </table>
         </div>

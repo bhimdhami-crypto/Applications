@@ -20,6 +20,12 @@ export class AuthController {
   }
 
   @Public()
+  @Get('demo')
+  demo() {
+    return this.auth.demo();
+  }
+
+  @Public()
   @Post('verify')
   @HttpCode(200)
   verify(@Body() dto: VerifyDto) {
@@ -32,6 +38,9 @@ export class AuthController {
       where: { userId: user.id },
       include: { company: true },
     });
-    return { ...user, employee };
+    if (!employee) return { ...user, employee: null };
+    // The storage key stays server side; the client only needs to know a photo exists
+    const { photoKey, ...rest } = employee;
+    return { ...user, employee: { ...rest, hasPhoto: !!photoKey } };
   }
 }

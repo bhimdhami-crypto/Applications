@@ -6,6 +6,7 @@ import { workingDays } from '../src/leave/calendar';
 import { instalmentFor } from '../src/loans/loan-rules';
 import { publicHolidays } from '../src/leave/public-holidays';
 import { seedLibrary, seedWorkplace } from './seed-workplace';
+import { seedTalent } from './seed-talent';
 
 const COMPANIES = [
   { code: 'MSA-INC', name: 'Mindspace Artificial Intelligence Inc.', country: 'United States', countryCode: 'US', currency: 'USD' },
@@ -122,6 +123,7 @@ export async function seed(prisma: PrismaClient) {
   await seedMoney(prisma, employeeIdByEmail);
   await seedLibrary(prisma);
   await seedWorkplace(prisma, employeeIdByEmail);
+  await seedTalent(prisma, employeeIdByEmail);
   return PEOPLE.map((p) => ({ email: p.email, role: p.role }));
 }
 
@@ -205,10 +207,12 @@ async function seedMoney(prisma: PrismaClient, ids: Map<string, string>) {
       createdById: users.get('tester@mindspace-ai.test'),
     },
   });
+  // Relative to today so the seeded IOU is always still within its settlement window
+  const iouNeededOn = new Date(new Date().setUTCHours(0, 0, 0, 0) - 3 * 86_400_000);
   await prisma.loan.create({
     data: {
       employeeId: brian, kind: LoanKind.IOU, amount: '15000.00', currency: 'KES', months: 1, instalment: '15000.00',
-      purpose: 'Venue deposit for the payroll training day', costCentre: 'FIN-OPS', neededOn: new Date('2026-10-05T00:00:00Z'), settleBy: new Date('2026-10-19T00:00:00Z'),
+      purpose: 'Venue deposit for the payroll training day', costCentre: 'FIN-OPS', neededOn: iouNeededOn, settleBy: new Date(iouNeededOn.getTime() + 14 * 86_400_000),
       status: RequestStatus.APPROVED, stages: [ApprovalStage.FINANCE], stage: null,
       decisions: json([decision(ApprovalStage.FINANCE, 'finance@mindspace-ai.test', 'Lucy Achieng', '2026-10-02')]),
       createdById: users.get('payroll@mindspace-ai.test'),

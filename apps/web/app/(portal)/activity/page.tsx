@@ -4,6 +4,8 @@ import Link from 'next/link';
 import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { ActivityWeek, api, hoursAndMinutes, MODE_LABEL, timeIn, WorkLog, WorkMode, WorkSession, zonedIso } from '@/lib/api';
 import { useSession } from '@/lib/session';
+import { Users } from 'lucide-react';
+import { PageHeader } from '@/components/ui';
 
 const MODES = Object.keys(MODE_LABEL) as WorkMode[];
 const dayName = (d: string) => new Date(`${d}T00:00:00Z`).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short', timeZone: 'UTC' });
@@ -34,8 +36,8 @@ export default function MyDayPage() {
     return () => clearInterval(t);
   }, [data?.open]);
 
-  if (!me.employee) return <><h1>My day</h1><div className="notice">Only employees record their working time.</div></>;
-  if (!data) return <><h1>My day</h1>{error ? <div className="notice error">{error}</div> : <p className="muted">Loading…</p>}</>;
+  if (!me.employee) return <><PageHeader title="My day" /><div className="notice info">Only employees record their working time.</div></>;
+  if (!data) return <><PageHeader title="My day" />{error ? <div className="notice error">{error}</div> : <div className="loading"><span className="spinner" /> Loading your week…</div>}</>;
 
   const tz = data.timeZone;
   const editable = (date: string) => date >= data.editableFrom && date <= data.today;
@@ -89,11 +91,11 @@ export default function MyDayPage() {
 
   return (
     <>
-      <h1>My day</h1>
-      <p className="muted">
-        Clock in when you start work and out when you finish, and note what you worked on.{' '}
-        {can('MANAGER', 'HR', 'PAYROLL') && <Link href="/activity/team">See team activity</Link>}
-      </p>
+      <PageHeader
+        title="My day"
+        sub="Clock in when you start work and out when you finish, and note what you worked on. Only times, work mode and notes are recorded (POL-21)."
+        actions={can('MANAGER', 'HR', 'PAYROLL') && <Link className="button secondary" href="/activity/team"><Users size={16} /> Team attendance</Link>}
+      />
       {error && <div className="notice error">{error}</div>}
 
       <div className="grid">
